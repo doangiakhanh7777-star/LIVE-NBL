@@ -17,7 +17,7 @@ try:
             ctypes.windll.user32.MessageBoxW(None,'NBL LIVE đang mở. Dùng cửa sổ hiện tại để tránh chạy trùng lịch.','NBL LIVE',0x40)
             raise SystemExit(0)
     os.chdir(base)
-    runpy.run_path(str(base/'app.py'),run_name='__main__')
+    runpy.run_path(str(base/'app_with_api.py'),run_name='__main__')
 except SystemExit:
     raise
 except Exception:
