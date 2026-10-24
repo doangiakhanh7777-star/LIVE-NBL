@@ -1,0 +1,13 @@
+BỘ ĐỌC TIẾNG VIỆT KÈM SẴN — NBL LIVE 4.0.2
+
+Đã kèm rec.onnx, keys.txt và thông tin nguồn MODEL_INFO.json.
+Mô hình: PP-OCRv6 medium, OcrDoc Run 6, có đủ bảng chữ tiếng Việt.
+Nguồn tác giả: https://huggingface.co/truonggiabao7/ocrdoc-models
+Giấy phép trọng số: Apache-2.0 (xem LICENSE-PaddleOCR.txt).
+Mô hình được tinh chỉnh trên giấy tờ; đã thử riêng các dòng giao diện mẫu.
+Điều này không bảo đảm mọi ảnh chụp LIVE Studio đều đọc chính xác.
+
+NBL báo mô hình thực sự đang nạp tại Tin nhắn & chào khách và trong gói
+chẩn đoán. Nếu nạp lỗi sẽ hiện rõ, không âm thầm chuyển về mô hình khác.
+Nếu bạn tự thay mô hình/bảng ký tự, app hiển thị Mô hình tùy chỉnh.
+Thay sai cặp có thể gây đọc sai; cài lại gói đầy đủ khi cần khôi phục.

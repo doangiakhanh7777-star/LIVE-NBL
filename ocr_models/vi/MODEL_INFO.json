@@ -1,0 +1,8 @@
+{
+  "name": "PP-OCRv6 tiếng Việt (OcrDoc Run 6)",
+  "source": "https://huggingface.co/truonggiabao7/ocrdoc-models",
+  "license": "Apache-2.0",
+  "rec_sha256": "767305d37d06728fe9578ff8132595ce23f66139df5e2937fd4131bd1dc34f12",
+  "keys_sha256": "5d801bf60472c4c1b184b6b6843aa2c754d8daf1429247e07658ee0bd79ab448",
+  "note": "Mô hình được tinh chỉnh trên giấy tờ tiếng Việt; đã thử riêng chữ giao diện, chưa kiểm thử LIVE Studio thật."
+}

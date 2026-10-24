@@ -1,0 +1,64 @@
+NBL LIVE 4.0.2 — GÓI SỬA THEO KIỂM TOÁN 17/10/2026
+
+CẬP NHẬT
+1. Kết thúc phiên LIVE đang được NBL quản lý; đóng NBL LIVE và NBL VIDEO.
+2. Giải nén toàn bộ ZIP vào thư mục riêng, chạy CAP_NHAT_4.0.2.bat.
+   Nếu không tự tìm được nơi cài, kéo thư mục NBL đang dùng thả vào file BAT.
+3. Chờ DA CAP NHAT NBL LIVE 4.0.2. Tệp hỏng hoặc kiểm tra sau cài lỗi sẽ
+   chặn cập nhật/khôi phục bản trước. Mỗi lần có thư mục sao lưu riêng.
+4. Chrome: tải lại tiện ích từ CHROME_NBL_LIVE trong thư mục vừa cập nhật,
+   rồi tải lại trang TikTok Shop. Nếu tiện ích được nạp từ nơi cũ khác,
+   gỡ tiện ích cũ và nạp lại đúng thư mục mới. App và tiện ích đều phải là 4.0.2.
+5. Mở NBL như bình thường. Thiết lập đã lưu theo nick được giữ lại.
+
+GIỮ NGUYÊN CÁCH DÙNG
+- Chọn nick ở đầu app. Nội dung theo nick; các nút có thể dùng chung.
+- Tin nhắn định kỳ chỉnh trong NBL, gửi qua LIVE Studio trên máy tính.
+- Trả lời bình luận, giỏ hàng và ghim sản phẩm thực hiện trên Chrome.
+- Ghim và nghỉ sau khi tháo ghim là hai khoảng riêng; xáo trộn sản phẩm.
+- Từng mục có nút bật/dừng riêng, không tự gửi lại khi chưa chắc đã gửi.
+
+GIỚI HẠN SỐ NICK
+App lưu tối đa 16 phiên/nguồn video, nhưng bộ điều khiển LIVE Studio hiện
+chỉ có tối đa 2 hồ sơ nick. Lưu hai hồ sơ không tự tạo hai phiên Studio,
+không xác nhận TikTok cho mở hai phiên trên mọi máy. Hai nick thật đồng
+thời và đường âm thanh riêng vẫn cần kiểm tra trên máy Windows vận hành.
+
+NHẮN MẪU / CHÀO
+Ô nhập đọc chưa rõ hoặc lệnh chờ quá lâu trước khi bấm: tạm hoãn và thử lại.
+Có cảnh báo thật, sai nick hoặc người dùng Dừng: dừng, không tự thử lại.
+Nếu đã gõ nhưng chưa bấm Gửi, tool chỉ xóa bản nháp khi ảnh ô nhập chưa đổi
+và vẫn đúng ô nhận phím; cần xác nhận ô trống mới cho phép thử lại.
+Nếu không xóa/xác nhận được thì giữ lại và báo rõ để kiểm tra.
+Không xóa bản nháp đã bị người dùng thay đổi hoặc tự gửi lại tin không rõ kết quả.
+Số, tiền, số điện thoại, dấu âm, phần trăm và từ phủ định vẫn được bảo vệ.
+OCR nhầm chữ rn/m và một lỗi nhỏ trong từ dài có dung sai giới hạn.
+
+KHI ĐÓNG APP
+NBL thử kết thúc lịch trước. Nếu thất bại, app hỏi có đóng ngay không và
+nói rõ LIVE có thể còn đang chạy. Chọn Không để tiếp tục kiểm tra; chọn Có
+thì ngừng tác vụ NBL, giữ lịch ở trạng thái cần kiểm tra khi mở lại.
+Đóng NBL không phải bằng chứng TikTok đã kết thúc phiên LIVE.
+
+KHI TỆP LỊCH HỎNG
+NBL giữ bản lỗi, thử bản .bak hoặc cứu các phần hợp lệ và hiện thông báo.
+Lịch chờ lấy từ bản khôi phục không được tự mở LIVE cũ; kiểm tra/tạo lại lịch.
+
+KIỂM TRA VÀ BÁO LỖI
+- KIEM_TRA_WINDOWS.bat: mở một cửa sổ thử riêng để kiểm tra UI Automation
+  nhận nhãn cảnh báo, đếm ngược và bỏ qua dòng chat. Không bấm TikTok.
+  Kết quả nếu đạt lưu tại LOCALAPPDATA\NBL_LIVE_2\native_alarm_check.json.
+- Quản lý nick → Xuất gói chẩn đoán để gom lỗi và kết quả kiểm tra trên máy.
+- Bộ kiểm tra phát triển: cài requirements-test.txt, cần Node và PowerShell;
+  chạy python run_tests.py từ thư mục ZIP đầy đủ có thư mục tests.
+  TEST_RESULT.json ghi rõ số đạt, lỗi và bỏ qua.
+- Đo OCR với ảnh đã có nhãn: python benchmark_studio_ocr.py labels.json.
+  Xem mẫu cấu trúc nhãn ở đầu tệp đó. Chương trình chạy hoàn toàn offline,
+  kiểm tra ảnh trùng và không đánh ảnh tạo/mẫu thành nghiệm thu Studio thật.
+
+TRẠNG THÁI BÀN GIAO
+Đã chạy kiểm tra mã/Qt/OCR/PowerShell và giao dịch cập nhật trong môi trường
+phát triển. Chưa có 20 ảnh Studio thật có nhãn; chưa có Windows/LIVE Studio
+thật trong môi trường này. Vì vậy chưa ghi đạt nghiệm thu vận hành và chưa
+đề nghị chạy không người trông. Đọc BIEN_BAN_KHAC_PHUC_4.0.2.md.
+Đây là gói cập nhật cho NBL 3.9/4.0/4.0.1 có runtime, không là bộ cài độc lập.

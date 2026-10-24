@@ -1,0 +1,15 @@
+NBL LIVE 4.0.2 — BỘ CÀI ĐẦY ĐỦ CHO WINDOWS 10/11 64-BIT
+
+1. Đóng NBL LIVE cũ. Chạy NBL_LIVE_Setup_4.0.2.exe rồi bấm Tiếp tục > Cài đặt.
+2. Có sẵn Python, thư viện video và OCR. Không cần cài Python hay VLC riêng để mở NBL LIVE.
+3. Mở bằng biểu tượng NBL LIVE 4.0.2 mới trên màn hình. Thiết lập nick cũ được giữ lại.
+4. Chrome: mở chrome://extensions, bật Chế độ nhà phát triển. Nếu dùng tiện ích cũ tại cùng thư mục, bấm Tải lại. Nếu tiện ích cũ nằm ở thư mục khác, sao lưu hoặc đồng bộ thiết lập vào app trước, tắt tiện ích cũ rồi bấm Tải tiện ích đã giải nén và chọn thư mục CHROME_NBL_LIVE trong thư mục cài 4.0.2. Không bật hai bản tiện ích NBL cùng lúc. Tải lại trang TikTok Shop và kết nối app.
+5. Tìm thư mục tiện ích: menu Start > NBL LIVE 4.0.2 > Thư mục tiện ích Chrome.
+6. Giữ TikTok LIVE Studio đang dùng; đăng nhập nick và kiểm tra lựa chọn nút/vùng ảnh trước khi chạy lịch.
+7. Nếu Setup báo kiểm tra chưa đạt: không chạy LIVE bằng bản vừa cài. Gửi SETUP_CHECK.log trong thư mục cài để tìm nguyên nhân. Bản cũ vẫn ở nguyên thư mục cũ.
+
+Bộ cài giữ dữ liệu nick/lịch tại %LOCALAPPDATA%\NBL_LIVE_2 khi cài và khi gỡ. Gỡ ứng dụng chỉ xóa các tệp của bộ cài, giữ các tệp khác do người dùng thêm.
+Bản này cài vào thư mục riêng, không tự xóa bản cũ. Dùng đúng biểu tượng có số 4.0.2 để tránh mở nhầm. Không mở đồng thời hai bản NBL LIVE.
+
+GIỚI HẠN KIỂM TRA
+Mã 4.0.2 đã đạt 103 bài Python và 17 bài JavaScript trong môi trường kiểm tra ghi trong KET_QUA_KIEM_TRA.txt. Bộ Setup đã được kiểm tra đóng gói và toàn vẹn tệp, chưa chạy trên Windows thật. Chưa xác nhận OCR với 20 ảnh LIVE Studio thật (M05). Cần chạy thử có người theo dõi trên máy sử dụng trước khi vận hành chính thức.

@@ -1,0 +1,188 @@
+NBL LIVE 4.1 — HƯỚNG DẪN CẬP NHẬT VÀ SỬ DỤNG (19/10/2026)
+
+=====================================================================
+A. CẬP NHẬT TỪ 4.0.2 (giữ nguyên nick, vùng khoanh ảnh, lịch, tin nhắn)
+=====================================================================
+1. Bấm Dừng nhắn mẫu / Dừng Chào, đóng NBL LIVE và mọi cửa sổ NBL VIDEO.
+2. Giải nén gói 4.1 ra một thư mục RIÊNG (không giải nén đè vào thư mục NBL).
+3. Bấm đúp CAP_NHAT_4.1.bat. Nếu báo không tìm thấy NBL: kéo thả thư mục cài
+   NBL (thư mục có app.py, ví dụ C:\Users\ADMIN\Desktop\4.0.2) vào file .bat.
+   Tệp tự kiểm tra gói, sao lưu bản cũ vào _sao_luu\truoc_4.1_..., chép đè,
+   rồi kiểm tra lại. Lỗi ở bất kỳ bước nào thì tự khôi phục bản cũ.
+4. Chrome: mở chrome://extensions → tiện ích TOOL NBL LIVE → bấm Tải lại.
+   Số phiên bản phải là 4.1.0. Nếu vẫn 4.0.x: bấm Chi tiết xem "Nguồn", Xóa
+   tiện ích đó → Tải tiện ích đã giải nén → chọn thư mục CHROME_NBL_LIVE trong
+   thư mục NBL. Tải lại trang Bảng điều khiển LIVE của TikTok Shop.
+5. Dán mã kết nối vào tiện ích MỘT lần. Từ 4.1 tiện ích nhớ mã: tắt Chrome
+   mở lại, mở lại tab LIVE là tự nối lại.
+
+=====================================================================
+B. LỊCH LIVE TỰ ĐỘNG — CHẠY THẾ NÀO
+=====================================================================
+Mỗi lịch: nick, giờ bắt đầu, giờ kết thúc, các clip, và "Bộ sản phẩm số"
+(1 = bộ đầu tiên từ trên xuống trong mục Bộ sản phẩm TRỰC TIẾP của Chrome).
+
+1. Ngay khi lưu lịch (hoặc ngay sau khi phiên trước của nick đó kết thúc),
+   NBL lên Chrome thêm sẵn bộ sản phẩm đã chọn vào giỏ:
+   - Giỏ đã có sản phẩm (anh thêm tay) → bỏ qua, coi như sẵn sàng.
+   - Món hết hàng không vào được giỏ ("Đã thêm 8/10") → vẫn tính là xong.
+   - Lỗi → thử lại sau 5 phút, tối đa 3 lần, mỗi lần báo Telegram.
+   - Nick đang LIVE thì CHỜ phiên đó xong mới thêm (không thêm vào phiên đang chạy).
+2. Khoảng 2 phút trước giờ phát, NBL kiểm tra lại giỏ. Giỏ trống (ví dụ bị
+   TikTok cưỡng chế xoá) → thêm lại 1 lần.
+3. KHÔNG CÓ GIỎ THÌ KHÔNG PHÁT (phát không giỏ dễ bị khoá nick). Lịch "Phiên này
+   không bán hàng" thì không cần giỏ.
+4. Tới giờ: NBL VIDEO phát lại TỪ CLIP ĐẦU (luôn lặp lại, bỏ ô "lặp lại") →
+   NBL bấm "Phát LIVE" trên Studio → chờ đồng hồ LIVE chạy → bấm "Ghép" cửa sổ
+   Trò chuyện nổi → bật nhắn mẫu / chào khách (nếu đã tích "Bật cùng lịch LIVE")
+   → bật ghim + trả lời bình luận trên Chrome.
+5. App trễ giờ (máy bận, vừa mở lại app…) vẫn phát bù, giữ nguyên giờ kết thúc.
+   Phát chưa được → thử lại mỗi 30 giây, mỗi lần báo Telegram, tới khi còn dưới
+   1 phút của khung giờ thì bỏ lịch.
+6. Hết giờ: bấm đồng hồ → "Kết thúc LIVE" (không bao giờ bấm "Tạm dừng LIVE") →
+   "Kết thúc ngay" → đóng trang tổng kết Studio (dấu X) → đóng bảng tổng kết
+   Chrome. Lỗi → thử lại mỗi 30 giây, tối đa 5 lần, mỗi lần báo Telegram; sau 5
+   lần báo "LIVE CÓ THỂ VẪN ĐANG CHẠY" để anh tắt tay.
+7. MÀN HÌNH ĐEN: đang LIVE mà FPS = 0 hoặc Tải lên = 0 kbps → báo Telegram ngay,
+   cho NBL VIDEO phát lại từ đầu 1 lần; đen quá 2 phút → tự kết thúc LIVE.
+8. Tắt app rồi mở lại giữa phiên: NBL tự kiểm tra Studio, đang LIVE thì chạy
+   tiếp nhắn mẫu / chào khách / ghim; hết giờ thì kết thúc như thường.
+
+Ghim sản phẩm (Chrome): ghim theo SỐ THỨ TỰ trên giỏ của phiên đó (món chủ đạo
+đặt đầu bộ). Danh sách số ghim dùng chung theo nick. Thứ tự ghim được xáo trộn
+ngẫu nhiên mỗi vòng. Số không có trên giỏ thì bỏ qua.
+
+=====================================================================
+C. 2 NICK LIVE CÙNG LÚC TRÊN 1 MÁY
+=====================================================================
+- Mỗi nick một cửa sổ TikTok LIVE Studio và một cửa sổ NBL VIDEO riêng.
+- ÂM THANH: 2 NBL VIDEO cùng phát ra MỘT loa thì Studio nào cũng thu cả 2 tiếng.
+  Chọn "thiết bị âm thanh" riêng cho từng NBL VIDEO (ví dụ cài VB-Cable / Voicemeeter,
+  mỗi Studio nghe một thiết bị) hoặc tắt tiếng một phiên. NBL cảnh báo khi lưu
+  lịch trùng giờ khác nick và báo Telegram khi 2 phiên dùng chung loa.
+- Mọi thao tác trên Studio đi qua MỘT hàng đợi: 2 phiên cùng lúc thì mỗi việc
+  (gửi tin, chào khách, kiểm tra) chậm hơn. Không đặt khoảng cách nhắn quá dày.
+- KHÔNG đóng cửa sổ NBL VIDEO giữa các phiên: Studio quay theo cửa sổ đó.
+
+=====================================================================
+D. CÁC BẢN VÁ ĐÃ GỘP VÀO 4.1 (vá lần 1 → 15 ngày 18/10/2026)
+=====================================================================
+- Ảnh tên nick so có dung sai (chuột lướt qua, lệch 1-2 điểm ảnh vẫn nhận).
+- "Studio bị cửa sổ khác che": chỉ xét vùng dùng tới, chấp nhận cửa sổ của Studio.
+- Đồng hồ LIVE nằm trong nút đỏ: đọc nhiều cách; tính giờ theo lúc chụp ảnh.
+- Lệnh chờ quá hạn: 20 giây chỉ là hạn bắt đầu; mỗi việc có tới 90 giây.
+- Quét cảnh báo lần 2 chỉ đọc chỗ thay đổi (nhanh hơn nhiều).
+- Ô nhắn tin: kiểm tra và dán bằng copy/paste (Ctrl+A, Ctrl+C, Ctrl+V), so từng
+  ký tự kể cả câu dài 2–3 dòng; trả lại clipboard sau khi gửi. Gửi bằng Enter,
+  Enter lần 2, rồi mới bấm giữa vùng nút Gửi.
+- Ô trống nhận cả bằng điểm ảnh (con trỏ nhấp nháy không còn làm hoãn).
+- Tự đưa Studio lên trước (4 cách, chờ tới 1 giây mỗi cách); mất Studio giữa
+  chừng thì tự kéo lại.
+- Tự ghép cửa sổ Trò chuyện nổi; tự đóng thông báo (OK / Đã hiểu / Đóng…), không
+  bấm captcha, xác minh, kết thúc, xoá, đăng xuất, thanh toán.
+- Báo cáo: Thiết lập & cảnh báo → Mở báo cáo hoạt động / Mở báo cáo lỗi (mỗi loại
+  giữ 100 bản mới nhất, tên tệp theo ngày giờ, kèm ảnh khi lỗi).
+- Chrome: tự nối lại; tự đóng thông báo trên trang LIVE; báo cáo phần Chrome.
+- Bảng NBL trên trang Chrome mặc định ở góc dưới bên phải (không che Phân tích LIVE).
+
+=====================================================================
+E. GIỚI HẠN CÒN LẠI — ĐỌC KỸ
+=====================================================================
+- Bản 4.1 đã chạy kiểm thử tự động (mô phỏng Studio/Chrome theo ảnh anh gửi);
+  thao tác thật trên máy Windows của anh CHƯA được kiểm chứng. Hãy chạy thử 1 lịch
+  ngắn (5–10 phút) có người ngồi canh trước khi để máy tự chạy.
+- Giữ kích thước / vị trí cửa sổ Studio như lúc khoanh vùng đọc bằng ảnh.
+- Studio phải hiện trên màn hình; NBL sẽ đưa Studio lên trước khi thao tác.
+- Không có tính năng né vi phạm. Nhắn / chào quá dày có thể bị coi là spam.
+
+=====================================================================
+F. BẢN VÁ 4.1.1 (19/10/2026)
+=====================================================================
+- BỎ HẲN tính năng "Đăng nhập TikTok Shop bằng QR" (trang, menu, tiện ích Chrome).
+  Chrome chỉ liên kết với NBL bằng MÃ GHÉP ĐÔI: Giỏ hàng & trả lời · Chrome →
+  Sao chép mã → dán vào tiện ích → Kết nối với app → "Dùng Chrome này cho nick
+  đang chọn". Đăng nhập TikTok Shop thì làm trên Chrome như bình thường.
+- Bấm "Dùng Chrome này cho nick đang chọn" mà trang chưa đọc được tên nick: NBL
+  không nhảy sang trang QR nữa mà báo rõ cần làm gì (mở đúng trang Bảng điều
+  khiển LIVE, hoặc chọn mục "Tên tài khoản" trong bảng NBL trên Chrome).
+- Trang LIVE trả lời chậm / đang tải lại không còn làm tiện ích tự ngắt kết nối
+  ("Tab Chrome ngắt kết nối: received 1005"). Lệnh của lượt đó không được xác
+  nhận nên NBL không ghi thành công giả.
+- Tiện ích Chrome lên 4.1.1 (chrome://extensions → Tải lại).
+
+=====================================================================
+G. BẢN VÁ 4.1.2 (19/10/2026) — gồm luôn 4.1.1
+=====================================================================
+- Phát / Kết thúc LIVE theo lịch CHỈ làm bằng đọc ảnh Studio. Nick chưa khoanh
+  vùng (Tin nhắn & chào khách → Thiết lập đọc bằng ảnh: "Đồng hồ LIVE" và
+  "Khung chat") thì:
+  · không cho lưu lịch mới, báo rõ cần khoanh vùng;
+  · lịch đã có: không bấm gì trên Studio, báo Telegram cần khoanh vùng, cứ 30
+    giây kiểm tra lại; khoanh xong là tự phát (nếu còn trong khung giờ).
+- Trước đây nick chưa khoanh vùng bị đưa về cách bấm nút cũ của 4.0.2 và lỗi
+  "LIVE state unknown; no confirmed live/offline indicator".
+- VIDEO (theo cách setup của chủ shop 19/10 02:40): mở sẵn NBL VIDEO của nick
+  (Video & âm thanh → MỞ & PHÁT) và gắn vào Studio. Lịch KHÔNG chọn clip nữa.
+  Tới giờ NBL chỉ cho chính cửa sổ NBL VIDEO đó PHÁT LẠI TỪ ĐẦU, rồi mới bấm
+  Phát LIVE. NBL không đổi danh sách video, không mở cửa sổ thứ hai (kể cả khi
+  NBL vừa mở lại mà NBL VIDEO cũ vẫn chạy), và KHÔNG BAO GIỜ DỪNG VIDEO (hết LIVE,
+  lỗi, bỏ lịch... video vẫn chạy). Trước đây NBL dừng video khi bỏ lịch → Studio
+  đen màn hình.
+- Nick chưa có video trong trang Video & âm thanh thì không cho lưu lịch.
+
+=====================================================================
+H. BẢN VÁ 4.1.3 (19/10/2026) — gồm luôn 4.1.1 và 4.1.2
+=====================================================================
+Lỗi chủ shop gặp 03:33: lịch đầu chạy, lịch mới không chạy; trang tổng kết trên
+Studio ("Đã kết thúc! 2 người xem đã tham gia…") và bảng "Chúc mừng…" trên Chrome
+không đóng.
+- Studio: nhận được thêm các kiểu trang tổng kết ("Đã kết thúc!", "Tổng số lượt
+  xem", "Tạm tính phiên LIVE này"…); đóng bằng dấu X cùng hàng "Trung tâm LIVE"
+  (không bao giờ bấm X của cửa sổ Studio), không được thì bấm Esc. Studio hiện
+  nút "Phát LIVE" một chút rồi mới mở trang tổng kết: NBL canh thêm vài giây và
+  đóng luôn. Lịch sau gặp trang tổng kết cũ thì đóng rồi mới bấm Phát LIVE.
+- Chrome: bảng "Chúc mừng…" được tìm theo chữ (không cần đúng kiểu hộp thoại),
+  bấm dấu X như chuột thật; tiện ích TỰ ĐÓNG bảng này bất cứ lúc nào nó hiện ra.
+  Thêm giỏ vẫn chạy tiếp nếu chưa đóng được bảng.
+- Lịch kẹt "Cần kiểm tra" không còn chặn lịch sau: NBL xem lại Studio mỗi 15
+  giây; LIVE đã tắt thì lịch đó xong, lịch sau được thêm giỏ và phát. LIVE còn
+  chạy quá giờ kết thúc thì 3 phút thử kết thúc lại một lần và báo Telegram.
+- Giỏ hàng: Chrome đang bận (ghim/trả lời của phiên trước, thao tác khác) không
+  tính là lần lỗi, 20 giây thử lại. Lỗi thật gần giờ LIVE thử lại sau 1 phút
+  (còn xa thì 5 phút), tối đa 3 lần.
+- Chưa có quy tắc trả lời trên Chrome = không dùng trả lời tự động: NBL chỉ bật
+  ghim, không báo lỗi. Ghim không bật được thì báo rõ lý do.
+- LĂN CHUỘT trong app: không còn đổi số, ngày giờ, ô chọn, thanh âm lượng; lăn
+  chuột chỉ cuộn trang. Danh sách và ô chữ vẫn cuộn bình thường.
+- Tiện ích Chrome lên 4.1.3 (chrome://extensions → Tải lại).
+
+=====================================================================
+I. BẢN VÁ 4.1.4 (19/10/2026) — gồm luôn 4.1.1 → 4.1.3
+=====================================================================
+Lỗi chủ shop gặp 04:09 (video): Studio mở lại thành cửa sổ mới → lịch 03:13 kẹt
+"Cần kiểm tra" ("Cửa sổ Studio đã đổi"), bấm Hủy / kết thúc chỉ thử kết thúc lại
+và lỗi tiếp, Gỡ liên kết / Kết nối lại bị chặn vì còn lịch → không làm gì được.
+- Studio mở lại: NBL TỰ NHẬN cửa sổ Studio mới nếu chỉ có đúng 1 cửa sổ TikTok
+  LIVE Studio còn trống (không phải của nick khác), vẫn đối chiếu ảnh tên nick
+  trước khi bấm. Không chắc (2 Studio) thì báo: Kết nối LIVE Studio → chọn lại.
+- Hủy / kết thúc lịch đã chọn: có 3 lựa chọn — "Kết thúc LIVE" (NBL bấm kết
+  thúc trên Studio), "Chỉ hủy lịch" (NBL bỏ lịch NGAY, không bấm gì trên Studio;
+  LIVE còn chạy thì bạn tự tắt), "Thôi".
+- Lịch kẹt "Cần kiểm tra" / "Đang thử kết thúc lại" không còn chặn Kết nối LIVE
+  Studio và Thiết lập đọc bằng ảnh.
+- Đóng NBL LIVE KHÔNG đóng NBL VIDEO nữa (video vẫn chạy, Studio vẫn có hình);
+  mở lại NBL là nhận lại cửa sổ đó.
+- LƯU Ý NGUỒN STUDIO: nguồn quay đang là "pythonw.exe". Nếu NBL VIDEO bị đóng,
+  Studio có thể quay nhầm cửa sổ NBL LIVE (cũng là pythonw.exe) lên LIVE. Luôn để
+  NBL VIDEO mở; nếu Studio cho chọn theo tên cửa sổ thì chọn "NBL VIDEO xx — …".
+
+=====================================================================
+J. BẢN VÁ 4.1.5 (19/10/2026) — gồm 4.1.1 → 4.1.4
+=====================================================================
+- Lên nhiều lịch cùng lúc: lịch sau không còn "dính" giỏ của lịch trước. Lịch có
+  bộ số (1, 2, 3…): NBL XOÁ giỏ cũ (Tất cả → Xoá → xác nhận) rồi thêm đúng bộ
+  của lịch. Không xoá được thì thêm bộ mới lên ĐẦU giỏ (số ghim 1, 2, 3… vẫn là
+  bộ mới) và ghi báo cáo lỗi.
+- Bộ số 0 = "giữ giỏ tự thêm tay": NBL không đụng giỏ; giỏ trống thì không phát.
+- Lịch đã "giỏ sẵn sàng" từ bản cũ được chuẩn bị lại một lần cho đúng bộ.
+- Tiện ích Chrome 4.1.5 (chrome://extensions → Tải lại → tải lại trang LIVE).

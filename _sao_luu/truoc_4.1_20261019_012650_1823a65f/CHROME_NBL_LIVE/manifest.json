@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "TOOL NBL LIVE — Trợ lý LIVE",
+  "version": "4.0.2",
+  "description": "Ghim sản phẩm và trả lời bình luận trên Chrome cho NBL LIVE 4.0.",
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://shop.tiktok.com/streamer/live/product/dashboard*"
+      ],
+      "js": [
+        "engine.js",
+        "modules.js",
+        "pin_engine.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://shop.tiktok.com/*",
+        "https://seller-vn.tiktok.com/*",
+        "https://www.tiktok.com/login*"
+      ],
+      "js": [
+        "shop_login.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "minimum_chrome_version": "120",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "https://shop.tiktok.com/*",
+    "https://seller-vn.tiktok.com/*",
+    "https://www.tiktok.com/login*"
+  ]
+}
