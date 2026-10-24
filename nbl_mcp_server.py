@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 
 SERVER_NAME = "nbl-live"
-SERVER_VERSION = "1.0.0"
+SERVER_VERSION = "1.0.1"
 DEFAULT_TOKEN_FILE = "/mnt/c/Users/ADMIN/AppData/Local/NBL_LIVE_2/local_api_token.txt"
 
 
@@ -75,21 +75,42 @@ def http(method, path, body=None):
 
 
 def tool_defs():
+    read_only = {
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    }
+    write_safe = {
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    }
+    destructive = {
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    }
     return [
         {
             "name": "nbl_accounts",
             "description": "List NBL LIVE accounts/sessions and whether each account is connected to TikTok LIVE Studio.",
             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+            "annotations": read_only,
         },
         {
             "name": "nbl_schedules",
             "description": "List all NBL LIVE Studio schedules and their current states.",
             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+            "annotations": read_only,
         },
         {
             "name": "nbl_live_status",
             "description": "Return active NBL LIVE Studio schedules and live-control states.",
             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+            "annotations": read_only,
         },
         {
             "name": "nbl_create_schedule",
@@ -110,6 +131,7 @@ def tool_defs():
                 "required": ["start", "end"],
                 "additionalProperties": False,
             },
+            "annotations": write_safe,
         },
         {
             "name": "nbl_cancel_schedule",
@@ -120,6 +142,7 @@ def tool_defs():
                 "required": ["id"],
                 "additionalProperties": False,
             },
+            "annotations": destructive,
         },
         {
             "name": "nbl_stop_schedule",
@@ -130,6 +153,7 @@ def tool_defs():
                 "required": ["id"],
                 "additionalProperties": False,
             },
+            "annotations": destructive,
         },
     ]
 
