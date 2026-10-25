@@ -72,7 +72,7 @@ class LocalAPI:
                 return self.reply(item['status'],{'ok':True,'data':item['result']})
             def do_GET(self):
                 p=urlparse(self.path).path.rstrip('/') or '/'
-                if p=='/health':return self.reply(200,{'ok':True,'app':'NBL LIVE','api':'1.0','port':api.port,'auth':'bearer'})
+                if p=='/health':return self.reply(200,{'ok':True,'app':'NBL LIVE','api':'1.1','port':api.port,'auth':'bearer'})
                 if p=='/api/accounts':return self.call('accounts')
                 if p=='/api/schedules':return self.call('schedules')
                 if p=='/api/live/status':return self.call('status')
@@ -85,6 +85,8 @@ class LocalAPI:
                         return self.call('cancel',{'id':p.split('/')[-2]})
                     if p.startswith('/api/schedules/') and p.endswith('/stop'):
                         return self.call('stop',{'id':p.split('/')[-2]})
+                    if p.startswith('/api/schedules/') and p.endswith('/cart/retry'):
+                        return self.call('retry_cart',{'id':p.split('/')[-3]})
                     return self.reply(404,{'ok':False,'error':'Not found'})
                 except APIError as e:return self.reply(e.status,{'ok':False,'error':e.message})
             def do_DELETE(self):
@@ -149,11 +151,13 @@ class LocalAPI:
     def job_json(self,j):
         panel=self.panel(); p=panel.profile(j.get('profile')) if j.get('profile') else None
         s=next((x for x in self.owner.data.get('sessions',[]) if p and x.get('id')==p.get('session')),None)
+        cart=j.get('cart') or {}
         return {'id':j.get('id'),'state':j.get('state'),'error':j.get('error',''),
                 'start':j.get('start'),'end':j.get('end'),'account_number':(s or {}).get('number'),
                 'account':(p or {}).get('accountName') or (s or {}).get('account') or 'Nick '+str((s or {}).get('number')),
                 'profile_id':j.get('profile'),'no_sales':bool(j.get('no_sales')),
-                'bundle_index':j.get('bundle_index',0),'cart_state':(j.get('cart') or {}).get('state')}
+                'bundle_index':j.get('bundle_index',0),'cart_state':cart.get('state'),
+                'cart_attempts':int(cart.get('attempts',0) or 0)}
 
     def find_job(self,jid):
         j=next((x for x in self.panel().jobs if x.get('id')==str(jid)),None)
@@ -202,6 +206,33 @@ class LocalAPI:
                 try:panel.submit(j,'stop')
                 except Exception as e:j['state']='attention';j['error']=str(e)[:500];raise APIError(409,str(e)) from e
             panel.save();panel.render();return self.job_json(j)
+        if action=='retry_cart':
+            j=self.find_job(data.get('id'));state=j.get('state')
+            if j.get('no_sales'):raise APIError(409,'Lịch này là phiên không bán hàng, không có giỏ để thử lại.')
+            if state not in ('pending','start_retry'):
+                raise APIError(409,'Chỉ được tải lại giỏ trước khi LIVE bắt đầu.')
+            cart=j.setdefault('cart',dict(state='none',attempts=0,next=0))
+            if cart.get('command'):
+                raise APIError(409,'Giỏ đang xử lý một lệnh khác; đợi lệnh hiện tại xong rồi thử lại.')
+            probe=cart.get('probe') or {};now=time.time()
+            if probe.get('live') is True:
+                raise APIError(409,'Nick đang LIVE; không tải lại trang giỏ.')
+            if probe.get('live') is not False or now-float(probe.get('at',0) or 0)>120:
+                try:panel.submit(j,'live_probe')
+                except Exception as e:raise APIError(409,'Chưa xác nhận nick không LIVE: '+str(e)) from e
+                raise APIError(409,'Chưa xác nhận nick không LIVE. NBL vừa yêu cầu kiểm tra Studio; thử lại lệnh sau khi trạng thái được cập nhật.')
+            p=panel.profile(j.get('profile'))
+            if not p:raise APIError(404,'Không tìm thấy profile của lịch.')
+            try:
+                session,client=panel.client(p)
+                self.owner.bridge.command(client,dict(action='reload_dashboard',module='all',expectedAccount=session.get('chrome_binding',{}).get('account') or p.get('name','')))
+            except Exception as e:raise APIError(409,'Không tải lại được trang giỏ: '+str(e)) from e
+            for key in ('command','kind','until','wait','gave_up','fallback_checked','fallback','verified','waiting_noted','reload_after_failure'):
+                cart.pop(key,None)
+            cart.update(state='none',attempts=0,next=now+10)
+            j['error']='Đã tải lại trang giỏ; chờ thử thêm lại bộ sản phẩm'
+            panel.save();panel.render()
+            return {'schedule':self.job_json(j),'reload_requested':True,'retry_in_seconds':10}
         raise APIError(404,'Action not found')
 
     def close(self):
