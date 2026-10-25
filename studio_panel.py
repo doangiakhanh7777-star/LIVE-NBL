@@ -31,11 +31,13 @@ def video_problem(session):
  if not playlist:raise ValueError('Nick này chưa có video: vào trang Video & âm thanh → Thêm video → MỞ & PHÁT, rồi gắn cửa sổ NBL VIDEO vào Studio.')
  lost=[x for x in playlist if not Path(x).is_file()]
  if lost:raise ValueError('Video không còn trong máy: '+lost[0]+' (trang Video & âm thanh). Chưa bấm gì trên Studio.')
+POSTPONE=1800        # 4.1.7: a hand-started LIVE at schedule time is ended and the schedule moves 30 minutes
+PROBE_GAP=60         # 4.1.7: how often a nick waiting for its cart is looked at on Studio
 STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử kết thúc lại','pending':'Chờ đến giờ','preparing':'Đang chuẩn bị','starting':'Đang mở LIVE','running':'Đang LIVE','stopping':'Đang kết thúc','finished':'Đã kết thúc','failed':'Cần kiểm tra','attention':'Cần kiểm tra','manual_stop':'Đã dừng thủ công','skipped':'Đã bỏ lịch quá giờ','cancelled':'Đã hủy','recovery_review':'Cần kiểm tra sau khi mở lại app','recovering':'Đang kiểm tra'}
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.1.6 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.1.7 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
@@ -271,7 +273,7 @@ class StudioPanel(QWidget):
   selected=self.selected_job();selected_id=selected['id'] if selected else None;self.list.clear();p=self.current_profile()
   for j in self.jobs:
    if not p or j['profile']!=p['id']:continue
-   cart=j.get('cart',{});cart_text='' if j.get('no_sales') else ' · '+('giỏ tự thêm' if j.get('bundle_index')==0 else 'bộ '+str(j.get('bundle_index') or '?'))+': '+{'ready':'giỏ sẵn sàng','preparing':'đang thêm giỏ','failed':'thêm giỏ lỗi'}.get(cart.get('state'),'chờ thêm giỏ')
+   cart=j.get('cart',{});cart_text='' if j.get('no_sales') else ' · '+('giỏ tự thêm' if j.get('bundle_index')==0 else 'bộ '+str(j.get('bundle_index') or '?'))+': '+('chờ phiên LIVE bật tay kết thúc' if (cart.get('probe') or {}).get('live') and cart.get('state')!='ready' else 'giỏ đang có (không thêm được bộ)' if cart.get('fallback') else 'Chrome bận, chờ thêm giỏ' if cart.get('wait') and cart.get('state')=='none' else {'ready':'giỏ sẵn sàng','preparing':'đang thêm giỏ','failed':'thêm giỏ lỗi'}.get(cart.get('state'),'chờ thêm giỏ'))
    self.list.addItem(time.strftime('%d/%m %H:%M',time.localtime(j['start']))+' → '+time.strftime('%H:%M',time.localtime(j['end']))+' · '+STATE_LABELS.get(j['state'],j['state'])+cart_text+(' · '+j.get('error','') if j.get('error') else ''))
    item=self.list.item(self.list.count()-1);item.setData(Qt.ItemDataRole.UserRole,j['id'])
    if j['id']==selected_id:self.list.setCurrentItem(item)
@@ -296,7 +298,7 @@ class StudioPanel(QWidget):
   except OSError:
    if action!='stop':raise
    self.owner.log('Chưa lưu được lịch; vẫn gửi lệnh kết thúc Studio.')
-  future=self.pool.submit_priority(0 if action=='stop' else 10 if action=='start' else 20,execute,dict(copy.deepcopy(self.effective_profile(p)),_otherHandles=[str(q.get('windowHandle','')) for q in self.profiles if q is not p and q.get('windowHandle')]),'status' if action=='preflight' else action,j['end'] if action=='start' else 0,payload);self.futures[future]=(j['id'],None,action)
+  future=self.pool.submit_priority(0 if action=='stop' else 10 if action=='start' else 20,execute,dict(copy.deepcopy(self.effective_profile(p)),_otherHandles=[str(q.get('windowHandle','')) for q in self.profiles if q is not p and q.get('windowHandle')]),'status' if action in ('preflight','live_probe') else action,j['end'] if action=='start' else 0,payload);self.futures[future]=(j['id'],None,action)
  def notify(self,j,key,text,kind='loi',image=None):
   p=self.profile(j['profile']);name=p['name'] if p else j['profile']
   self.owner.log(name+' · '+text)
@@ -337,10 +339,16 @@ class StudioPanel(QWidget):
       if result.get('warnings'):raise ValueError('Studio đang cảnh báo: '+str(result['warnings']))
       if result.get('live'):
        if j.get('start_attempts'):self.on_started(j,'Studio đã LIVE sau lần bấm trước; nhận lại phiên');continue
-       raise ValueError('Nick đã LIVE trước lịch; không tự tiếp quản')
+       self.end_hand_live(j);continue
       self.start_video(j)
+     elif action=='live_probe':
+      cart=j.setdefault('cart',dict(state='none',attempts=0,next=0));was=(cart.get('probe') or {}).get('live')
+      cart['probe']=dict(at=time.time(),live=bool(result.get('live')))
+      if cart['probe']['live'] and not was:self.owner.log(str(self.profile(j['profile']).get('name',''))+' · Nick đang LIVE (bật tay): chưa đụng giỏ, chờ phiên này kết thúc.')
      elif action=='stop':
       if result.get('live'):raise ValueError('Chưa xác nhận LIVE đã kết thúc')
+      if result.get('studioClosed'):self.owner.log('Không còn cửa sổ TikTok LIVE Studio nào: Studio đã tắt nên LIVE đã dừng.')
+      if j.get('takeover'):self.postpone(j);continue
       self.on_stopped(j)
      elif action=='start':
       if j['state']=='attention':continue
@@ -352,6 +360,8 @@ class StudioPanel(QWidget):
      elif action=='status':
       if j['state'] not in ('running','recovering','attention','recovery_review'):continue
       if not result.get('live'):
+       if j.get('takeover'):self.postpone(j);continue
+       if result.get('studioClosed'):self.owner.log('Không còn cửa sổ TikTok LIVE Studio nào: Studio đã tắt nên LIVE đã dừng.')
        if j.get('dark_stop'):self.on_stopped(j);continue
        if j['state']=='attention' and (j.get('end_stop_attempted') or time.time()>=j['end']):
         self.on_stopped(j);continue
@@ -413,6 +423,10 @@ class StudioPanel(QWidget):
   """Start problems are retried while the slot lasts; stop problems are retried
   STOP_TRIES times; a still-running LIVE is never silently left on."""
   now=time.time();text=str(e)
+  if action=='live_probe':
+   # Not known whether the nick is LIVE: carry on as before 4.1.7 (prepare the cart).
+   cart=j.setdefault('cart',dict(state='none',attempts=0,next=0));cart['probe']=dict(at=now,live=None)
+   self.owner.log('Chưa đọc được Studio để biết nick có đang LIVE không: '+text);return
   if action=='collapse_chat':self.owner.log('Chưa thu được cửa sổ trò chuyện; các mục khác tiếp tục.');return
   if isinstance(e,NotTouched) and action=='status' and j['state']=='running':
    j['probe_failures']=j.get('probe_failures',0)+1
@@ -531,6 +545,7 @@ class StudioPanel(QWidget):
   if j['no_sales']:return True
   cart=j.setdefault('cart',dict(state='none',attempts=0,next=0))
   if cart['state']=='ready' and cart.get('verified'):return True
+  if (cart.get('probe') or {}).get('live'):return True     # preflight sees the hand LIVE → end it, move 30 min
   if not cart.get('waiting_noted'):
    cart['waiting_noted']=True;j['error']='Chờ giỏ hàng sẵn sàng trên Chrome mới phát'
   return False
@@ -549,6 +564,13 @@ class StudioPanel(QWidget):
      p=self.profile(profile);session,client=self.client(p);result=self.owner.bridge.snapshot().get(client,{}).get('control',{})
      if result.get('id')==cart['command'] and result.get('state') in ('done','failed'):
       kind=cart.pop('kind');cart.pop('command',None)
+      if kind=='fallback':
+       try:count=int(float(result.get('count','-1')))
+       except ValueError:count=-1
+       if result.get('state')=='done' and count>0:
+        cart.update(state='ready',verified=True,v415=True,fallback=True);j['error']=''
+        self.notify(j,'cart','⚠ Không thêm được bộ số '+str(j.get('bundle_index'))+' sau 3 lần; LIVE '+time.strftime('%H:%M %d/%m',time.localtime(j['start']))+' vẫn PHÁT với giỏ đang có ('+str(count)+' sản phẩm). Kiểm tra giỏ trên Chrome.')
+       continue
       if kind=='check':
        try:count=int(float(result.get('count','-1')))
        except ValueError:count=-1
@@ -564,18 +586,31 @@ class StudioPanel(QWidget):
      elif now>cart.get('until',0):
       kind=cart.pop('kind',None);cart.pop('command',None)
       if kind=='check':cart['verified']=False
+      elif kind=='fallback':pass
       else:self.cart_failed(j,cart,'Chrome chưa trả lời lệnh thêm giỏ',now)
      continue
     if cart['state'] in ('none','failed') and cart.get('attempts',0)<3 and now>=cart.get('next',0):
+     # 4.1.7: never touch the cart while this nick is LIVE (also a LIVE started by
+     # hand): look at Studio first, at most once a minute.
+     probe=cart.get('probe') or {}
+     if any(key[0]==j['id'] and key[2]=='live_probe' for key in self.futures.values()):continue
+     if now-probe.get('at',0)>=PROBE_GAP:
+      self.submit(j,'live_probe');continue
+     if probe.get('live'):continue
      p=self.profile(profile);session,client=self.client(p)
      cart['command']=self.owner.bridge.command(client,dict(action='prepare_bundle',module='all',bundleIndex=int(j.get('bundle_index') or 0),keepCart=j.get('bundle_index')==0,replace=j.get('bundle_index')!=0,preLive=True,expectedAccount=session.get('chrome_binding',{}).get('account') or p['name']))
-     cart.update(kind='add',until=now+160,state='preparing')
+     cart.update(kind='add',until=now+160,state='preparing');cart.pop('wait',None)
     elif cart['state']=='ready' and not cart.get('verified') and now>=j['start']-120:
      p=self.profile(profile);session,client=self.client(p)
      cart['command']=self.owner.bridge.command(client,dict(action='cart_check',module='all'));cart.update(kind='check',until=now+20)
+    elif cart['state']=='failed' and cart.get('attempts',0)>=3 and not cart.get('gave_up') and not cart.get('fallback_checked'):
+     # 4.1.7 (owner, 21/10/2026): the set could not be added 3 times, but if the
+     # cart still has products the LIVE goes ahead with that cart (with a warning).
+     p=self.profile(profile);session,client=self.client(p)
+     cart['command']=self.owner.bridge.command(client,dict(action='cart_check',module='all'));cart.update(kind='fallback',until=now+20,fallback_checked=True)
     elif cart['state']=='failed' and cart.get('attempts',0)>=3 and not cart.get('gave_up'):
-     cart['gave_up']=True;j['error']='KHÔNG PHÁT: chưa thêm được giỏ hàng sau 3 lần'
-     self.notify(j,'cart','KHÔNG PHÁT LIVE '+time.strftime('%H:%M %d/%m',time.localtime(j['start']))+' vì chưa thêm được giỏ hàng sau 3 lần (phát không có giỏ dễ bị khoá nick).')
+     cart['gave_up']=True;j['error']='KHÔNG PHÁT: chưa thêm được giỏ hàng sau 3 lần và giỏ đang trống'
+     self.notify(j,'cart','KHÔNG PHÁT LIVE '+time.strftime('%H:%M %d/%m',time.localtime(j['start']))+' vì chưa thêm được giỏ hàng sau 3 lần và giỏ đang trống (phát không có giỏ dễ bị khoá nick).')
    except Exception as e:
     if cart.get('command'):continue
     if now>=cart.get('next',0):self.cart_failed(j,cart,str(e),now)
@@ -584,13 +619,33 @@ class StudioPanel(QWidget):
   # job) is not a failed attempt: try again in 20 s. Real failures are retried after
   # 1 minute when the LIVE is near (5 minutes otherwise), at most 3 times.
   if transient:
-   cart.update(state='failed',next=now+20);self.owner.log('Giỏ hàng: Chrome đang bận ('+reason+'); thử lại sau 20 giây.');return
+   cart.update(state='none',next=now+20,wait='Chrome đang bận');self.owner.log('Giỏ hàng: Chrome đang bận ('+reason+'); thử lại sau 20 giây.');return
   gap=60 if j['start']-now<900 else 300
   cart['attempts']=cart.get('attempts',0)+1;cart.update(state='failed',next=now+gap)
   self.notify(j,'cart','Thêm giỏ hàng chưa được (lần '+str(cart['attempts'])+'/3): '+reason+('; thử lại sau '+('1 phút' if gap==60 else '5 phút') if cart['attempts']<3 else ''))
  def close_chrome_summary(self,j):
   try:p=self.profile(j['profile']);session,client=self.client(p);self.owner.bridge.command(client,dict(action='finish_live',module='all',expectedAccount=session.get('chrome_binding',{}).get('account') or p['name']))
   except Exception as e:self.owner.log('Đóng bảng tổng kết Chrome: '+str(e))
+ def end_hand_live(self,j):
+  # 4.1.7 (owner, 21/10/2026): the nick is still in a LIVE the owner started by hand
+  # when a schedule is due → NBL ends that LIVE and moves the schedule 30 minutes
+  # later (default rule). The cart is prepared again once the LIVE is over.
+  j['takeover']=True;j['state']='stopping';j['error']='Nick đang LIVE bật tay lúc tới giờ lịch: NBL kết thúc phiên đó rồi dời lịch 30 phút'
+  self.notify(j,'takeover','Tới giờ lịch '+time.strftime('%H:%M',time.localtime(j['start']))+' mà nick đang LIVE bật tay: NBL kết thúc phiên đó và dời lịch 30 phút.')
+  self.stop_chrome(j);self.submit(j,'stop')
+ def postpone(self,j,now=None):
+  now=time.time() if now is None else now
+  length=j['end']-j['start'];start=now+POSTPONE;end=start+length
+  later=[o['start'] for o in self.jobs if o is not j and o['profile']==j['profile'] and o['state'] in ('pending','start_retry') and o['start']>=j['start']]
+  if later and end>min(later)-60:end=min(later)-60
+  self.close_chrome_summary(j)
+  for key in ('takeover','start_attempts','stop_attempts','end_stop_attempted','retry_at','prepare_phase','video_sent','video_until','last_probe'):j.pop(key,None)
+  j['postponed']=j.get('postponed',0)+1;j['cart']=dict(state='none',attempts=0,next=0)
+  if end-start<120:
+   j['state']='skipped';j['error']='Đã kết thúc phiên LIVE bật tay; không còn chỗ để dời lịch (vướng lịch sau)'
+   self.notify(j,'takeover','Đã kết thúc phiên LIVE bật tay. Không dời được lịch vì vướng lịch sau của nick; bỏ lịch này.');return
+  j['start'],j['end']=start,end;j['state']='pending';j['error']='Đã dời 30 phút vì nick đang LIVE bật tay'
+  self.notify(j,'takeover','Đã kết thúc phiên LIVE bật tay. Lịch dời sang '+time.strftime('%H:%M',time.localtime(start))+' → '+time.strftime('%H:%M',time.localtime(end))+'; giỏ được chuẩn bị lại.','hoat_dong')
  def stop_owned_video(self,j,force=False):
   # 4.1.2 (owner, 19/10/2026 02:40): NBL never stops the owner's video. A stopped
   # NBL VIDEO is a black picture in Studio; the next LIVE replays it from the start.

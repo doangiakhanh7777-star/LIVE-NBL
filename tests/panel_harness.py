@@ -13,7 +13,7 @@ CLIP = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False).name
 
 METHODS = ('tick', 'notify', 'action_failed', 'start_video', 'warn_shared_audio', 'on_started', 'resume_automation',
            'on_stopped', 'watch_dark', 'poll_chrome_modules', 'start_chrome_modules', 'cart_ready', 'poll_cart',
-           'cart_failed', 'close_chrome_summary', 'stop_owned_video', 'stop_chrome', 'drop_job')
+           'cart_failed', 'close_chrome_summary', 'stop_owned_video', 'stop_chrome', 'drop_job', 'end_hand_live', 'postpone')
 
 
 def panel_class():
@@ -23,7 +23,7 @@ def panel_class():
     reports = []
     ns = dict(copy=copy, json=json, re=__import__('re'), time=time, Path=Path, NotTouched=L.NotTouched, same_file=same_file,
               decisions=S.decisions, execute=lambda *a, **k: None, ACTIVE=S.ACTIVE, START_MARGIN=S.START_MARGIN,
-              RETRY_GAP=S.RETRY_GAP, STOP_TRIES=S.STOP_TRIES, report=lambda *a: reports.append(a))
+              RETRY_GAP=S.RETRY_GAP, STOP_TRIES=S.STOP_TRIES, POSTPONE=1800, PROBE_GAP=60, report=lambda *a: reports.append(a))
     helpers = [copy.deepcopy(n) for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in ('vision_missing', 'video_problem')]
     mod = ast.Module(body=helpers + [ast.ClassDef(name='Panel', bases=[], keywords=[], body=body, decorator_list=[])], type_ignores=[])
     exec(compile(ast.fix_missing_locations(mod), str(ROOT/'studio_panel.py'), 'exec'), ns)
@@ -66,5 +66,5 @@ def make(jobs, profiles=None, sessions=None):
 def job(**kw):
     now = time.time()
     j = dict(id='j1', profile='p1', start=now+600, end=now+4200, clips=['/a.mp4'], bundle='', bundle_index=2, no_sales=False,
-             shuffle=False, state='pending', error='', cart=dict(state='none', attempts=0, next=0))
+             shuffle=False, state='pending', error='', cart=dict(state='none', attempts=0, next=0, probe=dict(at=now, live=False)))
     j.update(kw); return j

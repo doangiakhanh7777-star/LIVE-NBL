@@ -63,7 +63,7 @@ class Cart(unittest.TestCase):
         self.assertTrue(j['cart']['verified']); self.assertTrue(p.cart_ready(j))
 
     def test_cart_emptied_by_tiktok_is_added_again_once(self):
-        now = time.time(); j = job(start=now+100, cart=dict(state='ready', attempts=0, next=0, verified=False)); p = make([j])
+        now = time.time(); j = job(start=now+100, cart=dict(state='ready', attempts=0, next=0, verified=False, probe=dict(at=now, live=False))); p = make([j])
         p.poll_cart(now)
         p.owner.bridge.control = dict(id='cmd1', state='done', count='0'); p.poll_cart(now)
         self.assertEqual(j['cart']['state'], 'none'); self.assertTrue(any('TRỐNG' in a for a in p.alerts))
@@ -72,10 +72,12 @@ class Cart(unittest.TestCase):
     def test_three_failures_mean_no_live(self):
         now = time.time(); j = job(start=now+60); p = make([j])
         for i in range(3):
-            p.poll_cart(now + i*400)
+            j['cart']['probe'] = dict(at=now + i*400, live=False); p.poll_cart(now + i*400)
             p.owner.bridge.control = dict(id='cmd%d' % (i+1), state='failed', error='Không có bộ sản phẩm số 2')
             p.poll_cart(now + i*400 + 1)
-        p.poll_cart(now + 2000)
+        p.poll_cart(now + 2000)            # 4.1.7: first looks whether the cart still has products
+        self.assertEqual(p.owner.bridge.commands[-1]['action'], 'cart_check')
+        p.owner.bridge.control = dict(id='cmd4', state='done', count='0'); p.poll_cart(now + 2001); p.poll_cart(now + 2002)
         self.assertEqual(j['cart']['attempts'], 3); self.assertTrue(any('KHÔNG PHÁT' in a for a in p.alerts))
         self.assertFalse(p.cart_ready(j))
 

@@ -75,7 +75,13 @@ def execute(profile,action,deadline=0,payload=None):
    # 4.1.4: Studio was closed and opened again (new window). Attach to the new one
    # by itself when exactly one free TikTok LIVE Studio window of the same program
    # is open; the saved nick picture is still checked before anything is clicked.
-   fresh=rebind_window(profile)
+   try:windows=list_windows()
+   except Exception:windows=None
+   fresh=rebind_window(profile,windows) if windows is not None else None
+   # 4.1.7 (owner log 20/10/2026 13:58): no TikTok LIVE Studio window is left at all
+   # = Studio was closed, so the LIVE is over. Say so instead of "tắt tay ngay".
+   if not fresh and windows is not None and action in ('status','stop') and not studio_windows(profile,windows,free_only=False):
+    return {'live':False,'studioClosed':True}
    if not fresh:raise type(error)('Studio đã mở lại thành cửa sổ mới nhưng NBL không chắc cửa sổ nào của nick này. Bấm Kết nối LIVE Studio → Tìm cửa sổ, chọn lại rồi Lưu (vùng đã khoanh được giữ).') from error
    result=execute_vision(fresh,action,deadline,payload)
    if isinstance(result,dict):result.update(windowHandle=fresh['windowHandle'],pid=fresh['pid'],windowTitle=fresh['windowTitle'],rebound=True)
@@ -120,14 +126,27 @@ def window_gone(error):
  return 'Cửa sổ Studio đã đổi' in text or 'không còn thuộc Studio đã lưu' in text
 
 
+def studio_windows(profile,windows,free_only=True):
+ exe=os.path.normcase(str(profile.get('exePath','')))
+ taken={str(h) for h in profile.get('_otherHandles',[]) if h} if free_only else set()
+ return [w for w in windows if isinstance(w,dict) and is_studio_window(w) and os.path.normcase(str(w.get('exePath','')))==exe and str(w.get('windowHandle')) not in taken]
+
+
+def _area(w):
+ try:return max(0,int(w.get('width') or 0))*max(0,int(w.get('height') or 0))
+ except (TypeError,ValueError):return 0
+
+
 def rebind_window(profile,windows=None):
- """The one TikTok LIVE Studio window of the same program that no other nick uses, or None."""
+ """The TikTok LIVE Studio window of the same program that no other nick uses, or None.
+ 4.1.7: Studio also opens small windows of its own (floating chat, pop-ups). When
+ there are several, the main one is taken only if it is clearly the biggest
+ (at least twice the next); the saved nick picture is still checked before a click."""
  try:windows=list_windows() if windows is None else windows
  except Exception:return None
- exe=os.path.normcase(str(profile.get('exePath','')))
- taken={str(h) for h in profile.get('_otherHandles',[]) if h}
- found=[w for w in windows if isinstance(w,dict) and is_studio_window(w) and os.path.normcase(str(w.get('exePath','')))==exe and str(w.get('windowHandle')) not in taken]
- if len(found)!=1:return None
+ found=sorted(studio_windows(profile,windows),key=_area,reverse=True)
+ if not found:return None
+ if len(found)>1 and not (_area(found[0])>0 and _area(found[0])>=2*_area(found[1])):return None
  w=found[0]
  return {**profile,'windowHandle':str(w['windowHandle']),'pid':str(w['pid']),'windowTitle':w.get('windowTitle') or profile.get('windowTitle','')}
 

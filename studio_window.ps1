@@ -14,6 +14,8 @@ public static class NblWindows {
  [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT p);
  [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h,uint flag);
  [StructLayout(LayoutKind.Sequential)] public struct POINT {public int X,Y;}
+ [StructLayout(LayoutKind.Sequential)] public struct RECT {public int Left,Top,Right,Bottom;}
+ [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out RECT r);
  public static IntPtr[] All(){var result=new List<IntPtr>();EnumWindows((h,p)=>{if(IsWindowVisible(h))result.Add(h);return true;},IntPtr.Zero);return result.ToArray();}
  public static string Title(IntPtr h){var s=new StringBuilder(2048);GetWindowText(h,s,s.Capacity);return s.ToString();}
 }
@@ -27,7 +29,8 @@ function Read-Window([IntPtr]$h){
  if($exe -notmatch '(tiktok.*(live|studio)|live[ ._-]*studio)'){return}
  $title=[NblWindows]::Title($h)
  if(-not $title -or $title -notmatch 'live|studio'){return}
- return @{pid=[string]$ownerId;windowTitle=$title;exePath=$p.Path;windowHandle=[string]$h.ToInt64()}
+ $r=New-Object NblWindows+RECT;$null=[NblWindows]::GetWindowRect($h,[ref]$r)
+ return @{pid=[string]$ownerId;windowTitle=$title;exePath=$p.Path;windowHandle=[string]$h.ToInt64();width=[int]($r.Right-$r.Left);height=[int]($r.Bottom-$r.Top)}
 }
 if($Action -eq 'point'){
  Start-Sleep -Seconds 4
