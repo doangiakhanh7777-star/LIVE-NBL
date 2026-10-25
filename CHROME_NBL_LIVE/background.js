@@ -43,13 +43,25 @@ function open(state){
   if(!current())return;
   let message;try{message=JSON.parse(event.data);}catch(e){return;}
   if(!message||message.type!=='tick')return;
-  const commands=message.commands||[];let response={account:'Chưa đăng nhập',accountVerified:false,modules:{},acks:[],config:{}};
+  const commands=message.commands||[];
+  const reloads=commands.filter(c=>c&&c.action==='reload_dashboard');
+  const forwarded=reloads.length?commands.filter(c=>!c||c.action!=='reload_dashboard'):commands;
+  let response={account:'Chưa đăng nhập',accountVerified:false,modules:{},acks:[],config:{}};
   try{
    const tab=await chrome.tabs.get(state.tabId);
    if(dashboardUrl(tab.url)){
     let version;try{version=await contentMessage(state.tabId,{type:'version'},1000);}catch(e){}
-    if(version?.protocol===PROTOCOL)response=await contentMessage(state.tabId,message)||response;
-    else response.acks=commands.map(c=>({id:c.id,error:'Tải lại trang LIVE để dùng tiện ích 4.1.5.'}));
+    if(version?.protocol===PROTOCOL)response=await contentMessage(state.tabId,{...message,commands:forwarded})||response;
+    else response.acks=forwarded.map(c=>({id:c.id,error:'Tải lại trang LIVE để dùng tiện ích 4.1.5.'}));
+    if(reloads.length){
+     const ids=new Set(reloads.map(c=>c.id));
+     response.acks=(Array.isArray(response.acks)?response.acks:[]).filter(a=>!ids.has(a?.id));
+     response.acks.push(...reloads.map(c=>({id:c.id,error:''})));
+     // Reply to NBL first, then reload only the TikTok Shop product dashboard.
+     // The extension background socket remains alive and the content script is
+     // injected again when the page finishes loading.
+     setTimeout(()=>{if(current())chrome.tabs.reload(state.tabId).catch(()=>{});},350);
+    }
    }else response.acks=commands.map(c=>({id:c.id,error:'Chưa mở bảng LIVE của nick này.'}));
   }catch(e){
    // 4.1.1: a slow or reloading LIVE tab used to close the socket here ("Tab Chrome
