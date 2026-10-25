@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 
 SERVER_NAME = "nbl-live"
-SERVER_VERSION = "1.0.2"
+SERVER_VERSION = "1.1.0"
 DEFAULT_TOKEN_FILE = "/mnt/c/Users/ADMIN/AppData/Local/NBL_LIVE_2/local_api_token.txt"
 
 
@@ -102,7 +102,7 @@ def tool_defs():
         },
         {
             "name": "nbl_schedules",
-            "description": "List NBL LIVE schedules and states.",
+            "description": "List NBL LIVE schedules and states, including cart state and retry attempts.",
             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
             "annotations": read_only,
         },
@@ -129,6 +129,17 @@ def tool_defs():
                     "allow_overlap": {"type": "boolean", "default": False},
                 },
                 "required": ["start", "end"],
+                "additionalProperties": False,
+            },
+            "annotations": write_safe,
+        },
+        {
+            "name": "nbl_retry_cart",
+            "description": "For one pending sales schedule, safely reload only the paired TikTok Shop product dashboard and restart cart preparation. Read nbl_schedules first and pass the exact schedule id. Refuses while LIVE is active or not yet confirmed safe to reload.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "required": ["id"],
                 "additionalProperties": False,
             },
             "annotations": write_safe,
@@ -168,6 +179,8 @@ def call_tool(name, args):
         status, value = http("GET", "/api/live/status")
     elif name == "nbl_create_schedule":
         status, value = http("POST", "/api/schedules", args)
+    elif name == "nbl_retry_cart":
+        status, value = http("POST", "/api/schedules/%s/cart/retry" % args.get("id", ""), {})
     elif name == "nbl_cancel_schedule":
         status, value = http("POST", "/api/schedules/%s/cancel" % args.get("id", ""), {})
     elif name == "nbl_stop_schedule":
@@ -219,7 +232,7 @@ def main():
                     "protocolVersion": requested,
                     "capabilities": {"tools": {"listChanged": False}},
                     "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
-                    "instructions": "Manage configured NBL LIVE accounts. Read state before schedule changes. Prefer account_number.",
+                    "instructions": "Manage configured NBL LIVE accounts. Read state before schedule changes. Prefer account_number. Read schedules before cart retry and use the exact schedule id.",
                 })
             elif method == "ping":
                 response(request_id, {})
