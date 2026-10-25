@@ -27,6 +27,13 @@ if __name__ == '__main__':
     from no_wheel import install as no_wheel
     no_wheel(qapp)
 
+    # Install small runtime enhancements before Console creates StudioPanel.
+    try:
+        from cart_retry_patch import install as install_cart_retry
+        install_cart_retry()
+    except Exception as exc:
+        print('Cart retry patch không tải được:', str(exc)[:300])
+
     window = nbl.Console()
     local_api = None
     try:
