@@ -2,8 +2,18 @@
   "id": "nbl-direct-commands",
   "name": "NBL Direct Commands",
   "description": "Direct Telegram slash commands for NBL LIVE Local API without invoking an AI model.",
-  "categories": ["scheduling"],
-  "activation": {"onStartup": true},
+  "version": "1.0.1",
+  "activation": {
+    "onStartup": true
+  },
+  "commandAliases": [
+    { "name": "nbl_help", "kind": "runtime-slash" },
+    { "name": "nbl_status", "kind": "runtime-slash" },
+    { "name": "nbl_schedules", "kind": "runtime-slash" },
+    { "name": "nbl_create", "kind": "runtime-slash" },
+    { "name": "nbl_cancel", "kind": "runtime-slash" },
+    { "name": "nbl_stop", "kind": "runtime-slash" }
+  ],
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
