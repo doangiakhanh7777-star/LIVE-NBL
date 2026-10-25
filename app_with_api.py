@@ -34,6 +34,8 @@ if __name__ == '__main__':
         install_chrome_reload()
         from cart_retry_patch import install as install_cart_retry
         install_cart_retry()
+        from strict_cart_gate_patch import install as install_strict_cart_gate
+        install_strict_cart_gate()
     except Exception as exc:
         print('NBL runtime patch không tải được:', str(exc)[:300])
 
