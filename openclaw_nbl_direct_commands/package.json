@@ -1,0 +1,13 @@
+{
+  "name": "@nbl/openclaw-nbl-direct-commands",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "openclaw": {
+    "extensions": ["./index.ts"],
+    "compat": {
+      "pluginApi": ">=2026.10.0",
+      "minGatewayVersion": ">=2026.10.0"
+    }
+  }
+}
