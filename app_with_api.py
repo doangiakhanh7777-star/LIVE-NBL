@@ -27,12 +27,15 @@ if __name__ == '__main__':
     from no_wheel import install as no_wheel
     no_wheel(qapp)
 
-    # Install small runtime enhancements before Console creates StudioPanel.
+    # Install small runtime enhancements before Console creates ChromeBridge /
+    # StudioPanel instances. Core start/stop behavior remains untouched.
     try:
+        from chrome_reload_patch import install as install_chrome_reload
+        install_chrome_reload()
         from cart_retry_patch import install as install_cart_retry
         install_cart_retry()
     except Exception as exc:
-        print('Cart retry patch không tải được:', str(exc)[:300])
+        print('NBL runtime patch không tải được:', str(exc)[:300])
 
     window = nbl.Console()
     local_api = None
