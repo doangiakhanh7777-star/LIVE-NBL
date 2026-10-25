@@ -5,6 +5,7 @@ const ACCOUNT_NUMBER = 2;
 const ACCOUNT_NAME = "giakhanhdoxe";
 const TOKEN_FILE = process.env.NBL_API_TOKEN_FILE || "/mnt/c/Users/ADMIN/AppData/Local/NBL_LIVE_2/local_api_token.txt";
 const TERMINAL = new Set(["finished", "cancelled", "skipped", "failed", "manual_stop"]);
+const MAX_BATCH = 30;
 
 function windowsHost() {
   if (process.env.NBL_API_HOST?.trim()) return process.env.NBL_API_HOST.trim();
@@ -74,132 +75,157 @@ function fmt(ts) {
 
 function helpText() {
   return [
-    "NBL Direct — không dùng AI/quota:",
-    "/nbl_status",
-    "/nbl_schedules",
-    "/nbl_create DD/MM/YYYY HH:MM-HH:MM BO;HH:MM-HH:MM BO",
-    "Ví dụ: /nbl_create 25/10/2026 17:45-18:45 1;19:45-20:45 1",
-    "/nbl_cancel JOB_ID",
-    "/nbl_stop JOB_ID",
+    "NBL Direct — lenh Viet khong dau, khong dung AI/quota:",
+    "/trangthai — xem ket noi Studio va LIVE hien tai",
+    "/lich — xem lich LIVE",
+    "/taolich DD/MM/YYYY HH:MM-HH:MM BO;HH:MM-HH:MM BO",
+    "Cung ngay: /taolich 25/10/2026 17:45-18:45 1;19:45-20:45 1",
+    "Nhieu ngay: /taolich 25/10/2026 17:45-18:45 1;26/10/2026 19:45-20:45 2",
+    "/huylich JOB_ID — huy lich chua chay",
+    "/dunglive JOB_ID — dung lich dang chay",
+    "/huongdan — xem huong dan nay",
+    "Lenh cu /nbl_* van dung duoc.",
   ].join("\n");
 }
 
+function parseBatch(raw) {
+  const chunks = String(raw || "").trim().split(/[;\n]+/).map((s) => s.trim()).filter(Boolean);
+  if (!chunks.length) return { error: "Khong co lich de tao." };
+  if (chunks.length > MAX_BATCH) return { error: `Moi lan toi da ${MAX_BATCH} lich.` };
+
+  const items = [];
+  let currentDate = null;
+  for (const chunk of chunks) {
+    let rest = chunk;
+    const dateMatch = /^(\d{1,2}\/\d{1,2}\/\d{4})\s+(.+)$/.exec(rest);
+    if (dateMatch) {
+      currentDate = parseDate(dateMatch[1]);
+      if (!currentDate) return { error: `Sai ngay: ${dateMatch[1]}` };
+      rest = dateMatch[2].trim();
+    }
+    if (!currentDate) return { error: "Lich dau tien phai co ngay DD/MM/YYYY." };
+
+    const m = /^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})(?:\s+(\d{1,3}))?$/.exec(rest);
+    if (!m) {
+      items.push({ invalid: true, raw: chunk, reason: "cu phap sai" });
+      continue;
+    }
+    const st = parseTime(m[1]), en = parseTime(m[2]);
+    const bundle = m[3] === undefined ? 1 : Number(m[3]);
+    if (!st || !en || !Number.isInteger(bundle) || bundle < 0 || bundle > 200) {
+      items.push({ invalid: true, raw: chunk, reason: "gio/bo khong hop le" });
+      continue;
+    }
+    items.push({ date: { ...currentDate }, st, en, bundle, raw: chunk });
+  }
+  return { items };
+}
+
+async function statusHandler() {
+  try {
+    const [accounts, live] = await Promise.all([callApi("/api/accounts"), callApi("/api/live/status")]);
+    const a = (accounts || []).find((x) => Number(x.account_number ?? x.number) === ACCOUNT_NUMBER || x.account === ACCOUNT_NAME);
+    if (!a) return { text: `Khong tim thay nick ${ACCOUNT_NAME}.` };
+    return { text: [
+      `✅ ${ACCOUNT_NAME} · nick so ${ACCOUNT_NUMBER}`,
+      `Studio: ${a.studio_connected ? "da ket noi" : "chua ket noi"}`,
+      `Playlist: ${a.playlist_count ?? 0}`,
+      `LIVE dang hoat dong: ${live?.count ?? 0}`,
+    ].join("\n") };
+  } catch (e) { return { text: `❌ NBL API: ${e?.message || String(e)}` }; }
+}
+
+async function schedulesHandler() {
+  try {
+    const rows = (await callApi("/api/schedules")) || [];
+    const mine = rows.filter((x) => Number(x.account_number) === ACCOUNT_NUMBER);
+    if (!mine.length) return { text: `Nick ${ACCOUNT_NAME}: chua co lich.` };
+    const active = mine.filter((x) => !TERMINAL.has(String(x.state)));
+    const show = (active.length ? active : mine.slice(-10)).slice(0, 20);
+    return { text: `${ACCOUNT_NAME} · ${mine.length} lich (${active.length} chua ket thuc)\n` + show.map((x) => `${fmt(x.start)} → ${new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(Number(x.end) * 1000))} · bo ${x.bundle_index ?? 0} · ${x.state} · ${String(x.id).slice(0, 8)}`).join("\n") };
+  } catch (e) { return { text: `❌ NBL API: ${e?.message || String(e)}` }; }
+}
+
+async function createHandler(ctx) {
+  const parsed = parseBatch(ctx.args);
+  if (parsed.error) return { text: `${parsed.error}\n\n${helpText()}` };
+
+  let existing;
+  try { existing = (await callApi("/api/schedules")) || []; }
+  catch (e) { return { text: `❌ Khong doc duoc lich truoc khi tao: ${e?.message || String(e)}` }; }
+
+  const reserved = existing
+    .filter((x) => Number(x.account_number) === ACCOUNT_NUMBER && !TERMINAL.has(String(x.state)))
+    .map((x) => ({ start: Number(x.start), end: Number(x.end), id: String(x.id || "") }));
+  const results = [];
+  let okCount = 0;
+
+  for (const item of parsed.items) {
+    if (item.invalid) {
+      results.push(`❌ ${item.raw}: ${item.reason}`);
+      continue;
+    }
+    const { date, st, en, bundle, raw } = item;
+    const start = epoch(date.iso, st), end = epoch(date.iso, en);
+    if (!(end > start)) { results.push(`❌ ${raw}: gio ket thuc phai sau gio bat dau`); continue; }
+    if (end - start < 120) { results.push(`❌ ${raw}: phien phai it nhat 2 phut`); continue; }
+    const overlap = reserved.find((x) => start < x.end && x.start < end);
+    if (overlap) { results.push(`❌ ${raw}: trung lich ${overlap.id.slice(0, 8)}`); continue; }
+
+    try {
+      const job = await callApi("/api/schedules", "POST", {
+        account_number: ACCOUNT_NUMBER,
+        start: `${date.iso}T${st}:00+07:00`,
+        end: `${date.iso}T${en}:00+07:00`,
+        bundle_index: bundle,
+      });
+      reserved.push({ start, end, id: String(job.id || "") });
+      okCount += 1;
+      results.push(`✅ ${date.d}/${date.m}/${date.y} ${st}-${en} · bo ${bundle} · ${String(job.id || "").slice(0, 8)} · ${job.state || "pending"}`);
+    } catch (e) {
+      results.push(`❌ ${date.d}/${date.m}/${date.y} ${st}-${en} · bo ${bundle}: ${e?.message || String(e)}`);
+    }
+  }
+
+  return { text: `NBL ${ACCOUNT_NAME} · tao thanh cong ${okCount}/${parsed.items.length} lich\n` + results.join("\n") };
+}
+
+async function cancelHandler(ctx) {
+  const id = String(ctx.args || "").trim();
+  if (!id) return { text: "Dung: /huylich JOB_ID" };
+  try {
+    const job = await callApi(`/api/schedules/${encodeURIComponent(id)}/cancel`, "POST", {});
+    return { text: `✅ ${String(job.id || id).slice(0, 8)} · ${job.state}` };
+  } catch (e) { return { text: `❌ ${e?.message || String(e)}` }; }
+}
+
+async function stopHandler(ctx) {
+  const id = String(ctx.args || "").trim();
+  if (!id) return { text: "Dung: /dunglive JOB_ID" };
+  try {
+    const job = await callApi(`/api/schedules/${encodeURIComponent(id)}/stop`, "POST", {});
+    return { text: `✅ ${String(job.id || id).slice(0, 8)} · ${job.state}` };
+  } catch (e) { return { text: `❌ ${e?.message || String(e)}` }; }
+}
+
+function addCommand(api, name, description, handler, acceptsArgs = false) {
+  api.registerCommand({ name, description, requireAuth: true, acceptsArgs, handler });
+}
+
 export default function register(api) {
-  api.registerCommand({
-    name: "nbl_help",
-    description: "Hướng dẫn NBL Direct",
-    requireAuth: true,
-    handler: async () => ({ text: helpText() }),
-  });
+  // Lenh Viet khong dau.
+  addCommand(api, "huongdan", "Huong dan NBL Direct", async () => ({ text: helpText() }));
+  addCommand(api, "trangthai", "Xem trang thai NBL LIVE", statusHandler);
+  addCommand(api, "lich", "Xem lich NBL LIVE", schedulesHandler);
+  addCommand(api, "taolich", "Tao mot hoac nhieu lich LIVE", createHandler, true);
+  addCommand(api, "huylich", "Huy lich NBL chua chay", cancelHandler, true);
+  addCommand(api, "dunglive", "Dung lich NBL dang chay", stopHandler, true);
 
-  api.registerCommand({
-    name: "nbl_status",
-    description: "Trạng thái NBL LIVE",
-    requireAuth: true,
-    handler: async () => {
-      try {
-        const [accounts, live] = await Promise.all([callApi("/api/accounts"), callApi("/api/live/status")]);
-        const a = (accounts || []).find((x) => Number(x.account_number ?? x.number) === ACCOUNT_NUMBER || x.account === ACCOUNT_NAME);
-        if (!a) return { text: `Không tìm thấy nick ${ACCOUNT_NAME}.` };
-        return { text: [`✅ ${ACCOUNT_NAME} · nick số ${ACCOUNT_NUMBER}`, `Studio: ${a.studio_connected ? "đã kết nối" : "chưa kết nối"}`, `Playlist: ${a.playlist_count ?? 0}`, `LIVE đang hoạt động: ${live?.count ?? 0}`].join("\n") };
-      } catch (e) { return { text: `❌ NBL API: ${e?.message || String(e)}` }; }
-    },
-  });
-
-  api.registerCommand({
-    name: "nbl_schedules",
-    description: "Liệt kê lịch NBL LIVE",
-    requireAuth: true,
-    handler: async () => {
-      try {
-        const rows = (await callApi("/api/schedules")) || [];
-        const mine = rows.filter((x) => Number(x.account_number) === ACCOUNT_NUMBER);
-        if (!mine.length) return { text: `Nick ${ACCOUNT_NAME}: chưa có lịch.` };
-        const active = mine.filter((x) => !TERMINAL.has(String(x.state)));
-        const show = (active.length ? active : mine.slice(-10)).slice(0, 20);
-        return { text: `${ACCOUNT_NAME} · ${mine.length} lịch (${active.length} chưa kết thúc)\n` + show.map((x) => `${fmt(x.start)} → ${new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(Number(x.end) * 1000))} · bộ ${x.bundle_index ?? 0} · ${x.state} · ${String(x.id).slice(0, 8)}`).join("\n") };
-      } catch (e) { return { text: `❌ NBL API: ${e?.message || String(e)}` }; }
-    },
-  });
-
-  api.registerCommand({
-    name: "nbl_create",
-    description: "Tạo lịch LIVE NBL trực tiếp",
-    acceptsArgs: true,
-    requireAuth: true,
-    handler: async (ctx) => {
-      const raw = String(ctx.args || "").trim();
-      const firstSpace = raw.indexOf(" ");
-      if (firstSpace < 0) return { text: helpText() };
-      const date = parseDate(raw.slice(0, firstSpace));
-      if (!date) return { text: "Sai ngày. Dùng DD/MM/YYYY.\n" + helpText() };
-      const specs = raw.slice(firstSpace + 1).split(";").map((s) => s.trim()).filter(Boolean);
-      if (!specs.length) return { text: helpText() };
-
-      let existing;
-      try { existing = (await callApi("/api/schedules")) || []; }
-      catch (e) { return { text: `❌ Không đọc được lịch trước khi tạo: ${e?.message || String(e)}` }; }
-
-      const reserved = existing
-        .filter((x) => Number(x.account_number) === ACCOUNT_NUMBER && !TERMINAL.has(String(x.state)))
-        .map((x) => ({ start: Number(x.start), end: Number(x.end), id: String(x.id || "") }));
-      const results = [];
-
-      for (const spec of specs) {
-        const m = /^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})(?:\s+(\d{1,3}))?$/.exec(spec);
-        if (!m) { results.push(`❌ ${spec}: cú pháp sai`); continue; }
-        const st = parseTime(m[1]), en = parseTime(m[2]);
-        const bundle = m[3] === undefined ? 1 : Number(m[3]);
-        if (!st || !en || !Number.isInteger(bundle) || bundle < 0 || bundle > 200) { results.push(`❌ ${spec}: giờ/bộ không hợp lệ`); continue; }
-        const start = epoch(date.iso, st), end = epoch(date.iso, en);
-        if (!(end > start)) { results.push(`❌ ${spec}: giờ kết thúc phải sau giờ bắt đầu`); continue; }
-        if (end - start < 120) { results.push(`❌ ${spec}: phiên phải ít nhất 2 phút`); continue; }
-        const overlap = reserved.find((x) => start < x.end && x.start < end);
-        if (overlap) { results.push(`❌ ${spec}: trùng lịch ${overlap.id.slice(0, 8)}`); continue; }
-        try {
-          const job = await callApi("/api/schedules", "POST", {
-            account_number: ACCOUNT_NUMBER,
-            start: `${date.iso}T${st}:00+07:00`,
-            end: `${date.iso}T${en}:00+07:00`,
-            bundle_index: bundle,
-          });
-          reserved.push({ start, end, id: String(job.id || "") });
-          results.push(`✅ ${st}-${en} · bộ ${bundle} · ${String(job.id || "").slice(0, 8)} · ${job.state || "pending"}`);
-        } catch (e) {
-          results.push(`❌ ${st}-${en} · bộ ${bundle}: ${e?.message || String(e)}`);
-        }
-      }
-      return { text: `NBL ${ACCOUNT_NAME} · ${date.d}/${date.m}/${date.y}\n` + results.join("\n") };
-    },
-  });
-
-  api.registerCommand({
-    name: "nbl_cancel",
-    description: "Hủy lịch NBL chưa chạy",
-    acceptsArgs: true,
-    requireAuth: true,
-    handler: async (ctx) => {
-      const id = String(ctx.args || "").trim();
-      if (!id) return { text: "Dùng: /nbl_cancel JOB_ID" };
-      try {
-        const job = await callApi(`/api/schedules/${encodeURIComponent(id)}/cancel`, "POST", {});
-        return { text: `✅ ${String(job.id || id).slice(0, 8)} · ${job.state}` };
-      } catch (e) { return { text: `❌ ${e?.message || String(e)}` }; }
-    },
-  });
-
-  api.registerCommand({
-    name: "nbl_stop",
-    description: "Dừng lịch NBL đang chạy",
-    acceptsArgs: true,
-    requireAuth: true,
-    handler: async (ctx) => {
-      const id = String(ctx.args || "").trim();
-      if (!id) return { text: "Dùng: /nbl_stop JOB_ID" };
-      try {
-        const job = await callApi(`/api/schedules/${encodeURIComponent(id)}/stop`, "POST", {});
-        return { text: `✅ ${String(job.id || id).slice(0, 8)} · ${job.state}` };
-      } catch (e) { return { text: `❌ ${e?.message || String(e)}` }; }
-    },
-  });
+  // Giu lenh cu de khong lam gay workflow dang dung.
+  addCommand(api, "nbl_help", "Huong dan NBL Direct", async () => ({ text: helpText() }));
+  addCommand(api, "nbl_status", "Trang thai NBL LIVE", statusHandler);
+  addCommand(api, "nbl_schedules", "Liet ke lich NBL LIVE", schedulesHandler);
+  addCommand(api, "nbl_create", "Tao lich LIVE NBL truc tiep", createHandler, true);
+  addCommand(api, "nbl_cancel", "Huy lich NBL chua chay", cancelHandler, true);
+  addCommand(api, "nbl_stop", "Dung lich NBL dang chay", stopHandler, true);
 }
