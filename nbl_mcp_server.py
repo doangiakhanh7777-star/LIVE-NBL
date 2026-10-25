@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 
 SERVER_NAME = "nbl-live"
-SERVER_VERSION = "1.0.1"
+SERVER_VERSION = "1.0.2"
 DEFAULT_TOKEN_FILE = "/mnt/c/Users/ADMIN/AppData/Local/NBL_LIVE_2/local_api_token.txt"
 
 
@@ -60,7 +60,7 @@ def http(method, path, body=None):
         "Accept": "application/json",
     }
     if body is not None:
-        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        data = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(api_base() + path, data=data, headers=headers, method=method)
     try:
@@ -96,25 +96,25 @@ def tool_defs():
     return [
         {
             "name": "nbl_accounts",
-            "description": "List NBL LIVE accounts/sessions and whether each account is connected to TikTok LIVE Studio.",
+            "description": "List NBL accounts and Studio connection state.",
             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
             "annotations": read_only,
         },
         {
             "name": "nbl_schedules",
-            "description": "List all NBL LIVE Studio schedules and their current states.",
+            "description": "List NBL LIVE schedules and states.",
             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
             "annotations": read_only,
         },
         {
             "name": "nbl_live_status",
-            "description": "Return active NBL LIVE Studio schedules and live-control states.",
+            "description": "Return currently active NBL LIVE schedules.",
             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
             "annotations": read_only,
         },
         {
             "name": "nbl_create_schedule",
-            "description": "Create a future NBL LIVE Studio schedule for one connected account. Times can be Unix timestamps or ISO-8601 strings. Use account_number when possible.",
+            "description": "Create one future LIVE schedule. Prefer account_number. Times: Unix or ISO-8601.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -135,7 +135,7 @@ def tool_defs():
         },
         {
             "name": "nbl_cancel_schedule",
-            "description": "Cancel a schedule that has not started. This does not force-stop an active LIVE; use nbl_stop_schedule for an active schedule.",
+            "description": "Cancel a schedule that has not started.",
             "inputSchema": {
                 "type": "object",
                 "properties": {"id": {"type": "string"}},
@@ -146,7 +146,7 @@ def tool_defs():
         },
         {
             "name": "nbl_stop_schedule",
-            "description": "Request NBL LIVE to safely end an active scheduled LIVE using its existing Studio stop flow, or cancel it if it has not started yet.",
+            "description": "Safely stop an active schedule or cancel it before start.",
             "inputSchema": {
                 "type": "object",
                 "properties": {"id": {"type": "string"}},
@@ -175,9 +175,11 @@ def call_tool(name, args):
     else:
         raise ValueError("Unknown tool: " + str(name))
     is_error = status >= 400 or not bool(value.get("ok", False))
+    # Keep one compact representation only. Returning both text and
+    # structuredContent duplicated every API response in the agent context.
+    text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     return {
-        "content": [{"type": "text", "text": json.dumps(value, ensure_ascii=False)}],
-        "structuredContent": value,
+        "content": [{"type": "text", "text": text}],
         "isError": is_error,
     }
 
@@ -217,7 +219,7 @@ def main():
                     "protocolVersion": requested,
                     "capabilities": {"tools": {"listChanged": False}},
                     "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
-                    "instructions": "Use NBL tools only to manage the owner's configured NBL LIVE accounts. Read account/schedule state before modifying schedules. Prefer account_number to ambiguous names.",
+                    "instructions": "Manage configured NBL LIVE accounts. Read state before schedule changes. Prefer account_number.",
                 })
             elif method == "ping":
                 response(request_id, {})
