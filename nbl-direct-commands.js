@@ -76,6 +76,7 @@ function fmt(ts) {
 function helpText() {
   return [
     "NBL Direct — lenh Viet khong dau, khong dung AI/quota:",
+    "/kiemtra — xem trang thai + lich LIVE",
     "/trangthai — xem ket noi Studio va LIVE hien tai",
     "/lich — xem lich LIVE",
     "/taolich DD/MM/YYYY HH:MM-HH:MM BO;HH:MM-HH:MM BO",
@@ -146,6 +147,12 @@ async function schedulesHandler() {
   } catch (e) { return { text: `❌ NBL API: ${e?.message || String(e)}` }; }
 }
 
+async function checkHandler() {
+  const a = await statusHandler();
+  const b = await schedulesHandler();
+  return { text: `${a.text}\n\n${b.text}` };
+}
+
 async function createHandler(ctx) {
   const parsed = parseBatch(ctx.args);
   if (parsed.error) return { text: `${parsed.error}\n\n${helpText()}` };
@@ -204,7 +211,7 @@ async function stopHandler(ctx) {
   if (!id) return { text: "Dung: /dunglive JOB_ID" };
   try {
     const job = await callApi(`/api/schedules/${encodeURIComponent(id)}/stop`, "POST", {});
-    return { text: `✅ ${String(job.id || id).slice(0, 8)} · ${job.state}` };
+    return { text: `✅ ${String(job.id || id).slice(0,8)} · ${job.state}` };
   } catch (e) { return { text: `❌ ${e?.message || String(e)}` }; }
 }
 
@@ -213,15 +220,14 @@ function addCommand(api, name, description, handler, acceptsArgs = false) {
 }
 
 export default function register(api) {
-  // Lenh Viet khong dau.
   addCommand(api, "huongdan", "Huong dan NBL Direct", async () => ({ text: helpText() }));
+  addCommand(api, "kiemtra", "Kiem tra trang thai va lich NBL LIVE", checkHandler);
   addCommand(api, "trangthai", "Xem trang thai NBL LIVE", statusHandler);
   addCommand(api, "lich", "Xem lich NBL LIVE", schedulesHandler);
   addCommand(api, "taolich", "Tao mot hoac nhieu lich LIVE", createHandler, true);
   addCommand(api, "huylich", "Huy lich NBL chua chay", cancelHandler, true);
   addCommand(api, "dunglive", "Dung lich NBL dang chay", stopHandler, true);
 
-  // Giu lenh cu de khong lam gay workflow dang dung.
   addCommand(api, "nbl_help", "Huong dan NBL Direct", async () => ({ text: helpText() }));
   addCommand(api, "nbl_status", "Trang thai NBL LIVE", statusHandler);
   addCommand(api, "nbl_schedules", "Liet ke lich NBL LIVE", schedulesHandler);
