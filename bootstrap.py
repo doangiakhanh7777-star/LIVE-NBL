@@ -8,7 +8,7 @@ base=Path(__file__).resolve().parent
 try:
     if sys.platform=='win32':
         import ctypes
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('NBL.Live.Desktop.4.0.2')
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('NBL.Live.Desktop.4.1')
         kernel=ctypes.WinDLL('kernel32',use_last_error=True)
         kernel.CreateMutexW.argtypes=[ctypes.c_void_p,ctypes.c_bool,ctypes.c_wchar_p];kernel.CreateMutexW.restype=ctypes.c_void_p
         app_mutex=kernel.CreateMutexW(None,False,'Local\\NBL_LIVE_Desktop_Console')
@@ -17,7 +17,7 @@ try:
             ctypes.windll.user32.MessageBoxW(None,'NBL LIVE đang mở. Dùng cửa sổ hiện tại để tránh chạy trùng lịch.','NBL LIVE',0x40)
             raise SystemExit(0)
     os.chdir(base)
-    runpy.run_path(str(base/'app_with_api.py'),run_name='__main__')
+    runpy.run_path(str(base/'app.py'),run_name='__main__')
 except SystemExit:
     raise
 except Exception:

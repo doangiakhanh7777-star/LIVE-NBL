@@ -3,15 +3,16 @@
 if(document.getElementById('nbl-live-extension'))return;
 const host=document.createElement('div');host.id='nbl-live-extension';document.documentElement.append(host);
 const ui=host.attachShadow({mode:'open'});
-ui.innerHTML=`<style>:host{all:initial}section{position:fixed;right:12px;bottom:12px;width:min(390px,calc(100vw - 40px));max-height:84vh;overflow:auto;z-index:2147483647;background:#fff;color:#25384d;padding:16px;border:2px solid #44b7f2;border-radius:20px;font:14px Arial;box-shadow:0 7px 28px #1b6b9b30}h3{margin:0 0 12px;cursor:move;touch-action:none;position:sticky;top:0;background:#fff;z-index:2;color:#1673aa}label{display:block;margin-top:11px;font-weight:600}input,textarea,select{box-sizing:border-box;width:100%;padding:9px;margin-top:5px;background:#f4fbff;color:#25384d;border:1px solid #b3d4e7;border-radius:10px;font:14px Arial}textarea{height:76px}button{background:#e8f6ff;color:#135982;border:1px solid #9ad3f3;border-radius:11px;padding:9px;margin:5px 4px 5px 0;cursor:pointer;font:13px Arial}button:hover{background:#ccecff}pre{white-space:pre-wrap;font:12px Arial;max-height:160px;overflow:auto}.red{background:#fff0ed;color:#ae3723;border-color:#ffc0ad}.bar{background:#ff993f;color:#382100;border-color:#f28629}.step{display:flex;align-items:center;gap:6px;margin-top:5px}.step output{min-width:84px;text-align:center;background:#f0f9ff;padding:8px;border-radius:10px}.step button{margin:0}.hint{font-size:12px;line-height:1.45;color:#526e80}.selectors{display:none}details{margin:14px 0;padding:10px;background:#f5fbff;border-radius:12px}summary{cursor:pointer;font-weight:600}.picked{font-size:12px;font-weight:400;color:#267440}</style>
-<section><h3>NBL LIVE • 4.1.5 <button id="fold">Thu gọn</button></h3><div id="body">
+ui.innerHTML=`<style>:host{all:initial}section{position:fixed;right:12px;bottom:12px;width:min(390px,calc(100vw - 40px));max-height:84vh;overflow:auto;z-index:2147483647;background:#fff;color:#3b2414;padding:16px;border:2px solid #f97316;border-radius:20px;font:14px Arial;box-shadow:0 7px 28px #c2410c30}h3{margin:0 0 12px;cursor:move;touch-action:none;position:sticky;top:0;background:#fff;z-index:2;color:#ea580c}label{display:block;margin-top:11px;font-weight:600}input,textarea,select{box-sizing:border-box;width:100%;padding:9px;margin-top:5px;background:#fffaf4;color:#3b2414;border:1px solid #fdba74;border-radius:10px;font:14px Arial}textarea{height:76px}button{background:#fff1e3;color:#9a3412;border:1px solid #fdba74;border-radius:11px;padding:9px;margin:5px 4px 5px 0;cursor:pointer;font:13px Arial}button:hover{background:#fed7aa}pre{white-space:pre-wrap;font:12px Arial;max-height:160px;overflow:auto}.red{background:#fff0ed;color:#ae3723;border-color:#ffc0ad}.bar{background:#ff993f;color:#382100;border-color:#f28629}.step{display:flex;align-items:center;gap:6px;margin-top:5px}.step output{min-width:84px;text-align:center;background:#fff1e3;padding:8px;border-radius:10px}.step button{margin:0}.hint{font-size:12px;line-height:1.45;color:#526e80}.selectors{display:none}details{margin:14px 0;padding:10px;background:#fff7ed;border-radius:12px}summary{cursor:pointer;font-weight:600}.picked{font-size:12px;font-weight:400;color:#267440}</style>
+<section><h3>NBL LIVE • 4.1.11 <button id="fold">Thu gọn</button></h3><div id="body">
 <p class="hint">Giỏ hàng và trả lời bình luận trên Chrome. Tin nhắn định kỳ và Chào khách cài trong app NBL LIVE.</p>
 <label>Tên chủ phòng trong bình luận<input id="owner" placeholder="Khánh Car Auto"></label>
 <label>Câu trả lời tự động<textarea id="rules" placeholder="bơm lốp;bom lop | Anh xem sản phẩm bơm lốp trong giỏ nhé."></textarea></label><p id="rulesHint" class="hint">Chưa có quy tắc. Chữ mẫu mờ không phải nội dung đã nhập.</p><p class="hint">Mỗi dòng: từ khóa | câu trả lời. Nhiều từ khóa cùng câu: ngăn bằng dấu ;</p>
+<div id="insertBox" class="hint" style="background:#fff1e3;border:1px solid #fdba74;border-radius:10px;padding:8px;margin-top:10px"><b>Ghim chèn theo kịch bản clip</b>: soạn trong app NBL LIVE (mục Kịch bản ghim giỏ hàng). Khi LIVE phát clip có kịch bản, món chèn được ghim đúng giây đã cắm cờ, xong thì ghim xáo trộn chạy tiếp. <span id="insertState">Chưa có kịch bản từ app.</span></div>
 <label>Chọn sản phẩm ghim bằng<select id="productMode"><option value="number">Số thứ tự trong giỏ</option><option value="name">Tên sản phẩm</option></select></label>
-<button id="readProducts">Chọn sản phẩm từ giỏ hiện tại</button><p class="hint">Nếu số trên trang không đọc được, app đánh số NBL và nhớ đúng món đã tích. Không cần chọn chữ Đã ghim khi nút Ghim/Bỏ ghim đã đọc được.</p><div id="productChoices"></div><input id="productBindings" type="hidden"><label>Sản phẩm muốn ghim<textarea id="pins" placeholder="1&#10;3&#10;5"></textarea></label><p class="hint">Mỗi dòng một số hoặc một tên theo cách chọn ở trên. Tự xáo trộn mỗi vòng; món không có trong giỏ được bỏ qua.</p>
-<label>Giữ sản phẩm đang ghim</label><div data-time="pinMin" data-default="30" data-min="1" data-label="Ít nhất"></div><div data-time="pinMax" data-default="40" data-min="1" data-label="Nhiều nhất"></div>
-<label>Nghỉ sau khi tháo ghim</label><div data-time="gapMin" data-default="30" data-min="1" data-label="Ít nhất"></div><div data-time="gapMax" data-default="40" data-min="1" data-label="Nhiều nhất"></div><p class="hint">Ghim → giữ → tháo ghim → nghỉ không ghim món nào → ghim món tiếp theo.</p>
+<button id="readProducts">Chọn sản phẩm từ giỏ hiện tại</button><p class="hint">Nếu số trên trang không đọc được, app đánh số NBL và nhớ đúng món đã tích. Không cần chọn chữ Đã ghim khi nút Ghim/Bỏ ghim đã đọc được.</p><div id="productChoices"></div><input id="productBindings" type="hidden"><div id="cycleBox"><label>Sản phẩm muốn ghim<textarea id="pins" placeholder="1&#10;3&#10;5"></textarea></label><p class="hint">Mỗi dòng một số hoặc một tên theo cách chọn ở trên. Tự xáo trộn mỗi vòng; món không có trong giỏ được bỏ qua.</p>
+<label>Giữ sản phẩm đang ghim</label><div data-time="pinMin" data-zero="1" data-default="30" data-min="0" data-label="Ít nhất"></div><div data-time="pinMax" data-zero="1" data-default="40" data-min="0" data-label="Nhiều nhất"></div>
+<label>Nghỉ sau khi tháo ghim</label><div data-time="gapMin" data-zero="1" data-default="30" data-min="0" data-label="Ít nhất"></div><div data-time="gapMax" data-zero="1" data-default="40" data-min="0" data-label="Nhiều nhất"></div><p class="hint">Ghim → giữ → tháo ghim → nghỉ không ghim món nào → ghim món tiếp theo. Để cả 4 ô bằng 0 (hoặc không chọn món nào) = TẮT ghim xáo trộn.</p></div>
 <label>Trả lời bình luận<select id="replyMode"><option value="auto">Tự gửi theo từ khóa</option><option value="suggest">Hiện gợi ý để tôi duyệt</option></select></label><label>Nghỉ trước khi trả lời lại cùng khách</label><div data-time="cooldown" data-default="60" data-min="15" data-label="Khoảng nghỉ"></div><div id="suggestions"></div>
 <details><summary>Chọn các nút trên trang — làm một lần</summary><p class="hint">Bấm Chọn rồi bấm đúng vị trí trên trang. Nhấn Esc để hủy. Các vị trí đã chọn được dùng chung giữa các nick; nội dung lưu riêng từng nick.</p><div id="pickFields"></div><button id="shareSetup">Lưu cách chọn nút để dùng chung</button><button id="useShared">Dùng cách chọn nút đã lưu</button>
 <details><summary>Cài đặt nâng cao</summary><div id="advancedFields"></div></details></details>
@@ -19,8 +20,8 @@ ui.innerHTML=`<style>:host{all:initial}section{position:fixed;right:12px;bottom:
 <button id="save">Lưu ngay</button><button id="check">Kiểm tra kết nối trang</button><button id="start" class="bar">Bật các mục</button><button id="stop" class="red">Dừng các mục</button><div id="modules"></div>
 <details><summary>Sao lưu và vị trí bảng</summary><button id="export">Xuất bản sao cài đặt</button><button id="import">Nhập bản sao cài đặt</button><input id="importFile" type="file" accept=".json" hidden><button id="resetPosition">Đưa bảng về góc dưới bên phải</button></details><p id="state">Đã dừng</p><pre id="log"></pre></div></section>`;
 const $=id=>ui.getElementById(id);
-const setupLabels={account:'Tên tài khoản',live:'Đồng hồ LIVE',input:'Ô nhập tin nhắn',send:'Nút gửi tin nhắn',rows:'Một dòng bình luận gồm tên và câu hỏi',user:'Tên khách trong dòng bình luận',text:'Câu hỏi trong dòng bình luận',products:'Một ô sản phẩm trong giỏ',productTitle:'Tên sản phẩm trong ô',productNumber:'Số thứ tự trong ô sản phẩm — nếu có',pinned:'Trạng thái ghim — không bắt buộc',unpinButton:'Nút Bỏ ghim trong ô sản phẩm — nếu có',bundleOpen:'Nút Thêm sản phẩm',bundleTab:'Mục Bộ sản phẩm TRỰC TIẾP — nếu có',bundleCards:'Một bộ sản phẩm có sẵn',bundleTitle:'Tên của bộ sản phẩm',bundleConfirm:'Nút xác nhận Thêm sản phẩm',bundleReady:'Danh sách sản phẩm trong phiên LIVE'};
-const sharedFields=Object.keys(setupLabels),relativeParents={user:'rows',text:'rows',productTitle:'products',productNumber:'products',pinned:'products',unpinButton:'products',bundleTitle:'bundleCards'};
+const setupLabels={account:'Tên tài khoản',live:'Đồng hồ LIVE',input:'Ô nhập tin nhắn',send:'Nút gửi tin nhắn',rows:'Một dòng bình luận gồm tên và câu hỏi',user:'Tên khách trong dòng bình luận',text:'Câu hỏi trong dòng bình luận',products:'Một ô sản phẩm trong giỏ',productTitle:'Tên sản phẩm trong ô',productNumber:'Số thứ tự trong ô sản phẩm — không bắt buộc',pinned:'Trạng thái ghim — không bắt buộc',unpinButton:'Nút Bỏ ghim trong ô sản phẩm — nếu có',bundleOpen:'Nút Thêm sản phẩm',bundleTab:'Mục Bộ sản phẩm TRỰC TIẾP — nếu có',bundleConfirm:'Nút xác nhận Thêm sản phẩm',bundleReady:'Danh sách sản phẩm trong phiên LIVE'};
+const sharedFields=Object.keys(setupLabels),relativeParents={user:'rows',text:'rows',productTitle:'products',productNumber:'products',pinned:'products',unpinButton:'products'};
 for(const [id,label] of Object.entries(setupLabels)){const row=document.createElement('div'),button=document.createElement('button'),status=document.createElement('span'),input=document.createElement('input'),advanced=document.createElement('label');button.textContent='Chọn '+label;button.dataset[relativeParents[id]?'relative':'pick']=id;if(relativeParents[id])button.dataset.parent=relativeParents[id];status.id=id+'Picked';status.className='picked';status.textContent='Chưa chọn';row.append(button,status);$('pickFields').append(row);input.id=id;advanced.textContent=label+' — mã vị trí';advanced.append(input);$('advancedFields').append(advanced);}
 for(const box of ui.querySelectorAll('[data-time]')){const id=box.dataset.time,input=document.createElement('input'),label=document.createElement('span'),out=document.createElement('output');input.id=id;input.type='hidden';input.value=box.dataset.default;label.textContent=box.dataset.label;out.id=id+'Display';box.className='step';box.append(label);for(const amount of [-10,-1,1,10]){const button=document.createElement('button');button.textContent=(amount>0?'+':'')+amount;button.onclick=()=>{input.value=String(Math.max(Number(box.dataset.min),Math.min(86400,Number(input.value)+amount)));input.dispatchEvent(new Event('change'));};box.append(button);if(amount===-1)box.append(out);}box.append(input);}
 const fields=['owner','rules','pins','productMode','replyMode','cooldown','pinMin','pinMax','gapMin','gapMax','bundleName','productBindings',...sharedFields];
@@ -28,7 +29,7 @@ const pickErrors=new Map();
 function relativeMatches(spec,base){if(spec===':scope'&&base instanceof Element)return [base];return [...base.querySelectorAll(spec)];}
 function buttonName(button){return [button.getAttribute('aria-label'),button.getAttribute('title'),button.textContent].filter(Boolean).map(x=>x.trim().replace(/^[^\p{L}\p{N}]+/u,'').replace(/\s+/g,' '));}
 function actionButtons(card,kind){const re=kind==='unpin'?/^(Bỏ ghim|Tháo ghim|Unpin)( sản phẩm)?$/i:/^(Ghim|Pin)( sản phẩm)?$/i;return [...card.querySelectorAll('button,[role=button]')].filter(visible).filter(b=>buttonName(b).some(x=>re.test(x)));}
-function readNumber(el){const values=[el.textContent,el.getAttribute('aria-label'),el.getAttribute('data-number'),el.getAttribute('data-index')];for(const value of values){const t=String(value||'').trim();if(/^#?\s*[1-9]\d{0,4}[.)]?$/.test(t))return Number(t.replace(/[^\d]/g,''));}return null;}
+function readNumber(el){const box=el&&el.matches&&el.matches('input')?el:el&&el.querySelector?el.querySelector('input'):null;const values=[box&&box.value,box&&box.getAttribute('value'),el.textContent,el.getAttribute('aria-label'),el.getAttribute('data-number'),el.getAttribute('data-index')];for(const value of values){const t=String(value||'').trim();if(/^#?\s*[1-9]\d{0,4}[.)]?$/.test(t))return Number(t.replace(/[^\d]/g,''));}return null;}
 function inspectField(id,spec){
  if(!spec)return {ok:false,text:id==='pinned'||id==='unpinButton'?'Tự nhận Ghim/Bỏ ghim':'Chưa chọn'};
  try{
@@ -38,7 +39,8 @@ function inspectField(id,spec){
   if(!parent&&!['rows','products','bundleCards'].includes(id)&&matches.length!==1)return {ok:false,text:'Chọn lại · tìm thấy '+matches.length+' chỗ'};
   if(parent&&roots.some(root=>relativeMatches(spec,root).filter(visible).length>1))return {ok:false,text:'Chọn lại · một khung khớp nhiều chỗ'};
   if(id==='productNumber'){
-   const numbers=matches.map(readNumber);if(matches.length!==roots.length||numbers.some(x=>x===null)||new Set(numbers).size!==numbers.length)return {ok:false,text:'Không đọc được số riêng · dùng Chọn sản phẩm từ giỏ hiện tại'};
+   // 4.1.11: lenient — a card without a readable number is counted by its place.
+   const numbers=matches.map(readNumber).filter(x=>x!==null);if(!numbers.length)return {ok:false,text:'Không đọc được số · NBL sẽ đếm thứ tự từ trên xuống (không bắt buộc)'};if(new Set(numbers).size!==numbers.length)return {ok:false,text:'Có số trùng nhau · chọn lại đúng ô số'};
    return {ok:true,text:'Đọc được: '+numbers.slice(0,5).join(', ')};
   }
   if(id==='products'){if(matches.some(card=>actionButtons(card,'pin').length+unpinButtons(card,read()).length!==1))return {ok:false,text:'Chọn lại khung bao trọn một món và đúng một nút Ghim/Bỏ ghim'};return {ok:true,text:'Đọc được '+matches.length+' ô sản phẩm cùng nút Ghim/Bỏ ghim'};}
@@ -95,9 +97,12 @@ const visible=e=>e&&e.getClientRects().length&&getComputedStyle(e).visibility!==
 function one(selector,base=document){if(!selector)throw Error('Chưa chọn vị trí trên trang');const a=relativeMatches(selector,base).filter(visible);if(a.length!==1)throw Error('Vị trí đã chọn phải khớp đúng một mục; hiện tìm được '+a.length);return a[0];}
 function read(){return Object.fromEntries(fields.map(id=>[id,$(id).value.trim()]));}
 function prepare(key){const c=read();if(!c.owner&&key!=='pin')throw Error('Nhập tên chủ phòng');
-if(key==='pin'){c.pinJobs=NBLPins.parseProducts(c.pins,c.productMode);if(!c.pinJobs.length)throw Error('Chưa chọn sản phẩm muốn ghim');for(const pair of [['pinMin','pinMax'],['gapMin','gapMax']]){for(const id of pair)c[id]=Number(c[id]);NBLPins.validateRange(c[pair[0]],c[pair[1]]);}if(!c.products||!c.productTitle)throw Error('Chọn một ô sản phẩm và tên sản phẩm trước');}
+if(key==='pin'){c.pinJobs=String(c.pins||'').trim()?NBLPins.parseProducts(c.pins,c.productMode):[];const times=['pinMin','pinMax','gapMin','gapMax'];for(const id of times)c[id]=Number(c[id]||0);
+ // 4.1.11 (owner): all four times 0, or no product chosen = cycle OFF (inserts from the clip script still run).
+ c.cycle=c.pinJobs.length>0&&times.some(id=>c[id]>0);
+ if(c.cycle){if(times.some(id=>c[id]<1))throw Error('Ghim xáo trộn: để 0 cả 4 ô để tắt, hoặc điền đủ 4 ô (ít nhất 1 giây)');for(const pair of [['pinMin','pinMax'],['gapMin','gapMax']])NBLPins.validateRange(c[pair[0]],c[pair[1]]);if(!c.products||!c.productTitle)throw Error('Chọn một ô sản phẩm và tên sản phẩm trước');}}
 if(key==='reply'){c.replyRules=NBL.parse(c.rules,'rule');if(!c.replyRules.length&&c.replyMode!=='suggest')throw Error('Chưa có câu trả lời theo từ khóa · nhập nội dung thật vào ô, chữ mẫu mờ chưa được tính');c.cooldown=Number(c.cooldown);if(!Number.isFinite(c.cooldown)||c.cooldown<15)throw Error('Nghỉ trả lời tối thiểu 15 giây');if(c.replyRules.some(x=>[...x.text].length>100))throw Error('Mỗi câu trả lời tối đa 100 ký tự');}return c;}
-function startModule(key,override){void saveConfig().catch(e=>log('Chưa lưu: '+e.message));if(tickBusy)return 'Đang xác nhận thao tác trước; thử lại sau vài giây.';try{if(key==='reply'){suggestions=[];renderSuggestions();}if(override)for(const id of fields)if(override[id]!=null)$(id).value=String(override[id]);const state=manager.start(key,()=>{const c=prepare(key);cfg=c;identity();liveTime();if(key==='pin'){const cards=productCards();if(!cards.length)log('Giỏ đang trống; chờ sản phẩm xuất hiện.');else{for(const job of c.pinJobs)pin(job);}}else{one(c.input);one(c.send);chat();if(!c.rows||!c.user||!c.text)throw Error('Chọn tên khách và câu hỏi trong dòng bình luận trước');}return c;});cfg=state.config;state.snapshot=identity();state.timerLast=liveTime();state.pinCycle=new NBLPins.Cycle(state.config.pinJobs||[]);state.nextPinAt=Date.now();state.detail=key==='pin'?'Đang kiểm tra món đã chọn':'Đang chờ bình luận mới';state.seen=new Set(key==='pin'?[]:chat().map(keyOf));connectionLost=false;renderModules();log('Bật '+key);return '';}catch(e){manager.stop(key,e.message);renderModules();log(key+': '+e.message);return e.message;}}
+function startModule(key,override){void saveConfig().catch(e=>log('Chưa lưu: '+e.message));if(tickBusy)return 'Đang xác nhận thao tác trước; thử lại sau vài giây.';try{if(key==='reply'){suggestions=[];renderSuggestions();}if(override)for(const id of fields)if(override[id]!=null)$(id).value=String(override[id]);const state=manager.start(key,()=>{const c=prepare(key);cfg=c;identity();liveTime();if(key==='pin'){if(c.products){const cards=productCards();if(!cards.length)log('Giỏ đang trống; chờ sản phẩm xuất hiện.');else if(c.cycle){for(const job of c.pinJobs)pin(job);}}if(!c.cycle)log('Ghim xáo trộn đang TẮT (để 0); chỉ chạy ghim chèn theo kịch bản clip.');}else{one(c.input);one(c.send);chat();if(!c.rows||!c.user||!c.text)throw Error('Chọn tên khách và câu hỏi trong dòng bình luận trước');}return c;});cfg=state.config;state.snapshot=identity();state.timerLast=liveTime();state.pinCycle=new NBLPins.Cycle(state.config.pinJobs||[]);state.nextPinAt=Date.now();state.detail=key==='pin'?'Đang kiểm tra món đã chọn':'Đang chờ bình luận mới';state.seen=new Set(key==='pin'?[]:chat().map(keyOf));connectionLost=false;renderModules();log('Bật '+key);return '';}catch(e){manager.stop(key,e.message);renderModules();log(key+': '+e.message);return e.message;}}
 function identity(){return one(cfg.account).textContent.trim();}
 function liveTime(){const s=one(cfg.live).textContent.match(/\b\d{2,}:\d{2}:\d{2}\b/);if(!s)throw Error('Không đọc được đồng hồ LIVE');return NBL.seconds(s[0]);}
 const rowKeys=new WeakMap();let nextRowKey=0;
@@ -116,10 +121,13 @@ function pin(product){
   // added fresh each LIVE with the main products on top. Saved bindings from an
   // older cart are not used, they would point at products of another set.
   if(cfg.productNumber&&cards.length){const rows=cards.map(card=>{const labels=relativeMatches(cfg.productNumber,card).filter(visible);return {card,number:labels.length===1?readNumber(labels[0]):null};});
-   if(rows.every(x=>x.number!==null)&&new Set(rows.map(x=>x.number)).size===rows.length)return rows.find(x=>x.number===product.number)?.card||null;}
+   const known=rows.filter(x=>x.number!==null);
+   if(known.length&&new Set(known.map(x=>x.number)).size===known.length){const hit=known.find(x=>x.number===product.number);if(hit)return hit.card;if(known.length===rows.length)return null;}}
   return cards[product.number-1]||null;
  }
- const matches=cards.filter(card=>{const titles=relativeMatches(cfg.productTitle,card).filter(visible);return titles.length===1&&NBL.norm(titles[0].textContent).includes(NBL.norm(product.text));});if(matches.length>1)throw Error('Tên khớp nhiều sản phẩm: '+product.text);return matches[0]||null;
+ const nn=x=>NBL.norm(x).replace(/\s+/g,' '),want=nn(product.text),named=cards.map(card=>{const titles=relativeMatches(cfg.productTitle,card).filter(visible);return {card,title:titles.length===1?nn(titles[0].textContent):''};});
+ const exact=named.filter(x=>x.title&&x.title===want);if(exact.length)return exact[0].card;
+ const matches=named.filter(x=>x.title&&x.title.includes(want));if(matches.length>1)throw Error('Tên khớp nhiều sản phẩm: '+product.text);return matches[0]?.card||null;
 }
 function unpinButtons(card,c=cfg){const automatic=actionButtons(card,'unpin');if(automatic.length)return automatic;if(actionButtons(card,'pin').length)return [];if(!c.unpinButton)return [];return relativeMatches(c.unpinButton,card).filter(visible).map(sendTarget);}
 function pinned(card){
@@ -143,7 +151,9 @@ async function send(text){assertContext();const before=chat().filter(r=>r.user==
 try{input.focus();changeInput(input,text);await delay(250);if(!state.running||state.generation!==generation)return;assertContext();if(inputText(input)!==text)throw Error('Ô nhập đã được thay đổi; dừng để giữ chữ của bạn.');const button=sendTarget(one(cfg.send));if(button.disabled||button.getAttribute('aria-disabled')==='true')throw Error('Nút gửi chưa hoạt động');button.click();submitted=true;lastSend=Date.now();await wait(()=>chat().filter(r=>r.user===cfg.owner&&r.text===text).length>before);log('Đã thấy bình luận chủ phòng: '+text);}
 finally{if(!submitted&&inputText(input)===text)changeInput(input,'');}}
 async function doPin(product){assertContext();const card=pin(product);if(!card)return null;const item=productIdentity(card);if(!pinned(card)){const buttons=actionButtons(card,'pin');if(buttons.length!==1)throw Error('Chưa tìm được nút Ghim trong ô sản phẩm');if(buttons[0].disabled||buttons[0].getAttribute('aria-disabled')==='true')throw Error('Nút ghim đang bị khóa');buttons[0].click();await wait(()=>pinned(trackedCard(item)));}log('Đã ghim: '+item.title);return item;}
-async function doUnpin(item){assertContext();const card=trackedCard(item);if(!card)throw Error('Sản phẩm đang ghim không còn trong danh sách; chưa xác nhận tháo ghim');if(!pinned(card))return;let buttons=unpinButtons(card);if(buttons.length!==1)throw Error('Chưa tìm được nút Bỏ ghim trong ô sản phẩm');const button=sendTarget(buttons[0]);if(button.disabled||button.getAttribute('aria-disabled')==='true')throw Error('Nút Bỏ ghim đang bị khóa');button.click();await wait(()=>{const current=trackedCard(item);return current&&!pinned(current);});log('Đã tháo ghim: '+item.title);}
+function pageUnpin(){const all=actionButtons(document,'unpin').filter(b=>!host.contains(b));return all.length===1?all[0]:null;}
+async function doUnpin(item){assertContext();let card=null;try{card=trackedCard(item);}catch(e){card=null;}
+ if(!card){const b=pageUnpin();if(!b)throw Error('Sản phẩm đang ghim không còn trong danh sách; chưa xác nhận tháo ghim');const button=sendTarget(b);button.click();await wait(()=>!pageUnpin());log('Đã tháo ghim (khung Đã ghim): '+item.title);return;}if(!pinned(card))return;let buttons=unpinButtons(card);if(buttons.length!==1)throw Error('Chưa tìm được nút Bỏ ghim trong ô sản phẩm');const button=sendTarget(buttons[0]);if(button.disabled||button.getAttribute('aria-disabled')==='true')throw Error('Nút Bỏ ghim đang bị khóa');button.click();await wait(()=>{const current=trackedCard(item);return current&&!pinned(current);});log('Đã tháo ghim: '+item.title);}
 function sendTarget(el){if(el instanceof SVGElement)el=el.closest('button,[role=button]')||el.closest('svg').parentElement;if(!el||typeof el.click!=='function')throw Error('Chọn nút gửi hoặc phần bao quanh biểu tượng gửi');return el;}
 function relative(el,parent){const parts=[];while(el&&el!==parent){let s=el.tagName.toLowerCase();const peers=[...el.parentElement.children].filter(x=>x.tagName===el.tagName);if(peers.length>1)s+=':nth-of-type('+(peers.indexOf(el)+1)+')';parts.unshift(s);el=el.parentElement;}if(!parts.length){if(el===parent)return ':scope';throw Error('Hãy bấm bên trong khung đã chọn');}return ':scope>'+parts.join('>');}
 function clearCatalog(id){if(['products','productTitle','productNumber'].includes(id)){$('productBindings').value='';$('productChoices').replaceChildren();}}
@@ -207,14 +217,50 @@ $('readProducts').onclick=()=>{
 };
 
 $('save').onclick=()=>saveConfig().then(()=>log('Đã lưu Chrome; app tự lưu khi đang kết nối.')).catch(e=>log(e.message));
-$('check').onclick=()=>{refreshFields();if(tickBusy){log('Chờ thao tác đang chạy xác nhận xong.');return;}for(const k of NBLModules.keys){try{const c=prepare(k);cfg=c;log(k+': tài khoản '+identity()+'; LIVE '+liveTime());if(k==='pin'){const found=c.pinJobs.filter(j=>pin(j)).length;log('Tìm thấy '+found+'/'+c.pinJobs.length+' món đã chọn; món thiếu sẽ bỏ qua');if(!found)throw Error('Chưa tìm được món nào đã chọn; đọc lại giỏ rồi tích món.');}else{one(c.input);one(c.send);chat();}log(k+': kiểm tra đọc trang đạt');}catch(e){log(k+': '+e.message);}}};
+$('check').onclick=()=>{refreshFields();if(tickBusy){log('Chờ thao tác đang chạy xác nhận xong.');return;}for(const k of NBLModules.keys){try{const c=prepare(k);cfg=c;log(k+': tài khoản '+identity()+'; LIVE '+liveTime());if(k==='pin'&&!c.cycle){log('pin: ghim xáo trộn đang tắt (để 0); ghim chèn lấy kịch bản từ app');}else if(k==='pin'){const found=c.pinJobs.filter(j=>pin(j)).length;log('Tìm thấy '+found+'/'+c.pinJobs.length+' món đã chọn; món thiếu sẽ bỏ qua');if(!found)throw Error('Chưa tìm được món nào đã chọn; đọc lại giỏ rồi tích món.');}else{one(c.input);one(c.send);chat();}log(k+': kiểm tra đọc trang đạt');}catch(e){log(k+': '+e.message);}}};
 $('stop').onclick=()=>stop();
 $('start').onclick=()=>{for(const k of NBLModules.keys)startModule(k);};
+// 4.1.11 (owner, 26/10/2026): "ghim chèn" — the app sends, every 10 s, the NBL VIDEO
+// position AND the pin script of the clip that is playing (made in the app by
+// watching the clip and planting flags). A flag pauses the shuffle pin, pins its own
+// product (found by NAME) for its own time, then the shuffle pins the next product.
+let clipSync=null;
+const FATAL=/captcha|xác minh|rời bảng|Tài khoản đã đổi|quay lại|Mục đã dừng/i;
+function activeInsert(){const t=NBLPins.clipSeconds(clipSync,Date.now(),0);if(t===null||!clipSync.script?.length)return null;const x=NBLPins.insertAt(clipSync.script,t,clipSync.duration/1000);return x?{...x,t,key:clipSync.clip+'#'+x.index}:null;}
+function clock(t){t=Math.max(0,Math.floor(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0');}
+async function insertTick(state){
+ const ins=activeInsert(),generation=state.generation;
+ if(!ins){
+  if(!state.insKey)return false;
+  // the flag is over: take its product down, the shuffle pins its next product at once
+  const item=state.insItem;state.insKey=null;state.insItem=null;state.insName='';
+  // shuffle on: its next pin replaces the inserted one at once; shuffle off: take it down
+  if(item&&!cfg.cycle){try{await doUnpin(item);}catch(e){if(FATAL.test(e.message))throw e;log('Ghim chèn: chưa tháo được ('+e.message+')');}}
+  if(state.pinCycle){state.pinCycle.phase='gap';state.pinCycle.current=null;}state.nextPinAt=Date.now();
+  state.detail='Hết món chèn · ghim xáo trộn chạy tiếp';return true;}
+ if(state.insKey!==ins.key){
+  const nn=x=>NBL.norm(x).replace(/\s+/g,' '),same=state.insItem&&nn(state.insName)===nn(ins.name);
+  state.insKey=ins.key;state.insTryAt=0;state.insWarned=false;
+  if(!same){state.insItem=null;state.insName=ins.name;}
+  if(state.pinCycle){state.pinCycle.phase='gap';state.pinCycle.current=null;}     // a new pin replaces the shuffle's pin
+  log('Ghim chèn '+clock(ins.at)+': '+ins.name+' trong '+Math.round(ins.end-ins.at)+' giây');}
+ if(state.insItem){state.detail='Ghim chèn: '+ins.name+' · tới '+clock(ins.end);return true;}
+ if(Date.now()<state.insTryAt){state.detail='Ghim chèn: đang thử lại '+ins.name;return true;}
+ state.insTryAt=Date.now()+5000;
+ let item=null,why='';
+ try{item=await doPin({mode:'name',text:ins.name,key:ins.name});if(!item)why='giỏ chưa có món tên "'+ins.name+'"';}
+ catch(e){if(FATAL.test(e.message))throw e;why=e.message;}
+ if(!state.running||generation!==state.generation)return true;
+ if(item){state.insItem=item;state.insName=ins.name;state.lastProductKey=item.key;state.detail='Ghim chèn: '+ins.name;return true;}
+ if(!state.insWarned){state.insWarned=true;log('Ghim chèn '+clock(ins.at)+': '+why+'; thử lại mỗi 5 giây tới hết thời gian của cờ');report('loi','Chrome · Ghim chèn: '+why,'');}
+ state.detail='Ghim chèn: chưa ghim được '+ins.name;return true;}
 async function tick(){if(tickBusy||!running||connectionLost||controlBusy)return;tickBusy=true;try{
  for(const module of NBLModules.keys)await manager.guard(module,async state=>{
  if(connectionLost)return;activeModule=module;cfg=state.config;snapshot=state.snapshot;timerLast=state.timerLast;assertContext();state.timerLast=timerLast;
  const elapsed=(Date.now()-state.started)/1000;
- if(module==='pin'){
+ if(module==='pin'&&await insertTick(state)){}
+ else if(module==='pin'&&!cfg.cycle){state.detail='Ghim xáo trộn đang tắt · chờ món chèn theo kịch bản';}
+ else if(module==='pin'){
   if(Date.now()>=state.nextPinAt){const cycle=state.pinCycle,generation=state.generation;
    if(cycle.phase==='hold'){await doUnpin(cycle.current);if(!state.running||generation!==state.generation)return;const seconds=cycle.afterUnpin(cfg.gapMin,cfg.gapMax);state.nextPinAt=Date.now()+seconds*1000;state.detail='Đang nghỉ không ghim · '+seconds+' giây';log('Nghỉ không ghim sản phẩm trong '+seconds+' giây');}
    else{let choice=null,fallback=null;for(let attempt=0;attempt<cfg.pinJobs.length;attempt++){const candidate=cycle.next(),card=pin(candidate);if(!card)continue;if(productIdentity(card).key===state.lastProductKey){fallback=candidate;continue;}choice=candidate;break;}choice=choice||fallback;const item=choice?await doPin(choice):null;if(!state.running||generation!==state.generation)return;if(item){state.lastProductKey=item.key;const seconds=cycle.afterPin(item,cfg.pinMin,cfg.pinMax);state.nextPinAt=Date.now()+seconds*1000;state.detail='Đang giữ ghim: '+item.title;log('Giữ sản phẩm trong '+seconds+' giây');}else{state.nextPinAt=Date.now()+30000;state.detail='Đang chờ món đã chọn · chưa ghim được món nào';log('Chưa có món đã chọn trong giỏ; thử đọc lại sau 30 giây');}}
@@ -273,7 +319,17 @@ async function closeSummary(){const dialog=summaryDialog();if(!dialog)return fal
   if(target==='esc'){pressEscape(dialog);}else{try{fireClick(target);}catch(e){continue;}}
   for(let i=0;i<8;i++){await delay(300);if(!summaryDialog()){log('Đã đóng bảng tổng kết LIVE');report('hoat_dong','Chrome · Đã đóng bảng tổng kết LIVE','');return true;}}
  }
+ // 4.1.8 (owner, 25/10/2026): the box still stayed open and the next cart failed.
+ // Last resort: reload the LIVE page (the box is only on the page, the LIVE is over).
+ // At most once every 3 minutes so a box that comes back never loops the page.
+ if(reloadPage('đóng bảng tổng kết LIVE'))throw Object.assign(Error('Bảng tổng kết LIVE không đóng được; đang tải lại trang LIVE'),{busy:true});
  throw Error('Chưa đóng được bảng tổng kết LIVE trên Chrome');}
+function reloadPage(why){if(running)return false;   // 4.1.9: pin/reply on = a LIVE is going; never reload under it
+ let last=0;try{last=Number(sessionStorage.getItem('nblReloadAt')||0);}catch(e){}
+ if(Date.now()-last<180000)return false;
+ try{sessionStorage.setItem('nblReloadAt',String(Date.now()));}catch(e){}
+ log('Tải lại trang LIVE để '+why+'.');report('hoat_dong','Chrome · Tải lại trang LIVE để '+why,'');
+ setTimeout(()=>location.reload(),4000);return true;}
 // 4.1.5: empty the cart before a schedule adds its own set. "Tất cả" (select all) in
 // the product list → the remove button that appears → confirm. Any step missing:
 // leave the cart as it is (the new set still goes on TOP, so pin numbers 1, 2, 3…
@@ -309,7 +365,7 @@ async function prepareBundle(command){const generation=++controlEpoch;controlOwn
  const valid=()=>{if(generation!==controlEpoch||connectionLost||Date.now()>command.deadline*1000)throw Error('Đã hủy hoặc hết thời gian thêm giỏ');if(command.expectedAccount&&one(c.account).textContent.trim()!==command.expectedAccount)throw Error('Nick trên Chrome khác nick của lịch; không thêm giỏ');};
  try{valid();
   if(!command.preLive){const oldCfg=cfg;cfg=c;try{liveTime();}finally{cfg=oldCfg;}}
-  try{await closeSummary();}catch(e){log(e.message);}valid();
+  try{await closeSummary();}catch(e){log(e.message);if(e.busy||summaryDialog())throw Object.assign(Error(e.busy?e.message:'Bảng tổng kết LIVE đang che trang; chưa thêm giỏ'),{busy:e.busy});}valid();
   const count=cartCount(c);
   // 4.1.5 (owner, 19/10/2026 04:40): several schedules saved at once — the next one
   // found the PREVIOUS schedule's products still in the cart, skipped, and never
@@ -353,13 +409,16 @@ async function prepareBundle(command){const generation=++controlEpoch;controlOwn
   await waitFor(()=>!addDrawer(),4000,()=>{});
   controlResult={id:command.id,state:'done',bundle:name,index,added:outcome.ok[1],total:outcome.ok[2]};
   log('Đã thêm bộ sản phẩm ('+outcome.ok[1]+'/'+outcome.ok[2]+') · '+name);
- }catch(e){if(generation===controlEpoch&&controlResult.id===command.id){controlResult={id:command.id,state:'failed',error:e.message};log('Giỏ hàng: '+e.message);}}
+ }catch(e){if(generation===controlEpoch&&controlResult.id===command.id){controlResult={id:command.id,state:'failed',error:e.message,...(e.busy?{busy:'1'}:{})};log('Giỏ hàng: '+e.message);}}
  finally{if(controlOwner===generation){controlBusy=false;controlOwner=0;}}}
 $('addBundle').onclick=()=>{if(running||controlBusy){log('Dừng các mục và đợi thao tác trước kết thúc rồi thêm bộ.');return;}const c=read();let account;try{account=one(c.account).textContent.trim();}catch(e){log(e.message);return;}const v=String(c.bundleName||'').trim(),n=/^\d+$/.test(v)?Number(v):0;void prepareBundle({id:'manual-'+Date.now(),expectedAccount:account,bundle:n?'':v,bundleIndex:n,preLive:true,deadline:Date.now()/1000+150});};
 async function finishLive(command){const c=read();if(command.expectedAccount&&one(c.account).textContent.trim()!==command.expectedAccount)throw Error('Nick khác; không đóng cửa sổ tổng kết');
  // 4.1: the summary can appear seconds after Studio ends; it only has an X icon.
  const end=Date.now()+60000;while(Date.now()<end){if(summaryDialog()){await closeSummary();return;}await delay(1000);}}
 const handled=new Set();
+// 4.1.11: product names of the cart, every 15 s, so the app can check its pin scripts.
+let titlesAt=0;
+function cartTitlesUpdate(c){if(Date.now()-titlesAt<15000||!c.products||!c.productTitle||controlBusy)return {};titlesAt=Date.now();try{const titles=[...document.querySelectorAll(c.products)].filter(e=>visible(e)).map(card=>{const t=relativeMatches(c.productTitle,card).filter(e=>visible(e));return t.length===1?t[0].textContent.trim():'';}).filter(Boolean);return {cartTitles:[...new Set(titles)].slice(0,300)};}catch(e){return {};}}
 // 4.0 watchdog: if the app stops talking to this tab (app closed or crashed), stop
 // pinning/replying after 30 s instead of waiting forever with modules switched on.
 let lastTickAt=0,lastSentConfig='',lastSentConfigAt=0,runningSince=0,lastConnectionId='',connectionNeedsConfig=true;
@@ -384,11 +443,13 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  pulse();
  const acks=[];
  for(const c of message.commands||[]){if(handled.has(c.id))continue;handled.add(c.id);if(handled.size>500)handled.delete(handled.values().next().value);if(c.deadline*1000<Date.now()){acks.push({id:c.id,error:'Bỏ lệnh quá hạn'});continue;}let error='';if(c.action==='stop'){if(c.module==='all')cancelControl();manager.stop(c.module);if(c.module==='reply'||c.module==='all'){suggestions=[];renderSuggestions();}renderModules();}else if(c.action==='finish_live'){try{void finishLive(c).catch(e=>log(e.message));}catch(e){error=e.message;}}else if(c.action==='cart_check'){let n=-1;try{n=cartCount(read());}catch(e){}controlResult={id:c.id,state:'done',count:n};
-}else if(c.action==='prepare_bundle'){if(controlBusy||running){error='Dừng tương tác và đợi thao tác chuẩn bị trước';controlResult={id:c.id,state:'failed',error,busy:'1'};}else void prepareBundle(c);}else if(c.action==='start'){if(message.closing){acks.push({id:c.id,error:'App đang đóng'});continue;}if(c.expectedAccount){const previousConfig=cfg;try{cfg=read();if(identity()!==c.expectedAccount)throw Error('Tài khoản khác với phiên đã gắn trong app.');}catch(e){error=e.message;}finally{cfg=previousConfig;}}if(!error){if(c.module==='reply'){suggestions=[];renderSuggestions();}error=startModule(c.module,c.config);}}acks.push({id:c.id,error});}
+}else if(c.action==='clip_sync'){clipSync={position:Number(c.position)||0,duration:Number(c.duration)||0,playing:Boolean(c.playing),at:Number(c.at)||0,received:Date.now(),clip:String(c.clip||''),script:NBLPins.cleanScript(c.script)};try{$('insertState').textContent=clipSync.script.length?'Đang dùng kịch bản '+clipSync.script.length+' cờ của clip '+(c.clipName||'')+'.':'Clip đang phát chưa có kịch bản.';}catch(e){}
+}else if(c.action==='reload_page'){if(controlBusy)error='Đang thêm giỏ; chưa tải lại trang';else{if(running&&c.stopModules){manager.stop('all');renderModules();}if(running)error='Đang ghim/trả lời; không tải lại trang';else{log('App tải lại trang LIVE trước khi thêm giỏ / trước giờ phát.');report('hoat_dong','Chrome · Tải lại trang LIVE (chuẩn bị giỏ/phát)','');setTimeout(()=>location.reload(),1500);}}
+}else if(c.action==='prepare_bundle'){if(running&&c.stopModules&&!controlBusy){manager.stop('all');suggestions=[];renderSuggestions();renderModules();log('Tắt ghim/trả lời của phiên LIVE trước để chuẩn bị giỏ.');}if(controlBusy||running){error='Dừng tương tác và đợi thao tác chuẩn bị trước';controlResult={id:c.id,state:'failed',error,busy:'1'};}else void prepareBundle(c);}else if(c.action==='start'){if(message.closing){acks.push({id:c.id,error:'App đang đóng'});continue;}if(c.expectedAccount){const previousConfig=cfg;try{cfg=read();if(identity()!==c.expectedAccount)throw Error('Tài khoản khác với phiên đã gắn trong app.');}catch(e){error=e.message;}finally{cfg=previousConfig;}}if(!error){if(c.module==='reply'){suggestions=[];renderSuggestions();}error=startModule(c.module,c.config);}}acks.push({id:c.id,error});}
  let account='Chưa chọn tài khoản';try{const previousConfig=cfg;cfg=read();try{account=identity();}finally{cfg=previousConfig;}}catch(e){}
  // Return immediately; potentially slow confirmations don't block the connection heartbeat.
  void saveConfig().catch(()=>{});const current=read(),serialized=JSON.stringify(current);let config;if(connectionNeedsConfig||!message.configAck||serialized!==lastSentConfig||Date.now()-lastSentConfigAt>60000){config=current;connectionNeedsConfig=false;lastSentConfig=serialized;lastSentConfigAt=Date.now();}
- respond({account,accountVerified:Boolean(account&&account!=='Chưa chọn tài khoản'),modules:manager.status(),acks,...(config?{config}:{}),control:controlResult,reports:takeReports()});void tick();return false;
+ respond({account,accountVerified:Boolean(account&&account!=='Chưa chọn tài khoản'),modules:manager.status(),acks,...(config?{config}:{}),...cartTitlesUpdate(current),control:controlResult,reports:takeReports()});void tick();return false;
 });
 document.addEventListener('keydown',e=>{if(e.altKey&&e.shiftKey&&e.code==='KeyX'){stop('Dừng khẩn cấp bằng Alt+Shift+X');}});
 document.addEventListener('visibilitychange',()=>{if(!running)return;$('state').textContent=document.hidden?'Chạy nền qua app':'Đang chạy';log(document.hidden?'Chuyển tab: giữ lịch; bỏ các mốc quá hạn, không chạy bù':'Tab hiện lại: tiếp tục kiểm tra tài khoản/phiên');});

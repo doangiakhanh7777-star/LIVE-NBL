@@ -21,7 +21,7 @@ async function tick(b,commands=[{id:'c1',action:'cart_check',module:'all'}]){
 }
 test('manifest has no QR login script and no login hosts',()=>{
  const m=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json'),'utf8'));
- assert.equal(m.version,'4.1.5');
+ assert.equal(m.version,'4.1.11');
  const all=JSON.stringify(m);assert.ok(!/shop_login|seller-vn|tiktok\.com\/login/.test(all));
  assert.equal(m.content_scripts.length,1);assert.ok(!fs.existsSync(path.join(dir,'shop_login.js')));
 });

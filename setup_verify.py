@@ -17,7 +17,7 @@ try:
     with log.open('w', encoding='utf-8') as out:
         sys.stdout = sys.stderr = out
         check()
-        print('SETUP 4.0.2: DA KIEM TRA TOAN VEN ' + str(len(expected)) + ' TEP.')
+        print('SETUP 4.1: DA KIEM TRA TOAN VEN ' + str(len(expected)) + ' TEP.')
 except Exception:
     with log.open('a', encoding='utf-8') as out:
         traceback.print_exc(file=out)

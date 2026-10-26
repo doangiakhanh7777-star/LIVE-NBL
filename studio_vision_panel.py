@@ -2,6 +2,7 @@
 import base64
 import copy
 import io
+from pathlib import Path
 from PySide6.QtCore import Qt, QRect, QPoint, QTimer
 from PySide6.QtGui import QPixmap, QImage
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -13,6 +14,22 @@ LABELS = {'input':'Ô nhập tin nhắn — chỉ phần chữ, bỏ nút mặt 
           'clock':'Đồng hồ LIVE — chỉ khoanh 00:00:00',
           'greeting':'Một nút Chào — khoanh sát cả nút'}
 
+# 4.1.10 (owner, 26/10/2026): show the owner's own Studio screen with the right frame
+# drawn in orange next to the picture, so choosing the regions is easy.
+ASSETS = Path(__file__).resolve().parent / 'assets'
+GUIDES = {'greeting': ('mau_khoanh_chao.png', 'Khoanh SÁT một nút "👋 Chào" như khung cam (nút nào cũng được).\nKhông khoanh thì NBL dùng nút Chào mẫu có sẵn.'),
+          'chat': ('mau_khoanh_khung_chat.png', 'Khoanh cả khung chat như khung cam: tên khách, tin nhắn và cột nút Chào. Không lấy ô nhập tin.'),
+          'input': ('', 'Khoanh phần chữ của ô nhập tin nhắn ở dưới khung chat, bỏ nút mặt cười.'),
+          'send': ('', 'Khoanh sát nút Gửi (mũi tên trong vòng tròn) bên phải ô nhập.'),
+          'clock': ('', 'Khoanh đúng đồng hồ 00:00:00 (khi chưa LIVE: khoanh quanh nút Phát LIVE).')}
+
+
+def guide_for(key):
+    """(image path or None, hint text) shown beside the Studio picture."""
+    name, text = GUIDES.get(key, ('', ''))
+    path = ASSETS / name if name else None
+    return (path if path and path.is_file() else None), text
+
 
 class RegionImage(QLabel):
     def __init__(self, pixmap, chosen):
@@ -20,7 +37,7 @@ class RegionImage(QLabel):
         self.original = pixmap
         screen = QApplication.primaryScreen()
         available = screen.availableGeometry() if screen else QRect(0,0,1200,800)
-        self.scale = min(1., min(920,max(300,available.width()-80))/pixmap.width(),
+        self.scale = min(1., min(920,max(300,available.width()-420))/pixmap.width(),
                          max(180,available.height()-240)/pixmap.height())
         self.setPixmap(pixmap.scaled(round(pixmap.width()*self.scale), round(pixmap.height()*self.scale),
                                      Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation))
@@ -89,15 +106,39 @@ def show_regions(panel, profile, capture):
     note = QLabel('Chọn mục bên dưới rồi giữ chuột kéo một khung trên ảnh. Lưu riêng theo nick.\nCần khoanh lại nếu đổi kích thước Studio hoặc tỷ lệ màn hình.'); note.setWordWrap(True); layout.addWidget(note)
     selector = QComboBox()
     for key, label in LABELS.items(): selector.addItem(label, key)
+    selector.setStyleSheet('QComboBox{border:2px solid #f97316;border-radius:8px;padding:6px;font-weight:600}')
     layout.addWidget(selector)
     status = QLabel(); status.setWordWrap(True)
+    guide_image = QLabel(); guide_text = QLabel(); guide_text.setWordWrap(True); guide_text.setFixedWidth(300)
+    guide_text.setStyleSheet('color:#b45309;font-weight:600')
+    reset_greeting = QPushButton('Bỏ nút Chào đã khoanh, dùng nút Chào mẫu có sẵn')
+    def show_guide(*_):
+        path, text = guide_for(selector.currentData())
+        guide_text.setText(text)
+        if path:
+            guide_image.setPixmap(QPixmap(str(path)).scaledToWidth(300, Qt.TransformationMode.SmoothTransformation)); guide_image.show()
+        else:
+            guide_image.clear(); guide_image.hide()
+        reset_greeting.setVisible(selector.currentData() == 'greeting' and bool(config.get('greetingImage')))
+    def use_sample_greeting():
+        config.pop('greetingImage', None); regions.pop('greeting', None); config.pop('greetingDefault', None)
+        status.setText('Đã bỏ nút Chào tự khoanh; NBL sẽ dùng nút Chào mẫu có sẵn.'); show_guide()
+    reset_greeting.clicked.connect(use_sample_greeting)
+    selector.currentIndexChanged.connect(show_guide)
     def chosen(rect):
         key = selector.currentData(); regions[key] = rect
         if key in ('send','greeting'):
             x,y,w,h = rect; stream = io.BytesIO(); image.crop((x,y,x+w,y+h)).save(stream,format='PNG')
             config[key+'Image'] = base64.b64encode(stream.getvalue()).decode()
         status.setText('Đã khoanh: '+', '.join(LABELS[k].split(' — ')[0] for k in LABELS if k in regions))
-    layout.addWidget(RegionImage(pixmap, chosen)); layout.addWidget(status)
+        show_guide()
+    row = QHBoxLayout(); layout.addLayout(row)
+    row.addWidget(RegionImage(pixmap, chosen), 0, Qt.AlignmentFlag.AlignTop)
+    side = QVBoxLayout(); row.addLayout(side)
+    head = QLabel('MẪU KHOANH'); head.setStyleSheet('color:#ea580c;font-weight:700'); side.addWidget(head)
+    side.addWidget(guide_image); side.addWidget(guide_text); side.addWidget(reset_greeting); side.addStretch(1)
+    show_guide()
+    layout.addWidget(status)
     note = QLabel('Nhắn mẫu cần: ô nhập, nút Gửi, khung chat, đồng hồ. Chào cần thêm một nút Chào mẫu.\nKhi chạy bằng ảnh, NBL có thể đưa Studio lên trước. Các mục Chrome vẫn không dùng chuột.'); note.setWordWrap(True); layout.addWidget(note)
     buttons = QHBoxLayout(); layout.addLayout(buttons)
     save = QPushButton('Lưu các vùng đã khoanh'); cancel = QPushButton('Hủy'); buttons.addWidget(save); buttons.addWidget(cancel)

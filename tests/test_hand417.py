@@ -38,12 +38,12 @@ def feed(p, j, action, result=None, error=None):
 
 class HandLiveCart(unittest.TestCase):
     def test_nick_is_looked_at_before_the_cart_is_touched(self):
-        now = time.time(); j = job(start=now + 3600, cart=dict(state='none', attempts=0, next=0)); p = make([j])
+        now = time.time(); j = job(start=now + 3600, cart=dict(state='none', attempts=0, next=0, reloaded_at=now - 60)); p = make([j])
         p.poll_cart(now)
         self.assertEqual(p.owner.bridge.commands, []); self.assertIn(('j1', 'live_probe'), p.submitted)
 
     def test_cart_waits_while_the_nick_is_live_by_hand(self):
-        now = time.time(); j = job(start=now + 3600, cart=dict(state='none', attempts=0, next=0)); p = make([j])
+        now = time.time(); j = job(start=now + 3600, cart=dict(state='none', attempts=0, next=0, reloaded_at=now - 60)); p = make([j])
         feed(p, j, 'live_probe', dict(live=True))
         self.assertTrue(j['cart']['probe']['live'])
         p.poll_cart(time.time() + 1)
@@ -54,7 +54,7 @@ class HandLiveCart(unittest.TestCase):
         self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
 
     def test_unreadable_studio_does_not_block_the_cart(self):
-        now = time.time(); j = job(start=now + 3600, cart=dict(state='none', attempts=0, next=0)); p = make([j])
+        now = time.time(); j = job(start=now + 3600, cart=dict(state='none', attempts=0, next=0, reloaded_at=now - 60)); p = make([j])
         feed(p, j, 'live_probe', error=RuntimeError('timed out'))
         self.assertEqual(j['state'], 'pending'); self.assertIsNone(j['cart']['probe']['live'])
         p.poll_cart(time.time() + 1); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
@@ -103,26 +103,29 @@ class HandLiveTakeover(unittest.TestCase):
 
 
 class CartFallback(unittest.TestCase):
-    def failed3(self, now):
-        return job(start=now + 300, cart=dict(state='failed', attempts=3, next=0, probe=dict(at=now, live=False)))
+    # 4.1.8: no 3-try limit any more; the cart is looked at when the LIVE is due.
+    def failed(self, now):
+        return job(start=now - 5, end=now + 3600, cart=dict(state='failed', attempts=3, next=now + 60, probe=dict(at=now, live=False), reloaded_at=now - 30))
 
     def test_set_not_added_but_cart_has_products_goes_live(self):
-        now = time.time(); j = self.failed3(now); p = make([j])
+        now = time.time(); j = self.failed(now); p = make([j])
         p.poll_cart(now); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'cart_check')
         p.owner.bridge.control = dict(id='cmd1', state='done', count='12'); p.poll_cart(now + 1)
         self.assertTrue(p.cart_ready(j)); self.assertTrue(j['cart']['fallback'])
         self.assertTrue(any('vẫn PHÁT với giỏ đang có (12' in a for a in p.alerts))
-        self.assertFalse(any('KHÔNG PHÁT' in a for a in p.alerts))
 
-    def test_empty_cart_still_means_no_live(self):
-        now = time.time(); j = self.failed3(now); p = make([j])
-        p.poll_cart(now); p.owner.bridge.control = dict(id='cmd1', state='done', count='0'); p.poll_cart(now + 1); p.poll_cart(now + 2)
-        self.assertFalse(p.cart_ready(j)); self.assertTrue(any('KHÔNG PHÁT' in a for a in p.alerts))
+    def test_empty_cart_does_not_go_live_and_keeps_trying(self):
+        now = time.time(); j = self.failed(now); p = make([j])
+        p.poll_cart(now); p.owner.bridge.control = dict(id='cmd1', state='done', count='0'); p.poll_cart(now + 1)
+        self.assertFalse(p.cart_ready(j)); self.assertTrue(any('giỏ đang TRỐNG' in a for a in p.alerts))
+        j['cart']['probe'] = dict(at=now + 61, live=False); p.poll_cart(now + 61)
+        self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
 
-    def test_no_answer_from_chrome_means_no_live(self):
-        now = time.time(); j = self.failed3(now); p = make([j])
-        p.poll_cart(now); p.poll_cart(now + 30); p.poll_cart(now + 31)
-        self.assertFalse(p.cart_ready(j)); self.assertTrue(j['cart']['gave_up'])
+    def test_no_answer_from_chrome_is_looked_at_again(self):
+        now = time.time(); j = self.failed(now); p = make([j])
+        p.poll_cart(now); p.poll_cart(now + 30)
+        self.assertFalse(p.cart_ready(j)); self.assertNotIn('command', j['cart'])
+        p.poll_cart(now + 125); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'cart_check')
 
 
 class Rebind(unittest.TestCase):
@@ -133,18 +136,18 @@ class Rebind(unittest.TestCase):
     def test_two_big_windows_are_still_not_guessed(self):
         self.assertIsNone(S.rebind_window(OLD, [win(222, 20, 1600, 900), win(333, 30, 1500, 850)]))
 
-    def fail(self, profile, action, deadline=0, payload=None):
+    def broken_vision(self, profile, action, deadline=0, payload=None):
         raise StudioAttention('Cửa sổ Studio đã đổi. Kết nối lại cửa sổ, giữ các vùng đã lưu.')
 
     def test_closed_studio_means_the_live_is_over(self):
-        with patch.object(S.os, 'name', 'nt'), patch.object(V, 'execute_vision', self.fail), patch.object(S, 'list_windows', lambda: []):
-            self.assertEqual(S.execute(dict(OLD), 'stop'), {'live': False, 'studioClosed': True})
+        with patch.object(S.os, 'name', 'nt'), patch.object(V, 'execute_vision', self.broken_vision), patch.object(S, 'list_windows', lambda: []):
+            self.assertEqual(S.execute(dict(OLD), 'stop'), {'live': False, 'studioClosed': True, 'closed': True})
             with self.assertRaises(StudioAttention):
                 S.execute(dict(OLD), 'start')          # never "started" on a closed Studio
 
     def test_window_list_failure_is_not_taken_as_closed(self):
         def broken(): raise RuntimeError('powershell')
-        with patch.object(S.os, 'name', 'nt'), patch.object(V, 'execute_vision', self.fail), patch.object(S, 'list_windows', broken):
+        with patch.object(S.os, 'name', 'nt'), patch.object(V, 'execute_vision', self.broken_vision), patch.object(S, 'list_windows', broken):
             with self.assertRaises(StudioAttention):
                 S.execute(dict(OLD), 'stop')
 

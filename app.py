@@ -12,7 +12,7 @@ from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from PySide6.QtCore import QTimer, Qt, QUrl, QDateTime
 from PySide6.QtGui import QIcon, QDesktopServices, QPixmap
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget, QTabWidget, QLineEdit, QTextEdit, QCheckBox, QComboBox, QSpinBox, QDoubleSpinBox, QFileDialog, QMessageBox, QFormLayout, QGroupBox, QSlider, QDateTimeEdit, QScrollArea, QGridLayout, QSizePolicy, QStyle, QToolButton, QMenu, QAbstractSpinBox, QDialog)
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget, QListWidgetItem, QTabWidget, QLineEdit, QTextEdit, QCheckBox, QComboBox, QSpinBox, QDoubleSpinBox, QFileDialog, QMessageBox, QFormLayout, QGroupBox, QSlider, QDateTimeEdit, QScrollArea, QGridLayout, QSizePolicy, QStyle, QToolButton, QMenu, QAbstractSpinBox, QDialog)
 from PySide6.QtMultimedia import QMediaDevices
 from model import load, validate, write_json, new_session
 from obs_bridge import OBSBridge
@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.1.7'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.1.11'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -52,11 +52,11 @@ class Console(QMainWindow):
         self.compact = False; self.full_size = None
         central = QWidget(); self.setCentralWidget(central)
         layout = QVBoxLayout(central); layout.setContentsMargins(10,10,10,10); layout.setSpacing(8)
-        header = QHBoxLayout()
+        header_box = QWidget(); header_box.setObjectName('header'); header = QHBoxLayout(header_box); header.setContentsMargins(10,6,8,6)
         logo = QLabel(); logo.setPixmap(QPixmap(str(BASE/'assets/logo.png')).scaled(46,46,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)); header.addWidget(logo)
         title = QLabel('NBL LIVE'); title.setObjectName('title'); header.addWidget(title); header.addStretch()
         self.fold_button = button('Thu gọn',self.toggle_compact); header.addWidget(self.fold_button)
-        header.addWidget(button('■',self.emergency,'danger')); layout.addLayout(header)
+        header.addWidget(button('■',self.emergency,'danger')); layout.addWidget(header_box)
         self.full_panel=QWidget(); body=QVBoxLayout(self.full_panel);body.setContentsMargins(0,0,0,0);body.setSpacing(8)
         self.sessions=QListWidget();self.sessions.hide();self.sessions.currentRowChanged.connect(self.switch)
         self.account_selector=QComboBox();self.account_selector.setObjectName('accountSelector');self.account_selector.setMinimumHeight(44);self.account_selector.currentIndexChanged.connect(self.sessions.setCurrentRow);body.addWidget(self.account_selector)
@@ -69,7 +69,7 @@ class Console(QMainWindow):
         connect.setMenu(connect_menu);actions=QHBoxLayout();actions.addWidget(connect,1);actions.addWidget(manage,1);body.addLayout(actions)
         self.navigation=QComboBox();self.navigation.setMinimumHeight(42);body.addWidget(self.navigation)
         self.tabs=QTabWidget();self.tabs.tabBar().hide();self.navigation.currentIndexChanged.connect(self.tabs.setCurrentIndex);body.addWidget(self.tabs,1)
-        self.build_video();self.build_script();self.build_chrome();self.build_obs();self.build_schedule();self.build_tools()
+        self.build_video();self.build_script();self.build_chrome();self.build_pin_scripts();self.build_obs();self.build_schedule();self.build_tools()
         for form in self.findChildren(QFormLayout): form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
         self.logbox=QTextEdit();self.logbox.setReadOnly(True);self.logbox.setMaximumHeight(80);self.logbox.hide();body.addWidget(self.logbox)
         body.addWidget(button('Hiện / ẩn nhật ký',lambda:self.logbox.setVisible(not self.logbox.isVisible())))
@@ -125,10 +125,74 @@ class Console(QMainWindow):
         for d in QMediaDevices.audioOutputs(): self.device.addItem(d.description(),bytes(d.id()).hex())
         self.audio_devices=QMediaDevices(self);self.audio_devices.audioOutputsChanged.connect(self.refresh_devices)
         form = QFormLayout();form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows); form.addRow('Đầu ra âm thanh riêng',self.device); self.volume = QSlider(Qt.Orientation.Horizontal); self.volume.setRange(0,100); form.addRow('Âm lượng',self.volume); v.addLayout(form)
+        v.addWidget(button('🎧 Phát vào cáp ảo (máy không nghe, LIVE vẫn có tiếng)',self.use_virtual_cable,'primary'))
         note = QLabel('Nhiều phiên: chọn thiết bị / cáp âm thanh ảo riêng cho từng cửa sổ và chọn đúng đầu vào trong LIVE Studio. Tắt nguồn thu âm thanh máy dùng chung. App không tự tạo cáp âm thanh ảo.'); note.setWordWrap(True); note.setObjectName('subtitle'); v.addWidget(note)
         row = QGridLayout()
         for i,(text, action, kind) in enumerate( [('LƯU PHIÊN',self.save_current,''),('MỞ & PHÁT',lambda:self.command('play'),'primary'),('Tạm dừng / tiếp',lambda:self.command('pause'),''),('Video tiếp',lambda:self.command('next'),''),('Dừng video',lambda:self.command('stop'),'danger')]):row.addWidget(button(text,action,kind),i//2,i%2)
         v.addLayout(row)
+    def use_virtual_cable(self):
+        # 4.1.11 (owner, 26/10/2026): NBL VIDEO plays into a VB-CABLE, Studio takes its
+        # sound from the cable — the PC speakers stay quiet, the LIVE keeps the sound.
+        from pin_scripts import pick_cable
+        devices=[(self.device.itemText(i),self.device.itemData(i)) for i in range(self.device.count())]
+        mine=self.current().get('id');used=[s.get('device') for s in self.data['sessions'] if s.get('id')!=mine and s.get('device')]
+        found=pick_cable(devices,used)
+        if not found:
+            cables=pick_cable(devices,())
+            QMessageBox.information(self,'Cáp âm thanh ảo',('Máy có cáp ảo nhưng nick khác đang dùng rồi. 2 nick phát cùng lúc cần 2 cáp riêng (VB-CABLE A+B), nếu không tiếng 2 LIVE trộn vào nhau.' if cables else 'Máy chưa có cáp âm thanh ảo.')+'\n\nCài VB-CABLE (miễn phí, vb-audio.com) → khởi động lại máy → bấm lại nút này.');return
+        index=self.device.findData(found[0]);self.device.setCurrentIndex(index);self.save_current()
+        QMessageBox.information(self,'Đã chọn cáp ảo','NBL VIDEO của nick này giờ phát vào: '+found[1]+' (loa máy sẽ im).\n\nTrong TikTok LIVE Studio: thêm nguồn âm thanh / micro là "'+found[2]+'" và TẮT thu âm thanh hệ thống (để không lặp tiếng).\n\nMuốn nghe thử: Windows → Âm thanh → Ghi âm → '+found[2]+' → Thuộc tính → Nghe → tick "Nghe thiết bị này".')
+    def build_pin_scripts(self):
+        # 4.1.11 (owner, 26/10/2026): "Kịch bản ghim giỏ hàng" — watch a clip, stop, plant
+        # flags (product name + how long), saved per clip; used by Chrome during the LIVE.
+        import pin_scripts
+        self.pin_store=pin_scripts.Store(DATA/'kich_ban_ghim.json')
+        v=self.page('Kịch bản ghim giỏ hàng')
+        info=QLabel('Mở clip ra xem như YouTube: phát, dừng, tua. Thấy chỗ hợp thì bấm 🚩 Cắm cờ, chọn tên sản phẩm và giữ bao lâu, rồi Lưu. Kịch bản lưu riêng từng clip. Khi LIVE phát clip đó, Chrome tự ghim chèn đúng giây đã cắm cờ, xong ghim xáo trộn chạy tiếp.');info.setWordWrap(True);v.addWidget(info)
+        self.script_clips=QListWidget();self.script_clips.setMinimumHeight(180);self.script_clips.itemDoubleClicked.connect(lambda item:self.open_pin_script());v.addWidget(self.script_clips,1)
+        row=QGridLayout()
+        for i,(text,action,kind) in enumerate([('🎬 Soạn kịch bản clip đã chọn',self.open_pin_script,'primary'),('Chọn file video khác…',self.open_pin_script_file,''),('Xóa kịch bản clip đã chọn',self.delete_pin_script,'danger'),('Làm mới danh sách',self.refresh_pin_scripts,'')]):row.addWidget(button(text,action,kind),i//2,i%2)
+        v.addLayout(row);self.navigation.currentIndexChanged.connect(lambda i:self.refresh_pin_scripts());self.refresh_pin_scripts()
+    def refresh_pin_scripts(self):
+        if not hasattr(self,'script_clips'):return
+        clips=[];selected=self.script_clips.currentItem().data(Qt.ItemDataRole.UserRole) if self.script_clips.currentItem() else None
+        for s in self.data.get('sessions',[]):
+            for clip in s.get('playlist',[]):
+                if clip not in clips:clips.append(clip)
+        for item in self.pin_store.load().values():
+            if item.get('path') and item['path'] not in clips:clips.append(item['path'])
+        self.script_clips.clear()
+        for clip in clips:
+            n=len(self.pin_store.entries(clip));missing=not Path(clip).exists()
+            it=QListWidgetItem(('✅ '+str(n)+' cờ · ' if n else '◻ chưa có kịch bản · ')+Path(clip).name+(' (không thấy file)' if missing else ''));it.setData(Qt.ItemDataRole.UserRole,clip);self.script_clips.addItem(it)
+            if clip==selected:self.script_clips.setCurrentItem(it)
+    def cart_titles(self):
+        titles=[]
+        try:
+            snap=self.bridge.snapshot();binding=self.current().get('chrome_binding')
+            from session_binding import resolve_binding
+            client=resolve_binding(binding,snap) if binding else None
+            for key,state in ([(client,snap.get(client,{}))] if client else list(snap.items())):
+                for t in state.get('cartTitles') or []:
+                    if t not in titles:titles.append(t)
+        except Exception:pass
+        return titles
+    def open_pin_script(self,clip=None):
+        clip=clip or (self.script_clips.currentItem().data(Qt.ItemDataRole.UserRole) if self.script_clips.currentItem() else None)
+        if not clip:QMessageBox.information(self,'Kịch bản ghim','Chọn một clip trong danh sách (hoặc Chọn file video khác…).');return
+        if not Path(clip).exists():QMessageBox.warning(self,'Kịch bản ghim','Không thấy file clip: '+clip);return
+        try:
+            from pin_script_editor import PinScriptEditor
+            PinScriptEditor(self,clip,self.pin_store,self.cart_titles).exec()
+        except Exception as error:QMessageBox.warning(self,'Kịch bản ghim','Chưa mở được trình xem clip: '+str(error))
+        self.refresh_pin_scripts()
+    def open_pin_script_file(self):
+        path,_=QFileDialog.getOpenFileName(self,'Chọn clip','','Video (*.mp4 *.mkv *.mov *.avi *.webm);;Tất cả (*)')
+        if path:self.open_pin_script(path)
+    def delete_pin_script(self):
+        item=self.script_clips.currentItem()
+        if item and QMessageBox.question(self,'Xóa kịch bản','Xóa kịch bản ghim của clip '+Path(item.data(Qt.ItemDataRole.UserRole)).name+'?')==QMessageBox.StandardButton.Yes:
+            self.pin_store.delete(item.data(Qt.ItemDataRole.UserRole));self.refresh_pin_scripts()
     def refresh_devices(self):
         selected=self.device.currentData() or '';self.device.blockSignals(True);self.device.clear();self.device.addItem('Thiết bị mặc định của Windows','')
         for d in QMediaDevices.audioOutputs():self.device.addItem(d.description(),bytes(d.id()).hex())

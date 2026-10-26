@@ -57,29 +57,32 @@ class Cart(unittest.TestCase):
         p.owner.bridge.control = dict(id='cmd1', state='done', added='8', total='10', bundle='MỚI NHẤT')
         p.poll_cart(now)
         self.assertEqual(j['cart']['state'], 'ready'); self.assertFalse(j['cart']['verified'])
-        p.poll_cart(j['start']-100)
+        j['cart']['probe'] = dict(at=j['start']-100, live=False); p.poll_cart(j['start']-100)          # 4.1.9: the LIVE page is reloaded ~2-3 min before the LIVE
+        self.assertEqual(p.owner.bridge.commands[-1]['action'], 'reload_page')
+        p.poll_cart(j['start']-80)
         self.assertEqual(p.owner.bridge.commands[-1]['action'], 'cart_check')
-        p.owner.bridge.control = dict(id='cmd2', state='done', count='8'); p.poll_cart(j['start']-95)
+        p.owner.bridge.control = dict(id=j['cart']['command'], state='done', count='8'); p.poll_cart(j['start']-75)
         self.assertTrue(j['cart']['verified']); self.assertTrue(p.cart_ready(j))
 
     def test_cart_emptied_by_tiktok_is_added_again_once(self):
-        now = time.time(); j = job(start=now+100, cart=dict(state='ready', attempts=0, next=0, verified=False, probe=dict(at=now, live=False))); p = make([j])
+        now = time.time(); j = job(start=now+100, cart=dict(state='ready', attempts=0, next=0, verified=False, probe=dict(at=now, live=False), pre_reload=True, reloaded_at=now - 60)); p = make([j])
         p.poll_cart(now)
         p.owner.bridge.control = dict(id='cmd1', state='done', count='0'); p.poll_cart(now)
         self.assertEqual(j['cart']['state'], 'none'); self.assertTrue(any('TRỐNG' in a for a in p.alerts))
         p.poll_cart(now); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
 
-    def test_three_failures_mean_no_live(self):
-        now = time.time(); j = job(start=now+60); p = make([j])
-        for i in range(3):
-            j['cart']['probe'] = dict(at=now + i*400, live=False); p.poll_cart(now + i*400)
-            p.owner.bridge.control = dict(id='cmd%d' % (i+1), state='failed', error='Không có bộ sản phẩm số 2')
-            p.poll_cart(now + i*400 + 1)
-        p.poll_cart(now + 2000)            # 4.1.7: first looks whether the cart still has products
-        self.assertEqual(p.owner.bridge.commands[-1]['action'], 'cart_check')
-        p.owner.bridge.control = dict(id='cmd4', state='done', count='0'); p.poll_cart(now + 2001); p.poll_cart(now + 2002)
-        self.assertEqual(j['cart']['attempts'], 3); self.assertTrue(any('KHÔNG PHÁT' in a for a in p.alerts))
-        self.assertFalse(p.cart_ready(j))
+    def test_failures_are_retried_until_the_live(self):
+        # 4.1.8 (owner 25/10/2026 "không tự thử lại"): no 3-try limit any more.
+        now = time.time(); j = job(start=now+3600); p = make([j])
+        for i in range(6):
+            t = now + i*200
+            j['cart']['probe'] = dict(at=t, live=False); j['cart']['reloaded_at'] = t - 60; p.poll_cart(t)
+            self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
+            p.owner.bridge.control = dict(id=j['cart']['command'], state='failed', error='Không có bộ sản phẩm số 2')
+            p.poll_cart(t + 1)
+        self.assertEqual((j['cart']['attempts'], j['cart']['state']), (6, 'failed'))
+        self.assertEqual(sum('Thêm giỏ hàng chưa được' in a for a in p.alerts), 2)     # 1st and 5th, not every time
+        self.assertFalse(any('KHÔNG PHÁT' in a for a in p.alerts))
 
     def test_chrome_not_connected_counts_as_failure(self):
         now = time.time(); j = job(); p = make([j]); p.owner.bridge.down = True

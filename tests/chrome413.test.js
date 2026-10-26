@@ -54,6 +54,7 @@ test('the auto close runs on every app tick and a busy refusal reaches the app a
  assert.match(src,/try\{closeNotices\(\);\}catch\(e\)\{log\(e\.message\);\}\n try\{autoCloseSummary\(\);\}catch\(e\)\{\}/);
  assert.match(src,/controlResult=\{id:c\.id,state:'failed',error,busy:'1'\}/);
 });
-test('adding products goes on even if the end box cannot be closed',()=>{
- assert.match(src,/try\{await closeSummary\(\);\}catch\(e\)\{log\(e\.message\);\}valid\(\);/);
+test('4.1.8: a box that cannot be closed stops the cart with "busy" (retried) instead of clicking under it',()=>{
+ assert.match(src,/try\{await closeSummary\(\);\}catch\(e\)\{log\(e\.message\);if\(e\.busy\|\|summaryDialog\(\)\)throw/);
+ assert.match(src,/\.\.\.\(e\.busy\?\{busy:'1'\}:\{\}\)/);
 });

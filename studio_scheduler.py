@@ -66,7 +66,7 @@ def execute(profile,action,deadline=0,payload=None):
  if os.name!='nt':raise RuntimeError('Điều khiển LIVE Studio chỉ chạy trên Windows; chưa xác minh trên máy này.')
  required=['pid','windowTitle','exePath']
  # 4.1: with reading-by-image set up, starting and ending the LIVE also go through it.
- if action=='vision_capture' or (profile.get('vision',{}).get('enabled') and action in ('send','chat_check','greet_scan','greet','status','start','stop')):
+ if action=='vision_capture' or (profile.get('vision',{}).get('enabled') and action in ('send','chat_check','greet_scan','greet','status','start','stop','close_summary','reset_live')):
   if not is_studio_window(profile):raise ValueError('Chọn đúng cửa sổ LIVE Studio trước.')
   from studio_vision import execute_vision
   try:return execute_vision(profile,action,deadline,payload)
@@ -80,8 +80,8 @@ def execute(profile,action,deadline=0,payload=None):
    fresh=rebind_window(profile,windows) if windows is not None else None
    # 4.1.7 (owner log 20/10/2026 13:58): no TikTok LIVE Studio window is left at all
    # = Studio was closed, so the LIVE is over. Say so instead of "tắt tay ngay".
-   if not fresh and windows is not None and action in ('status','stop') and not studio_windows(profile,windows,free_only=False):
-    return {'live':False,'studioClosed':True}
+   if not fresh and windows is not None and action in ('status','stop','close_summary') and not studio_windows(profile,windows,free_only=False):
+    return {'live':False,'studioClosed':True,'closed':True}
    if not fresh:raise type(error)('Studio đã mở lại thành cửa sổ mới nhưng NBL không chắc cửa sổ nào của nick này. Bấm Kết nối LIVE Studio → Tìm cửa sổ, chọn lại rồi Lưu (vùng đã khoanh được giữ).') from error
    result=execute_vision(fresh,action,deadline,payload)
    if isinstance(result,dict):result.update(windowHandle=fresh['windowHandle'],pid=fresh['pid'],windowTitle=fresh['windowTitle'],rebound=True)
