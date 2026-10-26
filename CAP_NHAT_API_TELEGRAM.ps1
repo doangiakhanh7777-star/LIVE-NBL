@@ -17,8 +17,6 @@ function ThemThuMuc([System.Collections.Generic.List[string]]$list,[string]$p){
 
 $ungVien=[System.Collections.Generic.List[string]]::new()
 if(HopLe $Target){ ThemThuMuc $ungVien $Target }
-
-# 1) Tự tìm theo vị trí thường dùng.
 foreach($p in @(
   "$env:USERPROFILE\Desktop\NBL_LIVE",
   "$env:LOCALAPPDATA\Programs\NBL_LIVE",
@@ -27,7 +25,6 @@ foreach($p in @(
   "${env:ProgramFiles(x86)}\NBL_LIVE"
 )){ ThemThuMuc $ungVien $p }
 
-# 2) Tự đọc shortcut NBL LIVE trên Desktop và Start Menu.
 try {
   $ws=New-Object -ComObject WScript.Shell
   $shortcutRoots=@(
@@ -44,7 +41,6 @@ try {
         if($tp){
           $dir=Split-Path -Parent $tp
           ThemThuMuc $ungVien $dir
-          # Shortcut đôi khi trỏ vào file con trong thư mục cài.
           if($dir){ ThemThuMuc $ungVien (Split-Path -Parent $dir) }
         }
         if($sc.WorkingDirectory){ ThemThuMuc $ungVien $sc.WorkingDirectory }
@@ -53,7 +49,6 @@ try {
   }
 } catch {}
 
-# 3) Tự đọc vị trí cài trong Registry nếu có.
 foreach($key in @(
   'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NBL_LIVE_4.0.2',
   'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NBL_LIVE_4.0.2',
@@ -64,7 +59,6 @@ foreach($key in @(
   try { ThemThuMuc $ungVien ((Get-ItemProperty -LiteralPath $key -ErrorAction Stop).InstallLocation.Trim('"')) } catch {}
 }
 
-# 4) Nếu app đang mở, lấy luôn vị trí thật từ tiến trình rồi yêu cầu đóng trước khi cập nhật.
 try {
   Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe' OR Name='NBL_LIVE.exe'" | ForEach-Object {
     if($_.ExecutablePath){
@@ -76,8 +70,6 @@ try {
 } catch {}
 
 if($ungVien.Count -gt 0){ $Target=$ungVien[0] }
-
-# 5) Cuối cùng mới cho người dùng chọn bằng chuột.
 if(-not (HopLe $Target)){
   try {
     Add-Type -AssemblyName System.Windows.Forms
@@ -89,10 +81,7 @@ if(-not (HopLe $Target)){
     }
   } catch {}
 }
-
-if(-not (HopLe $Target)){
-  BaoLoi 'Không tìm thấy thư mục cài NBL LIVE thật. Thư mục đúng phải có app.py và runtime\python.exe.'
-}
+if(-not (HopLe $Target)){ BaoLoi 'Không tìm thấy thư mục cài NBL LIVE thật. Thư mục đúng phải có app.py và runtime\python.exe.' }
 $Target=(Resolve-Path -LiteralPath $Target).Path
 Write-Host ('Đã tìm thấy NBL LIVE tại: '+$Target)
 
@@ -109,7 +98,6 @@ New-Item -ItemType Directory -Path $backup -Force | Out-Null
 $branch='openclaw-local-api'
 $base='https://raw.githubusercontent.com/doangiakhanh7777-star/LIVE-NBL/'+$branch+'/'
 $files=@('bootstrap.py','app_with_api.py','local_api.py','chrome_reload_patch.py','cart_retry_patch.py','strict_cart_gate_patch.py')
-
 foreach($name in $files){
   $dest=Join-Path $Target $name
   if(Test-Path -LiteralPath $dest){ Copy-Item -LiteralPath $dest -Destination (Join-Path $backup $name) -Force }
@@ -158,11 +146,59 @@ if($LASTEXITCODE -ne 0){
   BaoLoi 'Kiểm tra file bị lỗi. Đã khôi phục app.py cũ.'
 }
 
+# Tạo launcher ẩn: icon NBL LIVE sẽ chạy bootstrap.py bằng runtime của chính app.
+$pythonw=Join-Path $Target 'runtime\pythonw.exe'
+if(-not (Test-Path -LiteralPath $pythonw)){ $pythonw=$py }
+$bootstrap=Join-Path $Target 'bootstrap.py'
+$wrapper=Join-Path $Target 'MO_NBL_LIVE_TELEGRAM.vbs'
+$escPy=$pythonw.Replace('"','""')
+$escBoot=$bootstrap.Replace('"','""')
+$escDir=$Target.Replace('"','""')
+$vbs="Set sh = CreateObject(`"WScript.Shell`")`r`nsh.CurrentDirectory = `"$escDir`"`r`nsh.Run `"`"`"$escPy`"`" `"`"$escBoot`"`"`", 0, False`r`n"
+[IO.File]::WriteAllText($wrapper,$vbs,[Text.Encoding]::ASCII)
+
+$ws=New-Object -ComObject WScript.Shell
+$desktop=[Environment]::GetFolderPath('Desktop')
+$desktopLink=Join-Path $desktop 'NBL LIVE.lnk'
+$sc=$ws.CreateShortcut($desktopLink)
+$sc.TargetPath=Join-Path $env:SystemRoot 'System32\wscript.exe'
+$sc.Arguments='"'+$wrapper+'"'
+$sc.WorkingDirectory=$Target
+$sc.Description='Mở NBL LIVE có điều khiển Telegram'
+$iconExe=Join-Path $Target 'NBL_LIVE.exe'
+$iconIco=Join-Path $Target 'assets\logo_38.ico'
+if(Test-Path -LiteralPath $iconExe){ $sc.IconLocation=$iconExe+',0' }
+elseif(Test-Path -LiteralPath $iconIco){ $sc.IconLocation=$iconIco }
+$sc.Save()
+
+# Đồng bộ các shortcut NBL LIVE cũ trong Start Menu/Desktop về launcher mới.
+$shortcutRoots=@(
+  [Environment]::GetFolderPath('Desktop'),
+  "$env:PUBLIC\Desktop",
+  [Environment]::GetFolderPath('StartMenu'),
+  "$env:ProgramData\Microsoft\Windows\Start Menu"
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+foreach($root in $shortcutRoots){
+  Get-ChildItem -LiteralPath $root -Filter '*.lnk' -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.BaseName -match '^NBL LIVE' } | ForEach-Object {
+    try {
+      $x=$ws.CreateShortcut($_.FullName)
+      $x.TargetPath=Join-Path $env:SystemRoot 'System32\wscript.exe'
+      $x.Arguments='"'+$wrapper+'"'
+      $x.WorkingDirectory=$Target
+      $x.Description='Mở NBL LIVE có điều khiển Telegram'
+      if(Test-Path -LiteralPath $iconExe){ $x.IconLocation=$iconExe+',0' }
+      elseif(Test-Path -LiteralPath $iconIco){ $x.IconLocation=$iconIco }
+      $x.Save()
+    } catch {}
+  }
+}
+
 Write-Host ''
 Write-Host '========================================='
 Write-Host 'ĐÃ CẬP NHẬT ĐIỀU KHIỂN TELEGRAM'
 Write-Host ('Thư mục NBL: '+$Target)
 Write-Host ('Bản sao lưu : '+$backup)
-Write-Host 'Bây giờ mở NBL LIVE bằng biểu tượng như bình thường.'
+Write-Host 'Đã sửa biểu tượng NBL LIVE trên Desktop để tự bật API.'
+Write-Host 'Bây giờ mở NBL LIVE bằng biểu tượng NBL LIVE như bình thường.'
 Write-Host 'Sau khi app mở, Telegram gửi /kiemtra.'
 Write-Host '========================================='
