@@ -5,7 +5,7 @@ pinned; the flags are saved as the clip's "kịch bản ghim giỏ hàng".
 The preview is its own player (muted by default) — it never touches NBL VIDEO and its
 window is not called "NBL VIDEO", so Studio never captures it."""
 from pathlib import Path
-from PySide6.QtCore import Qt, QUrl, QRect
+from PySide6.QtCore import Qt, QUrl, QRect, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut, QPainter, QColor, QPen
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSlider, QTableWidget,
                                QTableWidgetItem, QAbstractItemView, QHeaderView, QMessageBox, QComboBox, QSpinBox,
@@ -40,19 +40,40 @@ class FlagSlider(QSlider):
 
 
 class FlagDialog(QDialog):
-    def __init__(self, parent, at, names, entry=None):
-        super().__init__(parent); self.setWindowTitle('Cắm cờ ghim · ' + P.fmt(at))
+    def __init__(self, parent, at, names, entry=None, finder=None):
+        super().__init__(parent); self.setWindowTitle('Cắm cờ ghim · ' + P.fmt(at)); self.finder = finder
         form = QFormLayout(self)
         form.addRow(QLabel('Tại giây <b>' + P.fmt(at) + '</b> của clip, NBL sẽ ghim món này rồi tháo sau thời gian giữ.'))
         self.name = QComboBox(); self.name.setEditable(True); self.name.addItems(names)
         self.name.setCurrentText(entry['name'] if entry else ''); self.name.lineEdit().setPlaceholderText('Dán đúng tên sản phẩm hoặc chọn từ giỏ')
-        form.addRow('Tên sản phẩm', self.name)
+        form.addRow('Tên sản phẩm (3–4 chữ đầu) hoặc số thứ tự', self.name)
+        test = QPushButton('🔍 Tìm thử trên Chrome'); test.clicked.connect(self.try_find); self.found = QLabel(''); self.found.setWordWrap(True)
+        self.found.setStyleSheet('color:#9a3412;font-weight:600'); form.addRow(test, self.found)
         self.hold = QSpinBox(); self.hold.setRange(P.MIN_HOLD, P.MAX_HOLD); self.hold.setSuffix(' giây')
         self.hold.setValue(int(entry['hold']) if entry else P.DEFAULT_HOLD)
         form.addRow('Giữ ghim bao lâu (ít nhất 3 giây)', self.hold)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText('Lưu cờ'); buttons.button(QDialogButtonBox.StandardButton.Cancel).setText('Hủy')
         buttons.accepted.connect(self.check); buttons.rejected.connect(self.reject); form.addRow(buttons)
+
+    def try_find(self):
+        # 4.1.13 (owner): type 3–4 words (or a number), Chrome looks it up and says what it finds
+        text = self.name.currentText().strip()
+        if not text:
+            self.found.setText('Nhập tên hoặc số trước.'); return
+        if not self.finder:
+            self.found.setText('Chưa nối được Chrome.'); return
+        try:
+            answer = self.finder(text)
+        except Exception as error:
+            self.found.setText(str(error)); return
+        self.found.setText('Đang nhờ Chrome tìm…'); started = [0]
+        timer = QTimer(self)
+        def poll():
+            started[0] += 1; text_found = answer()
+            if text_found or started[0] > 40:
+                timer.stop(); self.found.setText(text_found or 'Chrome chưa trả lời (tab LIVE có đang mở không?)')
+        timer.timeout.connect(poll); timer.start(500)
 
     def check(self):
         if not self.name.currentText().strip():
@@ -61,11 +82,11 @@ class FlagDialog(QDialog):
 
 
 class PinScriptEditor(QDialog):
-    def __init__(self, parent, clip, store, titles=lambda: []):
+    def __init__(self, parent, clip, store, titles=lambda: [], finder=None):
         super().__init__(parent)
         from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
         from PySide6.QtMultimediaWidgets import QVideoWidget
-        self.clip, self.store, self.titles = str(clip), store, titles
+        self.clip, self.store, self.titles, self.finder = str(clip), store, titles, finder
         self.entries = [dict(e) for e in store.entries(clip)]; self.dirty = False
         self.setWindowTitle('Kịch bản ghim giỏ hàng — ' + Path(self.clip).name); self.resize(980, 760)
         v = QVBoxLayout(self)
@@ -162,7 +183,7 @@ class PinScriptEditor(QDialog):
         self.pause(); at = round(self.now(), 1)
         if any(abs(e['at'] - at) < 0.05 for e in self.entries):
             QMessageBox.information(self, 'Đã có cờ', 'Chỗ này đã có cờ; bấm vào cờ đó để sửa.'); return
-        d = FlagDialog(self, at, self.names())
+        d = FlagDialog(self, at, self.names(), finder=self.finder)
         if d.exec():
             e = dict(at=at, name=d.name.currentText().strip(), hold=d.hold.value())
             self.entries.append(e); self.dirty = True; self.redraw(e); self.hint()
@@ -171,7 +192,7 @@ class PinScriptEditor(QDialog):
         e = self.selected()
         if not e:
             self.status.setText('Chọn một cờ trong bảng trước.'); return
-        d = FlagDialog(self, e['at'], self.names(), e)
+        d = FlagDialog(self, e['at'], self.names(), e, finder=self.finder)
         if d.exec():
             e.update(name=d.name.currentText().strip(), hold=d.hold.value()); self.dirty = True; self.redraw(e); self.hint()
 

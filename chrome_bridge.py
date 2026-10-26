@@ -89,6 +89,8 @@ class ChromeBridge:
                     modules=reply.get('modules',{})
                     state['modules']={k:dict(running=bool(v.get('running')),error=str(v.get('error',''))[:500],detail=str(v.get('detail',''))[:500]) for k,v in modules.items() if k in ('pin','reply') and isinstance(v,dict)} if isinstance(modules,dict) else {};state['last']=time.monotonic()
                     if isinstance(reply.get('cartTitles'),list):state['cartTitles']=[str(x)[:200] for x in reply['cartTitles'][:300]]   # 4.1.11: check pin scripts
+                    fr=reply.get('findResult')
+                    if isinstance(fr,dict):state['findResult']={k:str(v)[:400] for k,v in fr.items() if k in ('id','state','text')}   # 4.1.13: Tìm thử
                     control=reply.get('control',{});state['control']={k:str(v)[:500] for k,v in control.items() if k in ('id','state','error','bundle','added','total','skipped','count','index','busy')} if isinstance(control,dict) else {}
                 config=reply.get('config');account=state['account']
                 if self.config_path and state.get('accountVerified') and isinstance(config,dict) and config and account not in ('Chưa chọn tài khoản','Chưa đăng nhập','Chưa hiệu chỉnh','Không đọc được trang','Đang đọc trang'):
@@ -143,9 +145,9 @@ class ChromeBridge:
                 if command['action']=='stop':self._flush_unconfirmed=True
     def snapshot(self):
         with self.lock:
-            return {k:{a:copy.deepcopy(v) for a,v in s.items() if a in ('tab','instance','account','accountVerified','modules','control','config','configAck','ackErrors','cartTitles')} for k,s in self.clients.items() if time.monotonic()-s['last']<10}
+            return {k:{a:copy.deepcopy(v) for a,v in s.items() if a in ('tab','instance','account','accountVerified','modules','control','config','configAck','ackErrors','cartTitles','findResult')} for k,s in self.clients.items() if time.monotonic()-s['last']<10}
     def command(self,client,payload):
-        if payload.get('action') not in ('start','stop','prepare_bundle','finish_live','cart_check','reload_page','clip_sync'):raise ValueError('Lệnh không hợp lệ.')
+        if payload.get('action') not in ('start','stop','prepare_bundle','finish_live','cart_check','reload_page','clip_sync','find_product'):raise ValueError('Lệnh không hợp lệ.')
         if payload.get('module') not in ('pin','reply','all'):raise ValueError('Mục không hợp lệ.')
         with self.lock:
             if self.closing and payload.get('action')!='stop':raise ValueError('App đang đóng; không nhận lệnh chạy mới.')

@@ -13,7 +13,7 @@ CLIP = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False).name
 
 METHODS = ('tick', 'notify', 'action_failed', 'start_video', 'warn_shared_audio', 'on_started', 'resume_automation',
            'on_stopped', 'watch_dark', 'poll_chrome_modules', 'start_chrome_modules', 'cart_ready', 'poll_cart',
-           'cart_failed', 'close_chrome_summary', 'stop_owned_video', 'stop_chrome', 'drop_job', 'end_hand_live', 'postpone', 'watch_summary', 'poll_summary', 'poll_clip', 'reset_done', 'reset_failed', 'check_scripts')
+           'cart_failed', 'close_chrome_summary', 'stop_owned_video', 'stop_chrome', 'drop_job', 'end_hand_live', 'postpone', 'watch_summary', 'poll_summary', 'poll_clip', 'reset_done', 'reset_failed')
 
 
 def panel_class():

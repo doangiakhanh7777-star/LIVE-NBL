@@ -80,19 +80,11 @@ class AppSide(unittest.TestCase):
         now = time.time(); p = make([]); p.owner.path = types.SimpleNamespace(parent=self.tmp); self.video(now)
         p.poll_clip(now); c = p.owner.bridge.commands[-1]
         self.assertEqual((c['action'], c['script'][0]['name']), ('clip_sync', 'Bơm lốp mini'))
-
-    def test_missing_names_are_reported_once_the_cart_is_ready(self):
-        now = time.time(); j = job(start=now + 600, cart=dict(state='ready', ready_at=now - 30))
-        sessions = {'s1': dict(id='s1', device='', mute=False, playlist=[str(self.clip)])}
-        p = make([j], sessions=sessions); p.owner.path = types.SimpleNamespace(parent=self.tmp)
-        p.owner.bridge.snapshot = lambda: {'client': dict(cartTitles=['Vietmap Live Pro'])}
-        p.check_scripts(now, P.Store(self.tmp/'kich_ban_ghim.json'))
-        self.assertTrue(any('KHÔNG có trong giỏ' in a and 'Bơm lốp mini' in a for a in p.alerts))
-        p.alerts.clear(); p.check_scripts(now + 5, P.Store(self.tmp/'kich_ban_ghim.json')); self.assertEqual(p.alerts, [])   # once
+        self.assertEqual(p.sync_info['s1']['flags'], 1)              # 4.1.13: shown in the clip list
 
     def test_app_has_the_page_the_editor_and_the_cable_button(self):
         app = (ROOT/'app.py').read_text(encoding='utf-8'); ed = (ROOT/'pin_script_editor.py').read_text(encoding='utf-8')
-        for text in ("self.page('Kịch bản ghim giỏ hàng')", 'Phát vào cáp ảo', 'PinScriptEditor(self,clip,self.pin_store,self.cart_titles)'):
+        for text in ('Soạn kịch bản ghim cho clip đã chọn', 'Phát vào cáp ảo', 'PinScriptEditor(self,clip,self.pin_store,self.cart_titles,self.find_on_chrome)'):
             self.assertIn(text, app)
         for text in ("'⏸ Dừng'", 'Qt.Key.Key_Space', '🚩 Cắm cờ tại đây', 'self.audio.setMuted(True)', 'Dời cờ tới chỗ đang xem', 'P.MIN_HOLD, P.MAX_HOLD'):
             self.assertIn(text, ed)

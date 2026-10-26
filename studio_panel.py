@@ -40,7 +40,7 @@ STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử 
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.1.11 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.1.14 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
@@ -767,27 +767,9 @@ class StudioPanel(QWidget):
     session,client=self.client(p)
     video=json.loads((self.owner.path.parent/'runtime'/session['id']/'status.json').read_text(encoding='utf-8'))
     if now-float(video.get('time',0))>5:continue
-    self.owner.bridge.command(client,pin_scripts.sync_payload(store,video))
-   except Exception:pass
-  self.check_scripts(now,store)
- def check_scripts(self,now,store):
-  # 4.1.11: once the cart of the next LIVE is ready, compare the clip scripts of the
-  # nick with the products really in the cart and say which names are missing.
-  import pin_scripts
-  for j in self.jobs:
-   if j['no_sales'] or j['state'] not in ('pending','start_retry','running') or j.get('script_check'):continue
-   cart=j.get('cart') or {}
-   if j['state']!='running' and (cart.get('state')!='ready' or now-cart.get('ready_at',0)<20):continue
-   try:
-    p=self.profile(j['profile']);session,client=self.client(p)
-    titles=self.owner.bridge.snapshot().get(client,{}).get('cartTitles') or []
-    if not titles:continue
-    j['script_check']=now;problems=[]
-    for clip in session.get('playlist',[]):
-     entries=store.entries(clip)
-     lost=pin_scripts.missing(entries,titles) if entries else []
-     if lost:problems.append(Path(clip).name+': '+', '.join(lost[:5])+(' …' if len(lost)>5 else ''))
-    if problems:self.notify(j,'script','Kịch bản ghim có món KHÔNG có trong giỏ (sẽ không ghim được): '+' | '.join(problems))
+    msg=pin_scripts.sync_payload(store,video);self.owner.bridge.command(client,msg)
+    if not hasattr(self,'sync_info'):self.sync_info={}
+    self.sync_info[p['session']]=dict(at=now,clip=msg['clip'],flags=len(msg['script']))   # shown in the clip list
    except Exception:pass
  def stop_owned_video(self,j,force=False):
   # 4.1.2 (owner, 19/10/2026 02:40): NBL never stops the owner's video. A stopped

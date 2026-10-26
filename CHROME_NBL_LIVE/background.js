@@ -49,7 +49,7 @@ function open(state){
    if(dashboardUrl(tab.url)){
     let version;try{version=await contentMessage(state.tabId,{type:'version'},1000);}catch(e){}
     if(version?.protocol===PROTOCOL)response=await contentMessage(state.tabId,message)||response;
-    else response.acks=commands.map(c=>({id:c.id,error:'Tải lại trang LIVE để dùng tiện ích 4.1.11.'}));
+    else response.acks=commands.map(c=>({id:c.id,error:'Tải lại trang LIVE để dùng tiện ích 4.1.14.'}));
    }else response.acks=commands.map(c=>({id:c.id,error:'Chưa mở bảng LIVE của nick này.'}));
   }catch(e){
    // 4.1.1: a slow or reloading LIVE tab used to close the socket here ("Tab Chrome

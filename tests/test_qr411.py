@@ -27,7 +27,7 @@ class QrRemoved(unittest.TestCase):
         for word in ('shop_login', 'ShopLoginPanel', 'def login_binding', 'self.login_binding', 'bằng QR', 'Đăng nhập TikTok Shop · QR',
                      'Lấy mã đăng nhập', 'setCurrentIndex(8)'):
             self.assertNotIn(word, src)
-        self.assertIn("'TOOL NBL LIVE • 4.1.11'", src)
+        self.assertIn("'TOOL NBL LIVE • 4.1.14'", src)
 
     def test_bridge_refuses_login_commands(self):
         import sys

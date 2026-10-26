@@ -98,8 +98,8 @@ test('shuffle pin: all four times 0 = OFF, half-filled = clear error',()=>{
 test('the unused "bundle name" picks are gone; the pinned box on top can be unpinned',async()=>{
  assert.doesNotMatch(src,/bundleTitle:'Tên của bộ sản phẩm'/);
  const clicked=[];let pinnedOnTop=true;const button={click:()=>{clicked.push('Bỏ ghim');pinnedOnTop=false;}};
- const ctx={Error,host:{contains:()=>false},document:{},assertContext:()=>{},trackedCard:()=>{throw Error('gone');},
-  actionButtons:()=>pinnedOnTop?[button]:[],sendTarget:b=>b,log:()=>{},wait:async t=>{if(!t())throw Error('no');}};
+ const ctx={Error,host:{contains:()=>false},document:{},assertContext:()=>{},numberRows:()=>[],listBox:()=>null,pause:async()=>{},Date,toTop:async()=>{},rowOf:async()=>null,CONFIRM_MS:15000,
+  actionButtons:()=>pinnedOnTop?[button]:[],sendTarget:b=>b,log:()=>{}};
  vm.createContext(ctx);vm.runInContext(fn('pageUnpin')+fn('doUnpin').replace('function doUnpin','this.doUnpin=async function'),ctx);
  await ctx.doUnpin({title:'Vietmap'});assert.deepEqual(clicked,['Bỏ ghim']);
 });

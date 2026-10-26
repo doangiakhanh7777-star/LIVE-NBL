@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TOOL NBL LIVE — Trợ lý LIVE",
-  "version": "4.1.11",
-  "description": "Chuẩn bị giỏ, ghim sản phẩm và trả lời bình luận trên Chrome cho NBL LIVE 4.1.11.",
+  "version": "4.1.14",
+  "description": "Chuẩn bị giỏ, ghim sản phẩm và trả lời bình luận trên Chrome cho NBL LIVE 4.1.14.",
   "permissions": [
     "storage",
     "alarms"
