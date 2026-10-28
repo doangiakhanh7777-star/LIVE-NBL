@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.2'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.3'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -400,7 +400,9 @@ class Console(QMainWindow):
         if pending and time.time()-pending[1]>600:pending=self.auto_bind=None
         session=next((s for s in self.data['sessions'] if pending and s['id']==pending[0]),None) or self.current()
         if resolve_binding(session.get('chrome_binding'),clients):self.auto_bind=None;return
-        taken={resolve_binding(s.get('chrome_binding'),clients) for s in self.data['sessions'] if s is not session and s.get('chrome_binding')}
+        # 4.3.3: one nick per PC — a tab still tied to ANOTHER nick config (e.g. old nick 01) moves to the nick in use
+        moved=[s for s in self.data['sessions'] if s is not session and s.get('chrome_binding') and resolve_binding(s.get('chrome_binding'),clients)]
+        taken=set()
         bad=('Chưa chọn tài khoản','Chưa hiệu chỉnh','Không đọc được trang','Đang đọc trang','Chưa đăng nhập','Chưa xác định','',None)
         free=[c for c,st in clients.items() if c not in taken and st.get('accountVerified') is not False and st.get('account') not in bad]
         if not free or len({clients[c].get('account') for c in free})!=1:return
@@ -408,6 +410,8 @@ class Console(QMainWindow):
         try:binding=make_binding(client,clients[client])
         except ValueError:return
         old=(session.get('chrome_binding') or {}).get('account')
+        for other in moved:
+            if resolve_binding(other.get('chrome_binding'),clients)==client:other.pop('chrome_binding',None);self.log('Bỏ gắn Chrome ở nick '+str(other.get('number',''))+' (bản này chỉ chạy 1 nick; chuyển sang nick đang dùng).')
         session.pop('chrome_login_binding',None);session['chrome_binding']=binding;session['account']=binding['account']
         try:write_json(self.path,self.data)
         except Exception as e:self.log('Chưa lưu gắn Chrome: '+type(e).__name__)

@@ -46,7 +46,7 @@ STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử 
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.2 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.3 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
