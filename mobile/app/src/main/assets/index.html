@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NBL LIVE</title>
+<style>
+:root{--navy:#1f3b52;--orange:#f37021;--bg:#eef2f6;--card:#fff;--ink:#1f3b52;--mut:#6b7f90;--ok:#1f9d55;--bad:#d64545;--line:#d7dfe7}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px}
+header b{font-size:17px;flex:1}
+header select{max-width:46%;background:#2c4f6b;color:#fff;border:0;border-radius:8px;padding:6px}
+main{padding:12px 12px 90px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:10px 0 9px;font-size:12px;color:var(--mut);font-weight:600}
+nav button.on{color:var(--orange)}
+nav i{display:block;font-style:normal;font-size:19px}
+.card{background:var(--card);border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 1px 2px #0001}
+.card h3{margin:0 0 8px;font-size:15px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1}.row>.badge,.row>b{flex:none}
+.mut{color:var(--mut);font-size:13px}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:700;background:#e3e9ef}
+.badge.live{background:var(--bad);color:#fff}.badge.ok{background:#d9f2e3;color:var(--ok)}
+button.b{border:0;border-radius:10px;padding:11px 12px;font-weight:700;font-size:15px;background:#e3e9ef;color:var(--ink)}
+button.p{background:var(--orange);color:#fff}button.n{background:var(--navy);color:#fff}button.d{background:var(--bad);color:#fff}
+button.s{padding:7px 10px;font-size:13px}
+button:disabled{opacity:.5}
+input,select,textarea{width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+textarea{min-height:90px}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}
+.sw{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line)}
+.sw:first-of-type{border-top:0}
+.tg{position:relative;width:52px;height:30px;flex:none}
+.tg input{display:none}.tg span{position:absolute;inset:0;background:#c5cfd8;border-radius:99px;transition:.2s}
+.tg span:after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s}
+.tg input:checked+span{background:var(--ok)}.tg input:checked+span:after{left:25px}
+#log{font:12px/1.45 ui-monospace,Consolas,monospace;max-height:260px;overflow:auto;white-space:pre-wrap;background:#0f2233;color:#cfe3f3;border-radius:8px;padding:8px}
+.job{border-top:1px solid var(--line);padding:9px 0}.job:first-child{border-top:0}
+.err{color:var(--bad);font-size:13px}
+#toast{position:fixed;left:12px;right:12px;bottom:74px;background:#0f2233;color:#fff;padding:11px 13px;border-radius:10px;display:none;z-index:9}
+#toast.bad{background:var(--bad)}
+.hold{position:relative;overflow:hidden;width:100%}
+.hold .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:#0003}
+img.shot{width:100%;border-radius:8px;margin-top:8px;background:#000}
+video{width:100%;border-radius:8px;background:#000;max-height:46vh}
+.flag{display:flex;gap:6px;align-items:center;border-top:1px solid var(--line);padding:7px 0}
+.flag .t{font-weight:700;min-width:58px;color:var(--orange)}
+.flag .nm{flex:1;overflow:hidden;text-overflow:ellipsis}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header><b>NBL LIVE</b><select id="pcSel" aria-label="Chọn PC"></select></header>
+<main>
+ <section id="t-home">
+  <div class="card" id="noPc">
+   <h3>Chưa ghép PC</h3>
+   <div class="mut">Trên PC: NBL → Thiết lập &amp; cảnh báo → App điện thoại → mở Camera điện thoại quét mã QR. Hoặc vào tab PC để nhập tay.</div>
+  </div>
+  <div class="card">
+   <div class="row" style="justify-content:space-between"><b id="nick">—</b><span id="liveBadge" class="badge">—</span></div>
+   <div class="mut" id="studio">Đang kết nối…</div>
+   <div class="mut" id="nextJob"></div>
+  </div>
+  <div class="card">
+   <button class="b p" id="autoBtn" style="width:100%">…</button>
+   <div class="mut" style="margin-top:6px">BẮT ĐẦU: tự bật ghim + AI khi LIVE. DỪNG: tắt ngay, không tự bật lại.</div>
+   <div class="sw"><span>📌 Ghim sản phẩm<br><span class="mut" id="pinText"></span></span><label class="tg"><input type="checkbox" id="pinOn"><span></span></label></div>
+   <div class="sw"><span>🤖 AI trả lời bình luận<br><span class="mut" id="aiText"></span></span><label class="tg"><input type="checkbox" id="aiOn"><span></span></label></div>
+  </div>
+  <div class="card">
+   <button class="b d hold" id="emBtn"><span class="fill"></span><span style="position:relative">🛑 GIỮ 2 GIÂY: TẮT KHẨN CẤP</span></button>
+   <div class="mut" style="margin-top:6px">Kết thúc LIVE, hủy lịch chưa chạy, tắt ghim/AI. NBL VIDEO vẫn phát.</div>
+  </div>
+  <div class="card">
+   <div class="row"><h3 style="margin:0">Màn hình Studio</h3><button class="b s n" id="shotBtn" style="flex:none">📷 Chụp</button></div>
+   <img class="shot hide" id="shot" alt="Ảnh Studio">
+  </div>
+  <div class="card"><h3>Nhật ký hoạt động</h3><div id="log"></div></div>
+ </section>
+
+ <section id="t-jobs" class="hide">
+  <div class="card">
+   <h3>Thêm lịch LIVE</h3>
+   <label>Ngày</label><input type="date" id="jDate">
+   <div class="row"><div><label>Bắt đầu</label><input type="time" id="jStart"></div><div><label>Kết thúc</label><input type="time" id="jEnd"></div></div>
+   <div class="row"><div><label>Bộ sản phẩm số (0 = giữ giỏ tự thêm tay)</label><input type="number" id="jBundle" min="0" max="200" value="1"></div></div>
+   <div class="sw"><span>LIVE không bán hàng (không thêm giỏ)</span><label class="tg"><input type="checkbox" id="jNoSales"><span></span></label></div>
+   <button class="b p" id="jAdd" style="width:100%;margin-top:8px">Lưu lịch</button>
+  </div>
+  <div class="card"><h3>Lịch</h3><div id="jobs" class="mut">…</div></div>
+ </section>
+
+ <section id="t-pin" class="hide">
+  <div class="card">
+   <h3>Cài đặt ghim</h3>
+   <label>Ghim theo</label><select id="pMode"><option value="number">Số thứ tự sản phẩm</option><option value="name">Tên sản phẩm</option></select>
+   <label>Danh sách ghim (số: 1,2,3 hoặc tên, mỗi dòng một sản phẩm)</label><textarea id="pList"></textarea>
+   <div class="row"><div><label>Giữ ghim từ (giây)</label><input type="number" id="pinMin"></div><div><label>đến</label><input type="number" id="pinMax"></div></div>
+   <div class="row"><div><label>Nghỉ giữa 2 lần ghim từ (giây)</label><input type="number" id="gapMin"></div><div><label>đến</label><input type="number" id="gapMax"></div></div>
+   <button class="b p" id="pSave" style="width:100%;margin-top:10px">Lưu cài đặt ghim</button>
+  </div>
+  <div class="card"><h3>Kịch bản cờ ghim theo clip</h3><div class="mut">Chọn clip trong NBL VIDEO, xem trên điện thoại và cắm cờ tại thời điểm cần ghim.</div><div id="clips"></div></div>
+  <div class="card hide" id="editor">
+   <div class="row"><h3 style="margin:0" id="edName"></h3><button class="b s" id="edClose" style="flex:none">Đóng</button></div>
+   <video id="vid" controls playsinline preload="metadata"></video>
+   <label>Sản phẩm cần ghim</label>
+   <input id="fName" list="titles" placeholder="Tên sản phẩm trong giỏ">
+   <datalist id="titles"></datalist>
+   <div class="row"><div><label>Giữ (giây)</label><input type="number" id="fHold" value="60" min="3"></div><div style="align-self:end"><button class="b n" id="fAdd" style="width:100%">🚩 Cắm cờ tại đây</button></div></div>
+   <div id="flags"></div>
+   <div class="mut" id="edMsg"></div>
+   <button class="b p" id="edSave" style="width:100%;margin-top:8px">Lưu kịch bản</button>
+  </div>
+ </section>
+
+ <section id="t-ai" class="hide">
+  <div class="card">
+   <div class="sw"><span>Bật AI trả lời bình luận khi LIVE</span><label class="tg"><input type="checkbox" id="aEnabled"><span></span></label></div>
+   <div class="mut" id="aSummary"></div>
+   <label>Kiểu trả lời</label><select id="aMode"><option value="chu">Chữ — gửi vào bình luận Studio</option><option value="giong">Giọng đọc — đọc vào LIVE</option><option value="ca_hai">Chữ + giọng đọc</option></select>
+   <label>Giọng đọc</label><select id="aVoice"></select>
+   <div class="row"><div><label>Tốc độ</label><select id="aSpeed"></select></div><div><label>Nghỉ mỗi khách (giây)</label><input type="number" id="aCool" min="15"></div><div><label>Tối đa câu/phút</label><input type="number" id="aRate" min="1" max="60"></div></div>
+   <label>Hướng dẫn cho AI (mô tả shop)</label><textarea id="aPrompt" style="min-height:150px"></textarea>
+   <button class="b s" id="aDefault">↺ Khôi phục mặc định</button>
+   <label>Từ khóa trả lời trước (mỗi dòng: từ khóa;từ khác | câu trả lời)</label><textarea id="aRules"></textarea>
+   <label>Gemini API key (<span id="aKeys">0</span> key đã lưu) — dán key mới để thay, để trống thì giữ</label><input id="aKeyIn" type="password" autocomplete="off" placeholder="AIza…">
+   <button class="b p" id="aSave" style="width:100%;margin-top:10px">Lưu cài đặt AI</button>
+  </div>
+ </section>
+
+ <section id="t-pc" class="hide">
+  <div class="card"><h3>PC đã ghép</h3><div id="pcs"></div></div>
+  <div class="card">
+   <h3>Thêm PC bằng tay</h3>
+   <label>Tên</label><input id="mName" placeholder="ADMIN-PC">
+   <label>Địa chỉ (tên Tailscale hoặc IP, nhiều cái cách dấu phẩy)</label><input id="mHost" placeholder="admin-pc,100.x.x.x">
+   <label>Cổng</label><input id="mPort" type="number" value="8766">
+   <label>Mã ghép (hiện dưới mã QR trên NBL)</label><input id="mToken" autocomplete="off">
+   <button class="b p" id="mAdd" style="width:100%;margin-top:10px">Lưu PC</button>
+  </div>
+  <div class="mut" style="text-align:center">NBL LIVE Android 4.3.0</div>
+ </section>
+</main>
+<div id="toast"></div>
+<nav>
+ <button data-t="home" class="on"><i>🏠</i>Tổng quan</button>
+ <button data-t="jobs"><i>🗓️</i>Lịch</button>
+ <button data-t="pin"><i>📌</i>Ghim</button>
+ <button data-t="ai"><i>🤖</i>AI</button>
+ <button data-t="pc"><i>💻</i>PC</button>
+</nav>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+let pcs=store.get('nbl_pcs',[]),cur=store.get('nbl_cur',0),tab='home',logAfter=0,status=null,loading=false;
+const save=()=>{store.set('nbl_pcs',pcs);store.set('nbl_cur',cur)};
+const pc=()=>pcs[cur];
+function toast(t,bad){const e=$('toast');e.textContent=t;e.className=bad?'bad':'';e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',bad?6000:2500)}
+class ApiErr extends Error{}
+const hostUrl=(h,p)=>'http://'+(h.includes(':')&&!h.startsWith('[')?'['+h+']':h)+':'+p.port;
+function hosts(p){const l=p.hosts.slice();if(p.good&&l.includes(p.good)){l.splice(l.indexOf(p.good),1);l.unshift(p.good)}return l}
+async function req(path,opt={}){
+ const p=pc();if(!p)throw new ApiErr('Chưa ghép PC nào.');
+ let last=null;
+ for(const h of hosts(p)){
+  const c=new AbortController(),tm=setTimeout(()=>c.abort(),opt.timeout||9000);
+  try{
+   const r=await fetch(hostUrl(h,p)+path,{method:opt.method||'GET',signal:c.signal,headers:Object.assign({Authorization:'Bearer '+p.token},opt.body?{'Content-Type':'application/json'}:{}),body:opt.body?JSON.stringify(opt.body):undefined});
+   if(p.good!==h){p.good=h;save()}
+   if(opt.raw){if(!r.ok){let j={};try{j=await r.json()}catch(e){}throw new ApiErr(j.error||('Lỗi '+r.status))}return r}
+   const j=await r.json();if(!j.ok)throw new ApiErr(j.error||('Lỗi '+r.status));return j.data;
+  }catch(e){if(e instanceof ApiErr)throw e;last=e}finally{clearTimeout(tm)}
+ }
+ throw new ApiErr('Không kết nối được '+p.name+'. Kiểm tra: Tailscale đang bật trên điện thoại, PC đang mở NBL.');
+}
+async function act(path,body,ok){try{const d=await req(path,{method:'POST',body:body||{}});if(ok)toast(ok);return d}catch(e){toast(e.message,true)}finally{refresh()}}
+
+// ---- pairing ----
+function addPc(o){
+ if(!o.token||!o.hosts.length)return toast('Thiếu địa chỉ hoặc mã ghép.',true);
+ const i=pcs.findIndex(p=>p.name.toLowerCase()===o.name.toLowerCase());
+ if(i>=0){pcs[i]=Object.assign(pcs[i],o);cur=i}else{pcs.push(o);cur=pcs.length-1}
+ save();renderPcs();toast('Đã lưu PC '+o.name);logAfter=0;$('log').textContent='';refresh();
+}
+window.nblPair=function(url){
+ try{const u=new URL(url.replace(/^nblive:\/\//,'http://x/'));const q=u.searchParams;
+  addPc({name:q.get('n')||'PC',hosts:(q.get('h')||'').split(',').map(s=>s.trim()).filter(Boolean),port:+(q.get('p')||8766),token:q.get('t')||''});show('home')}
+ catch(e){toast('Mã QR không đúng của NBL.',true)}
+};
+function renderPcs(){
+ const sel=$('pcSel');sel.innerHTML='';
+ pcs.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=p.name;sel.appendChild(o)});
+ sel.value=cur;sel.classList.toggle('hide',!pcs.length);$('noPc').classList.toggle('hide',!!pcs.length);
+ const box=$('pcs');box.innerHTML='';
+ if(!pcs.length)box.textContent='Chưa có PC nào.';
+ pcs.forEach((p,i)=>{const d=document.createElement('div');d.className='job';
+  const t=document.createElement('div');t.innerHTML='<b></b> <span class="mut"></span>';t.querySelector('b').textContent=p.name+(i===cur?' (đang dùng)':'');t.querySelector('.mut').textContent=p.hosts.join(', ')+' : '+p.port;d.appendChild(t);
+  const r=document.createElement('div');r.className='row';r.style.marginTop='6px';
+  const use=btn('Dùng PC này','b s n',()=>{cur=i;save();renderPcs();logAfter=0;$('log').textContent='';refresh()});
+  const del=btn('Xóa','b s',()=>{pcs.splice(i,1);cur=0;save();renderPcs()});r.append(use,del);d.appendChild(r);box.appendChild(d)});
+}
+$('pcSel').onchange=e=>{cur=+e.target.value;save();renderPcs();logAfter=0;$('log').textContent='';refresh();if(tab!=='home')show(tab)};
+$('mAdd').onclick=()=>addPc({name:$('mName').value.trim()||'PC',hosts:$('mHost').value.split(',').map(s=>s.trim()).filter(Boolean),port:+$('mPort').value||8766,token:$('mToken').value.trim()});
+function btn(t,c,f){const b=document.createElement('button');b.className=c;b.textContent=t;b.onclick=f;return b}
+
+// ---- tabs ----
+function show(t){tab=t;for(const s of ['home','jobs','pin','ai','pc'])$('t-'+s).classList.toggle('hide',s!==t);
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+ if(t==='jobs')loadJobs();if(t==='pin')loadPin();if(t==='ai')loadAi();if(t==='pc')renderPcs();window.scrollTo(0,0)}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
+const hm=s=>{const d=new Date(s*1000);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
+const dm=s=>{const d=new Date(s*1000);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')};
+
+// ---- home ----
+async function refresh(){
+ if(!pc()||loading)return;loading=true;try{await refreshNow()}finally{loading=false}
+}
+async function refreshNow(){
+ try{status=await req('/api/status');renderStatus()}catch(e){$('studio').textContent=e.message;$('liveBadge').textContent='mất kết nối';$('liveBadge').className='badge'}
+ try{const l=await req('/api/logs?after='+logAfter);if(l.length){const box=$('log');const atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-8;
+  for(const x of l){logAfter=x.n;box.textContent+=hm(x.at)+'  '+x.text+'\n'}if(box.textContent.length>40000)box.textContent=box.textContent.slice(-30000);if(atEnd)box.scrollTop=box.scrollHeight}}catch(e){}
+}
+function renderStatus(){
+ const s=status;$('nick').textContent=(s.nick||'Chưa có nick')+' · '+s.pc;
+ $('liveBadge').textContent=s.live?'● ĐANG LIVE':'Không LIVE';$('liveBadge').className='badge'+(s.live?' live':'');
+ $('studio').textContent=s.studio;
+ $('nextJob').textContent=s.next?('Lịch tới: '+dm(s.next.start)+' '+hm(s.next.start)+' → '+hm(s.next.end)+' · '+s.next.label):'Chưa có lịch sắp tới.';
+ const a=$('autoBtn');a.textContent=s.auto?'⏸ DỪNG ghim + AI tự động':'▶ BẮT ĐẦU ghim + AI tự động';a.className='b '+(s.auto?'n':'p');
+ $('pinOn').checked=s.pin.on;$('pinText').textContent=s.pin.chrome?(s.pin.on?'đang chạy':'đang tắt')+(s.pin.text?' · '+s.pin.text:''):'Chrome chưa kết nối trang LIVE';
+ $('aiOn').checked=s.ai.enabled;$('aiText').textContent=s.ai.summary||'';
+}
+$('autoBtn').onclick=()=>status&&act('/api/auto',{on:!status.auto},status.auto?'Đã tạm dừng':'Đã bật');
+$('pinOn').onchange=e=>act('/api/pin',{on:e.target.checked},e.target.checked?'Đã bật ghim':'Đã tắt ghim');
+$('aiOn').onchange=e=>act('/api/ai',{on:e.target.checked},e.target.checked?'Đã bật AI':'Đã tắt AI');
+(function(){const b=$('emBtn'),f=b.querySelector('.fill');let t=null,st=0;
+ const stop=()=>{clearInterval(t);t=null;f.style.width='0'};
+ b.addEventListener('pointerdown',e=>{e.preventDefault();st=Date.now();t=setInterval(()=>{const p=Math.min(1,(Date.now()-st)/2000);f.style.width=(p*100)+'%';if(p>=1){stop();act('/api/emergency',{confirm:'TAT'},'Đã gửi TẮT KHẨN CẤP')}},50)});
+ ['pointerup','pointerleave','pointercancel'].forEach(k=>b.addEventListener(k,stop));b.addEventListener('contextmenu',e=>e.preventDefault())})();
+$('shotBtn').onclick=async()=>{const b=$('shotBtn');b.disabled=true;try{const r=await req('/api/screenshot',{raw:true,timeout:20000});const u=URL.createObjectURL(await r.blob());const i=$('shot');if(i.src)URL.revokeObjectURL(i.src);i.src=u;i.classList.remove('hide')}catch(e){toast(e.message,true)}finally{b.disabled=false}};
+
+// ---- schedules ----
+function pad(n){return String(n).padStart(2,'0')}
+(function(){const d=new Date(Date.now()+3600e3);$('jDate').value=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());$('jStart').value=pad(d.getHours())+':00';$('jEnd').value=pad((d.getHours()+2)%24)+':00'})();
+$('jNoSales').onchange=e=>$('jBundle').disabled=e.target.checked;
+$('jAdd').onclick=async()=>{
+ const [y,m,d]=$('jDate').value.split('-').map(Number),[sh,sm]=$('jStart').value.split(':').map(Number),[eh,em]=$('jEnd').value.split(':').map(Number);
+ if(!y||isNaN(sh)||isNaN(eh))return toast('Chọn ngày và giờ.',true);
+ const s=new Date(y,m-1,d,sh,sm),e=new Date(y,m-1,d,eh,em);if(e<=s)e.setDate(e.getDate()+1);
+ try{await req('/api/schedules',{method:'POST',body:{start:s/1000,end:e/1000,bundle:+$('jBundle').value||0,noSales:$('jNoSales').checked}});toast('Đã lưu lịch '+hm(s/1000)+' → '+hm(e/1000));loadJobs()}catch(x){toast(x.message,true)}
+};
+async function loadJobs(){
+ const box=$('jobs');
+ try{const list=await req('/api/schedules');box.innerHTML='';if(!list.length){box.textContent='Chưa có lịch.';return}
+  for(const j of list.slice().reverse()){
+   const d=document.createElement('div');d.className='job';
+   const h=document.createElement('div');h.innerHTML='<b></b> <span class="badge"></span>';h.querySelector('b').textContent=dm(j.start)+' '+hm(j.start)+' → '+hm(j.end);
+   const bd=h.querySelector('.badge');bd.textContent=j.label;if(j.state==='running')bd.className='badge live';d.appendChild(h);
+   const info=document.createElement('div');info.className='mut';info.textContent=j.noSales?'Không bán hàng':(j.bundle===0?'Giỏ tự thêm tay':'Bộ '+j.bundle)+' · giỏ: '+({ready:j.cartVerified?'đã xác nhận':'đã thêm, chờ kiểm tra',failed:'lỗi '+j.cartAttempts+' lần, đang thử lại',preparing:'đang thêm',none:'chờ thêm'}[j.cart]||j.cart);d.appendChild(info);
+   if(j.error){const e=document.createElement('div');e.className='err';e.textContent=j.error;d.appendChild(e)}
+   const r=document.createElement('div');r.className='row';r.style.marginTop='6px';
+   if(j.canRetryCart)r.appendChild(btn('🛒 Thử thêm giỏ lại','b s n',async()=>{await act('/api/cart/retry',{id:j.id},'Đang thử thêm giỏ lại');loadJobs()}));
+   if(j.running){r.appendChild(btn('Kết thúc LIVE','b s d',async()=>{await act('/api/schedules/cancel',{id:j.id,end:true},'Đang kết thúc LIVE');loadJobs()}));
+    r.appendChild(btn('Chỉ hủy lịch','b s',async()=>{await act('/api/schedules/cancel',{id:j.id},'NBL thôi quản lý lịch này');loadJobs()}))}
+   else if(['pending','start_retry'].includes(j.state))r.appendChild(btn('Hủy lịch','b s',async()=>{await act('/api/schedules/cancel',{id:j.id},'Đã hủy lịch');loadJobs()}));
+   if(r.children.length)d.appendChild(r);box.appendChild(d)}
+ }catch(e){box.textContent=e.message}
+}
+
+// ---- pin ----
+let titles=[],clip=null,flags=[];
+async function loadPin(){
+ try{const p=await req('/api/pin/settings');$('pMode').value=p.mode;$('pList').value=p.products;for(const k of ['pinMin','pinMax','gapMin','gapMax'])$(k).value=p[k];titles=p.titles||[];fillTitles()}catch(e){toast(e.message,true)}
+ try{const c=await req('/api/clips');const box=$('clips');box.innerHTML='';if(!c.length)box.textContent='NBL VIDEO chưa có clip.';
+  for(const x of c){const d=document.createElement('div');d.className='flag';const n=document.createElement('span');n.className='nm';n.textContent=x.name+(x.exists?'':' (mất file)');const f=document.createElement('span');f.className='mut';f.textContent=x.flags+' cờ';d.append(n,f);if(x.exists)d.appendChild(btn('Mở','b s n',()=>openClip(x)));box.appendChild(d)}}catch(e){$('clips').textContent=e.message}
+}
+function fillTitles(){const dl=$('titles');dl.innerHTML='';for(const t of titles){const o=document.createElement('option');o.value=t;dl.appendChild(o)}}
+$('pSave').onclick=async()=>{try{await req('/api/pin/settings',{method:'PUT',body:{mode:$('pMode').value,products:$('pList').value,pinMin:+$('pinMin').value,pinMax:+$('pinMax').value,gapMin:+$('gapMin').value,gapMax:+$('gapMax').value}});toast('Đã lưu cài đặt ghim')}catch(e){toast(e.message,true)}};
+const fmt=s=>{s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+':'+pad(m):m)+':'+pad(x)};
+async function openClip(x){
+ try{const s=await req('/api/script?i='+x.i);clip=x;flags=s.entries.map(e=>Object.assign({},e));titles=s.titles.length?s.titles:titles;fillTitles();
+  $('edName').textContent=x.name;const p=pc();$('vid').src=hostUrl(p.good||p.hosts[0],p)+'/api/clip?i='+x.i+'&t='+encodeURIComponent(p.token);
+  $('editor').classList.remove('hide');$('edMsg').textContent='';renderFlags();$('editor').scrollIntoView({behavior:'smooth'})}catch(e){toast(e.message,true)}
+}
+$('edClose').onclick=()=>{$('vid').pause();$('vid').removeAttribute('src');$('vid').load();$('editor').classList.add('hide');clip=null};
+$('fAdd').onclick=()=>{const name=$('fName').value.trim();if(!name)return toast('Nhập tên sản phẩm cần ghim.',true);
+ const at=Math.round($('vid').currentTime*10)/10;if(flags.some(f=>Math.abs(f.at-at)<1))return toast('Đã có cờ ở '+fmt(at),true);
+ flags.push({at,name,hold:Math.max(3,+$('fHold').value||60)});flags.sort((a,b)=>a.at-b.at);renderFlags();toast('Cắm cờ '+fmt(at))};
+function renderFlags(){const box=$('flags');box.innerHTML='';if(!flags.length){box.innerHTML='<div class="mut">Chưa có cờ.</div>';return}
+ flags.forEach((f,i)=>{const d=document.createElement('div');d.className='flag';const t=document.createElement('span');t.className='t';t.textContent=fmt(f.at);t.onclick=()=>{$('vid').currentTime=f.at};
+  const n=document.createElement('span');n.className='nm';n.textContent=f.name+' · giữ '+f.hold+'s';n.onclick=t.onclick;
+  d.append(t,n,btn('✕','b s',()=>{flags.splice(i,1);renderFlags()}));box.appendChild(d)})}
+$('edSave').onclick=async()=>{if(!clip)return;const dur=isFinite($('vid').duration)?$('vid').duration:0;
+ try{const r=await req('/api/script?i='+clip.i,{method:'PUT',body:{entries:flags,duration:dur}});flags=r.entries;renderFlags();
+  $('edMsg').textContent=[...r.warnings,...(r.missing.length?['Chưa thấy trong giỏ: '+r.missing.join(', ')]:[])].join('\n');toast('Đã lưu '+flags.length+' cờ')}catch(e){toast(e.message,true)}};
+
+// ---- AI ----
+let aiDefault='';
+async function loadAi(){
+ try{const a=await req('/api/ai/settings');aiDefault=a.defaultPrompt;
+  const v=$('aVoice');if(!v.options.length)for(const x of a.voices){const o=document.createElement('option');o.value=x.id;o.textContent=x.id+' · '+x.text;v.appendChild(o)}
+  const sp=$('aSpeed');if(!sp.options.length)for(const x of a.speeds){const o=document.createElement('option');o.value=x;o.textContent=x+'x';sp.appendChild(o)}
+  $('aEnabled').checked=!!a.enabled;$('aMode').value=a.mode;v.value=a.voice;sp.value=String(a.speed);$('aCool').value=a.cooldown;$('aRate').value=a.max_per_minute;
+  $('aPrompt').value=a.prompt;$('aRules').value=a.rules||'';$('aKeys').textContent=a.keyCount;$('aSummary').textContent=a.summary||''}catch(e){toast(e.message,true)}
+}
+$('aDefault').onclick=()=>{if(aiDefault)$('aPrompt').value=aiDefault};
+$('aSave').onclick=async()=>{try{const a=await req('/api/ai/settings',{method:'PUT',body:{enabled:$('aEnabled').checked,mode:$('aMode').value,voice:$('aVoice').value,speed:$('aSpeed').value,cooldown:+$('aCool').value,max_per_minute:+$('aRate').value,prompt:$('aPrompt').value,rules:$('aRules').value,keys:$('aKeyIn').value}});
+ $('aKeyIn').value='';$('aKeys').textContent=a.keyCount;toast('Đã lưu cài đặt AI')}catch(e){toast(e.message,true)}};
+
+renderPcs();refresh();
+setInterval(()=>{if(!document.hidden&&tab==='home')refresh()},4000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
+if(location.hash.startsWith('#pair='))window.nblPair(decodeURIComponent(location.hash.slice(6)));
+</script>
+</body>
+</html>

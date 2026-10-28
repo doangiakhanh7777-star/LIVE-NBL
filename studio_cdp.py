@@ -30,6 +30,11 @@ from urllib.request import urlopen
 from studio_vision_logic import NotTouched, same_author
 
 BASE_PORT = 9339
+
+
+class StudioChanged(NotTouched):
+    """Studio answers but its buttons are not where NBL knows them (new Studio version?)."""
+
 LOG_DIR = Path(os.environ.get('LOCALAPPDATA', str(Path.home() / '.local/share'))) / 'NBL_LIVE_2' / 'logs'
 
 STATE_JS = r"""(() => {
@@ -82,15 +87,44 @@ END_PAGE_JS = r"""(() => {
 })()"""
 
 CLOSE_END_JS = r"""(() => {
+ // Measured 28/10/2026: the end page is a full-window dialog (.tt-live-modalV4, role=dialog)
+ // with "Thời lượng: 00:06:36"; its close X has no text and sits in [class*=_title-bar-buttons].
  const vis = el => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
- const isEnd = t => /tổng kết|tóm tắt|phiên live đã kết thúc|live đã kết thúc|đã kết thúc live|live summary|live ended|thời lượng/i.test(t);
+ const isEnd = t => /thời lượng\s*:|tổng kết|tóm tắt|phiên live đã kết thúc|live đã kết thúc|live summary|live ended|duration\s*:/i.test(t);
  for (const d of [...document.querySelectorAll('[role="dialog"], .tt-live-modalV4')].filter(vis)) {
    if (!isEnd(d.innerText)) continue;
-   const b = [...d.querySelectorAll('button')].filter(vis).find(b => /^(đóng|xong|ok|close|done)$/i.test((b.innerText || '').trim()) || /close|đóng/i.test(b.getAttribute('aria-label') || '') || /close/i.test(String(b.className)));
+   let b = [...d.querySelectorAll('[class*="_title-bar-buttons"] button, [class*="title-bar-buttons"] button')].filter(vis).find(b => !(b.innerText || '').trim());
+   if (!b) b = [...d.querySelectorAll('button')].filter(vis).find(b => /^(đóng|xong|ok|close|done)$/i.test((b.innerText || '').trim()) || /close|đóng/i.test(b.getAttribute('aria-label') || '') || /close/i.test(String(b.className)));
    if (b) { b.click(); return {seen: true, closed: true}; }
    return {seen: true, closed: false};
  }
  return {seen: false, closed: false};
+})()"""
+
+# Measured 28/10/2026 (chat window html/liveChatFloat, also #live-chat in the main window):
+# a comment = element id "-ChatMsg-<n>" holding the name (.username-*), its text in
+# [class*=msg-content-] .text. Joins ("đã tham gia") and likes have no -ChatMsg- id.
+CHAT_JS = r"""(() => {
+ const out = [];
+ for (const el of document.querySelectorAll('[id^="-ChatMsg-"]')) {
+   const box = el.parentElement || el;
+   const u = el.querySelector('[class*="username-"]') || el;
+   const t = box.querySelector('[class*="msg-content-"] .text') || box.querySelector('[class*="msg-content-"]');
+   const user = (u.innerText || '').trim(), text = t ? (t.innerText || '').trim() : '';
+   if (user && text) out.push({id: el.id.replace('-ChatMsg-', ''), user: user.slice(0, 80), text: text.slice(0, 300)});
+ }
+ return out.slice(-60);
+})()"""
+
+CAPTCHA_JS = r"""(() => {
+ const vis = el => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 20 && r.height > 20; };
+ const re = /captcha|xác minh|kéo thanh trượt|kéo mảnh ghép|xoay hình|verify to continue|drag the slider|security check/i;
+ for (const el of document.querySelectorAll('[id*="captcha" i], [class*="captcha" i], [role="dialog"], iframe')) {
+   if (!vis(el)) continue;
+   const t = (el.innerText || el.getAttribute('src') || el.id || el.className || '').toString();
+   if (re.test(t) || /captcha/i.test(String(el.id) + String(el.className))) return t.replace(/\s+/g, ' ').slice(0, 160) || 'captcha';
+ }
+ return '';
 })()"""
 
 
@@ -189,13 +223,34 @@ class Studio:
                 return t, s
         raise NotTouched('Bấm vào màn hình phát của Studio nhưng chưa thấy nút Phát LIVE.')
 
+    def connect_screen(self, port, wait=90):
+        """4.2.2 (owner, 28/10/2026): Studio needs time to open and lands on its home
+        page. Wait for it, open the studio screen by itself (the home 'Phát LIVE' only
+        opens that screen) and wait for the nick name."""
+        end = time.time() + wait; entered = False; s = {}
+        while time.time() < end:
+            try:
+                t, s = self.state()
+            except Exception:
+                time.sleep(1); continue
+            if s.get('hasButton') and s.get('nickname'):
+                break
+            if s.get('launch') and not s.get('hasButton') and not entered:
+                self.click(t, 'launch'); entered = True
+            time.sleep(1)
+        if s.get('living') and entered:
+            raise ValueError('Studio vừa vào trạng thái LIVE sau khi NBL mở màn hình phát. Kiểm tra Studio và tắt nếu không muốn phát.')
+        if not s.get('nickname'):
+            raise NotTouched('Studio đã mở nhưng sau ' + str(wait) + ' giây vẫn chưa thấy tên nick (Studio chưa đăng nhập?). Đăng nhập Studio rồi bấm lại.')
+        return dict(nickname=s['nickname'], live=bool(s.get('living')), home=False, port=port, entered=entered)
+
     # ---- actions ----
     def status(self, expected=''):
         t, s = self.state()
         if s.get('nickname') and expected and not same_author(s['nickname'], expected):
             raise NotTouched('Studio đang là nick "' + s['nickname'] + '", không phải "' + expected + '".')
         if not s.get('hasButton') and not s.get('launch'):
-            raise NotTouched('Chưa đọc được trạng thái LIVE trên Studio.')
+            raise StudioChanged('Studio đang mở nhưng không thấy nút Phát LIVE / đồng hồ LIVE (Studio đổi giao diện hoặc đang ở trang khác).')
         return dict(live=bool(s.get('living')), duration=s.get('duration', ''), health=s['health'], nickname=s.get('nickname', ''), method='cdp')
 
     def start(self, expected):
@@ -284,6 +339,55 @@ class Studio:
             (LOG_DIR / ('studio_trang_ket_thuc_' + time.strftime('%Y%m%d_%H%M%S') + '.json')).write_text(json.dumps(dict(label=label, pages=data), ensure_ascii=False, indent=1), encoding='utf-8')
         except Exception:
             pass
+
+    def captcha(self):
+        """Text of a captcha / security check shown anywhere in Studio ('' = none)."""
+        for t in self.pages():
+            try:
+                found = self.js(t, CAPTCHA_JS)
+            except Exception:
+                continue
+            if found:
+                return str(found)
+        return ''
+
+    def screenshot(self, quality=60):
+        """4.3.0 (phone app): picture of the Studio main window, read from inside (no screen capture)."""
+        import base64
+        r = self.call(self.main(), [('Page.captureScreenshot', {'format': 'jpeg', 'quality': int(quality)})])[0]
+        return base64.b64decode(r.get('data') or '')
+
+    def selfcheck(self):
+        """4.3.0 chạy thử: what NBL can see in Studio right now; reads only, clicks nothing."""
+        _, st = self.state()
+        out = dict(nickname=st.get('nickname', ''), hasButton=bool(st.get('hasButton')), living=bool(st.get('living')), idle=bool(st.get('idle')),
+                   buttonText=st.get('buttonText', ''), dialogs=[d.get('text', '')[:120] for d in st.get('dialogs') or []], health=st.get('health'))
+        out['chatBox'] = bool(self.chat_page())
+        try:
+            out['comments'] = len(self.chat_read())
+        except Exception:
+            out['comments'] = -1
+        try:
+            out['captcha'] = self.captcha()
+        except Exception:
+            out['captcha'] = ''
+        return out
+
+    def chat_read(self):
+        """Comments shown in Studio's chat (newest last), from the chat window or the main window."""
+        seen, out = set(), []
+        for part in ('/html/liveChatFloat/', '/html/main/'):
+            t = self.page(part)
+            if not t:
+                continue
+            try:
+                rows = self.js(t, CHAT_JS) or []
+            except Exception:
+                continue
+            for r in rows:
+                if r.get('id') and r['id'] not in seen:
+                    seen.add(r['id']); out.append(r)
+        return out
 
     def chat_page(self):
         for part in ('/html/main/', '/html/liveChatFloat/'):
@@ -398,7 +502,7 @@ def execute_cdp(profile, action, deadline=0, payload=None):
     port = int(profile.get('cdpPort') or BASE_PORT)
     expected = profile.get('accountName') or profile.get('name') or ''
     others = [int(p) for p in profile.get('_otherPorts') or []]
-    if action in ('status', 'stop', 'close_summary', 'probe', 'chat_check', 'send'):
+    if action in ('status', 'stop', 'close_summary', 'probe', 'chat_check', 'send', 'chat_read', 'captcha', 'screenshot', 'selfcheck'):
         studio = connect(profile.get('exePath'), port, others, open_if_closed=False)
         if studio is None:
             if action == 'probe':
@@ -407,9 +511,15 @@ def execute_cdp(profile, action, deadline=0, payload=None):
                 raise NotTouched('TikTok LIVE Studio đang mở nhưng không phải do NBL mở; NBL chưa đọc được nick này.')
             if action in ('status', 'stop', 'close_summary'):
                 return dict(live=False, studioClosed=True, closed=True, method='cdp')
+            if action in ('screenshot', 'selfcheck'):
+                raise NotTouched('TikTok LIVE Studio chưa mở.')
+            if action in ('chat_read', 'captcha'):
+                return dict(comments=[], captcha='', studioClosed=True, method='cdp')
             raise NotTouched('TikTok LIVE Studio chưa mở; chưa gửi.')
     else:
-        studio = connect(profile.get('exePath'), port, others, open_if_closed=True)
+        studio = connect(profile.get('exePath'), port, others, open_if_closed=not profile.get('noLaunch'))
+        if studio is None:
+            raise NotTouched('TikTok LIVE Studio chưa mở. Mở Studio bằng icon TikTok LIVE Studio; NBL tự kết nối.')
     if action == 'probe':
         return dict(windowFound=True)
     if action == 'status':
@@ -423,12 +533,47 @@ def execute_cdp(profile, action, deadline=0, payload=None):
         return dict(closed=not r['seen'] or r['closed'], seen=r['seen'], method='cdp')
     if action == 'chat_check':
         return studio.chat_check()
+    if action == 'chat_read':
+        return dict(comments=studio.chat_read(), method='cdp')
+    if action == 'captcha':
+        return dict(captcha=studio.captcha(), method='cdp')
     if action == 'send':
         return studio.send(str((payload or {}).get('text', '')), expected)
+    if action == 'selfcheck':
+        return dict(studio.selfcheck(), port=port, method='cdp')
+    if action == 'screenshot':
+        return dict(jpeg=studio.screenshot(), method='cdp')
     if action == 'connect':
-        t, s = studio.state()
-        return dict(nickname=s.get('nickname', ''), live=bool(s.get('living')), home=bool(s.get('launch')) and not s.get('hasButton'), port=port)
+        return studio.connect_screen(port)
     raise NotTouched('Kết nối tự động chưa làm mục này: ' + action)
 
 
-CDP_ACTIONS = ('probe', 'status', 'start', 'stop', 'close_summary', 'chat_check', 'send', 'connect')
+CDP_ACTIONS = ('probe', 'status', 'start', 'stop', 'close_summary', 'chat_check', 'send', 'connect', 'chat_read', 'captcha', 'screenshot', 'selfcheck')
+
+
+# ---- 4.3.0: Studio icons open Studio with NBL's port (owner agreed 28/10/2026) ----
+SHORTCUT_PS = r'''
+$ErrorActionPreference = 'SilentlyContinue'
+$args2 = '--remote-debugging-port=%PORT% --remote-allow-origins=http://127.0.0.1:%PORT%'
+$sh = New-Object -ComObject WScript.Shell
+$dirs = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('CommonDesktopDirectory'), [Environment]::GetFolderPath('StartMenu'), [Environment]::GetFolderPath('CommonStartMenu'))
+$n = 0
+foreach ($d in $dirs) { if (-not $d) { continue }
+  Get-ChildItem -Path $d -Filter '*.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+    $l = $sh.CreateShortcut($_.FullName)
+    if ($l.TargetPath -match 'TikTok LIVE Studio[^\\]*\.exe$' -and $l.Arguments -notmatch 'remote-debugging-port=%PORT%') { $l.Arguments = $args2; $l.Save(); $n++ } } }
+Write-Output $n
+'''
+
+
+def fix_shortcuts(port=BASE_PORT):
+    """Make every TikTok LIVE Studio icon (Desktop + Start) open Studio with the port.
+    Studio's own updater may write the icons again, so NBL runs this at every start."""
+    if os.name != 'nt':
+        return 0
+    try:
+        out = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', SHORTCUT_PS.replace('%PORT%', str(int(port)))],
+                             capture_output=True, text=True, timeout=40, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        return int((out.stdout or '0').strip().splitlines()[-1] or 0)
+    except Exception:
+        return 0

@@ -65,17 +65,14 @@ class HandLiveCart(unittest.TestCase):
 
 
 class HandLiveTakeover(unittest.TestCase):
-    def test_hand_live_at_schedule_time_is_ended_and_the_schedule_moves_30_minutes(self):
+    def test_hand_live_at_schedule_time_is_taken_over_not_ended(self):
+        # 4.3.0 (owner, 28/10/2026): a LIVE started by hand when the schedule is due is kept and
+        # managed until the schedule's end — never ended, never moved 30 minutes.
         now = time.time(); j = job(start=now - 5, end=now + 3595, state='preparing', prepare_phase='preflight'); p = make([j])
         feed(p, j, 'preflight', dict(live=True))
-        self.assertEqual((j['state'], j['takeover']), ('stopping', True)); self.assertIn(('j1', 'stop'), p.submitted)
-        self.assertTrue(any('LIVE bật tay' in a for a in p.alerts))
-        feed(p, j, 'stop', dict(live=False))
-        t = time.time()
-        self.assertEqual(j['state'], 'pending'); self.assertNotIn('takeover', j)
-        self.assertAlmostEqual(j['start'], t + 1800, delta=5); self.assertAlmostEqual(j['end'] - j['start'], 3600, delta=1)
-        self.assertEqual(j['cart'], dict(state='none', attempts=0, next=0))      # cart prepared again
-        self.assertTrue(any('dời sang' in a for a in p.alerts))
+        self.assertEqual(j['state'], 'running'); self.assertNotIn(('j1', 'stop'), p.submitted)
+        self.assertTrue(any('nhận phiên này' in a for a in p.alerts))
+        self.assertAlmostEqual(j['end'], now + 3595, delta=1)
 
     def test_moved_schedule_never_runs_into_the_next_one(self):
         now = time.time()

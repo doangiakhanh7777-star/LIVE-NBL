@@ -1,0 +1,1 @@
+-keep class vn.nbl.live.** { *; }

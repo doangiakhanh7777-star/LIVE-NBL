@@ -30,7 +30,7 @@ function page({virtual=true,names,slow=0,never=false}={}){
   Date:{now:()=>clock},setTimeout:(f,ms)=>{clock+=ms||0;setImmediate(f);},
   host:{contains:()=>false},cfg:{},getComputedStyle:()=>({visibility:'visible',overflowY:'auto'}),
   document:{addEventListener(){},body:{},documentElement:{},querySelectorAll:s=>{layout();if(s==='input')return [search,...products.map(p=>p.input)];if(s==='button,[role=button]')return [voucher,list,...products.map(p=>p.b)];return [];}},
-  changeInput:(input,text)=>{input.value=text;},log:()=>{},assertContext:()=>{},$:()=>null,selector:()=>'input'};
+  changeInput:(input,text)=>{input.value=text;},log:()=>{},assertContext:()=>{},$:()=>null,selector:()=>'input',NUM_CELL:'input'};
  vm.createContext(ctx);
  vm.runInContext('const visible=e=>e&&e.getClientRects().length;'+fn('buttonName')+fn('actionButtons')+fn('readNumber')+fn('sendTarget').replace('el instanceof SVGElement','false')+src.slice(src.indexOf('const pause='),src.indexOf('// "Kiểm tra cột số"'))+src.slice(src.indexOf('// "Kiểm tra cột số"'),src.indexOf('function sendTarget(el){')),ctx);
  vm.runInContext('listBox=()=>BOX;',Object.assign(ctx,{BOX:box}));

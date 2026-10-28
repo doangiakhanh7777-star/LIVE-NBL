@@ -133,7 +133,8 @@ class Notifier:
             if self.closed or not self.config.get('enabled'):
                 return False
             now = self.clock()
-            if not test and now - self.last.get(key, -1000) < 60:
+            # 4.3.0 (owner): each kind of message at most once every 10 minutes (captcha: 5 times, see alarm)
+            if not test and now - self.last.get(key, -1000) < 600:
                 return False
             try:self.work.put_nowait((self.generation, dict(self.config), text))
             except queue.Full:return False

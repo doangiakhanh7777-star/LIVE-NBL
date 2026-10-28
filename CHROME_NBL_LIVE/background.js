@@ -49,7 +49,7 @@ function open(state){
    if(dashboardUrl(tab.url)){
     let version;try{version=await contentMessage(state.tabId,{type:'version'},1000);}catch(e){}
     if(version?.protocol===PROTOCOL)response=await contentMessage(state.tabId,message)||response;
-    else response.acks=commands.map(c=>({id:c.id,error:'Tải lại trang LIVE để dùng tiện ích 4.2.1.'}));
+    else response.acks=commands.map(c=>({id:c.id,error:'Tải lại trang LIVE để dùng tiện ích 4.3.0.'}));
    }else response.acks=commands.map(c=>({id:c.id,error:'Chưa mở bảng LIVE của nick này.'}));
   }catch(e){
    // 4.1.1: a slow or reloading LIVE tab used to close the socket here ("Tab Chrome
@@ -70,6 +70,8 @@ function open(state){
  socket.onerror=()=>{};
 }
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
+ // 4.3.0: after NBL updated itself, it asks the extension to load its new files.
+ if(message.type==='reload_self'&&sender.tab&&officialUrl(sender.tab.url||'')){respond({ok:true});setTimeout(()=>chrome.runtime.reload(),300);return;}
  // 4.2.1 (owner, 28/10/2026): NBL opens the LIVE dashboard with #nbl=<code>; the page
  // pairs itself, no popup and no pasting. Only a shop.tiktok.com tab can ask this.
  if(message.type==='pair_self'){

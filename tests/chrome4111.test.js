@@ -26,7 +26,7 @@ test('the cart number is read from its <input> box (owner screenshots)',()=>{
 
 function cards(titles){return titles.map(t=>({title:t}));}
 test('names: an exact name wins; a name inside two products is refused, never guessed',()=>{
- const ctx={NBL,visible:()=>true,cfg:{productTitle:'t'},relativeMatches:(spec,card)=>[{textContent:card.title}],productCards:()=>ctx.list,Error};
+ const ctx={NBL,visible:()=>true,cfg:{productTitle:'t'},relativeMatches:(spec,card)=>[{textContent:card.title}],productCards:()=>ctx.list,Error,titleOf:card=>card.title};
  vm.createContext(ctx);vm.runInContext(fn('pin'),ctx);
  ctx.list=cards(['Bơm lốp mini','Bơm lốp mini PRO']);
  assert.equal(ctx.pin({mode:'name',text:'bơm lốp  mini'}).title,'Bơm lốp mini');

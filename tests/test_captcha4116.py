@@ -69,7 +69,7 @@ class ChromeCaptcha(unittest.TestCase):
         src = (ROOT/'CHROME_NBL_LIVE'/'content.js').read_text(encoding='utf-8')
         self.assertIn('captcha:captchaText()', src); self.assertIn('[class*=captcha i]', src)
         bridge = (ROOT/'chrome_bridge.py').read_text(encoding='utf-8')
-        self.assertIn("state['captcha']=", bridge); self.assertIn("'findResult','captcha')}", bridge)
+        self.assertIn("state['captcha']=", bridge); self.assertIn("'findResult','captcha','version')}", bridge)
 
 
 if __name__ == '__main__':

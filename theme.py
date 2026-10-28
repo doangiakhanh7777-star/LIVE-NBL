@@ -55,7 +55,11 @@ QScrollArea,QTabWidget::pane { border:0; }
 QWidget#card { background:#ffffff; border:1px solid #cfe6fa; border-radius:14px; }
 QComboBox#navigation { background:#1f7fd0; color:#ffffff; font-weight:700; border:0; border-radius:12px; padding:6px 14px; }
 QComboBox#navigation:hover { background:#15639f; }
-QComboBox#navigation QAbstractItemView { background:#ffffff; color:#123; selection-background-color:#f37021; selection-color:#ffffff; }
+QComboBox QAbstractItemView { background:#ffffff; color:#1f3b52; border:1px solid #bcd9f2; outline:0; selection-background-color:#ffe3d0; selection-color:#8a3a12; }
+QComboBox QAbstractItemView::item { color:#1f3b52; background:#ffffff; min-height:30px; padding:4px 10px; }
+QComboBox QAbstractItemView::item:selected, QComboBox QAbstractItemView::item:hover { background:#ffe3d0; color:#8a3a12; }
+QComboBox#navigation QAbstractItemView, QComboBox#navigation QAbstractItemView::item { color:#1f3b52; background:#ffffff; font-weight:600; }
+QComboBox#navigation QAbstractItemView::item:selected, QComboBox#navigation QAbstractItemView::item:hover { background:#f37021; color:#ffffff; }
 QScrollBar:vertical { background:#eef6fe; width:9px; margin:0; }
 QScrollBar::handle:vertical { background:#9cc6ec; min-height:32px; border-radius:4px; }
 QScrollBar::handle:vertical:hover { background:#1f7fd0; }

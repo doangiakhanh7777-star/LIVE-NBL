@@ -55,6 +55,19 @@ class FakeStudio(unittest.TestCase):
         self.assertEqual(s.js(s.main(), 'document.getElementById("sum").className'), 'hide')   # end page closed
         self.assertTrue(s.stop('Khánh Car Auto')['already'])
 
+    def test_chat_is_read_with_ids_and_names(self):
+        rows = self.studio.chat_read()
+        self.assertEqual([(r['id'], r['user'], r['text']) for r in rows], [('111', 'Tư Lù Auto Car', 'giá bao nhiêu em'), ('112', 'Khánh Car Auto', 'hello anh')])
+        self.assertEqual(self.studio.captcha(), '')
+
+    def test_selfcheck_and_screenshot_read_only(self):
+        before = self.studio.js(self.studio.main(), 'document.getElementById("log").textContent')
+        r = self.studio.selfcheck()
+        self.assertEqual(r['nickname'], 'Khánh Car Auto'); self.assertTrue(r['hasButton']); self.assertEqual(r['comments'], 2)
+        self.assertEqual(r['captcha'], '')
+        self.assertTrue(self.studio.screenshot().startswith(b'\xff\xd8'))
+        self.assertEqual(self.studio.js(self.studio.main(), 'document.getElementById("log").textContent'), before)
+
 
 class Routing(unittest.TestCase):
     def test_closed_studio_means_live_over_and_nothing_opened_for_status(self):

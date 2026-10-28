@@ -62,6 +62,7 @@ def make(jobs, profiles=None, sessions=None):
     p.effective_profile = lambda prof: prof
     p.submit = lambda j, action, payload=None: p.submitted.append((j['id'], action))
     p.reports = reports
+    p.poll_hand_live = p.auto_connect = p.poll_studio_captcha = lambda now: None   # 4.3.0 watchers: tested on their own
     return p
 
 

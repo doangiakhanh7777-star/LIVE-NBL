@@ -3,10 +3,10 @@
 if(document.getElementById('nbl-live-extension'))return;
 // 4.2.1: opened by NBL with #nbl=<code> → pair this tab by itself, then hide the code.
 {const m=/[#&]nbl=([a-f0-9]{32})/.exec(location.hash);if(m){try{chrome.runtime.sendMessage({type:'pair_self',token:m[1]});}catch(e){}history.replaceState(null,'',location.pathname+location.search);}}
-const host=document.createElement('div');host.id='nbl-live-extension';document.documentElement.append(host);
+const host=document.createElement('div');host.id='nbl-live-extension';host.style.display='none';document.documentElement.append(host);   // 4.3.0: cầu nối — không hiện gì trên trang, mọi thiết lập nằm trong app NBL
 const ui=host.attachShadow({mode:'open'});
 ui.innerHTML=`<style>:host{all:initial}section{position:fixed;right:12px;bottom:12px;width:min(390px,calc(100vw - 40px));max-height:84vh;overflow:auto;z-index:2147483647;background:#fff;color:#3b2414;padding:16px;border:2px solid #f97316;border-radius:20px;font:14px Arial;box-shadow:0 7px 28px #c2410c30}h3{margin:0 0 12px;cursor:move;touch-action:none;position:sticky;top:0;background:#fff;z-index:2;color:#ea580c}label{display:block;margin-top:11px;font-weight:600}input,textarea,select{box-sizing:border-box;width:100%;padding:9px;margin-top:5px;background:#fffaf4;color:#3b2414;border:1px solid #fdba74;border-radius:10px;font:14px Arial}textarea{height:76px}button{background:#fff1e3;color:#9a3412;border:1px solid #fdba74;border-radius:11px;padding:9px;margin:5px 4px 5px 0;cursor:pointer;font:13px Arial}button:hover{background:#fed7aa}pre{white-space:pre-wrap;font:12px Arial;max-height:160px;overflow:auto}.red{background:#fff0ed;color:#ae3723;border-color:#ffc0ad}.bar{background:#ff993f;color:#382100;border-color:#f28629}.step{display:flex;align-items:center;gap:6px;margin-top:5px}.step output{min-width:84px;text-align:center;background:#fff1e3;padding:8px;border-radius:10px}.step button{margin:0}.hint{font-size:12px;line-height:1.45;color:#526e80}.selectors{display:none}details{margin:14px 0;padding:10px;background:#fff7ed;border-radius:12px}summary{cursor:pointer;font-weight:600}.picked{font-size:12px;font-weight:400;color:#267440}</style>
-<section><h3>NBL LIVE • 4.2.1 <button id="fold">Thu gọn</button></h3><div id="body">
+<section><h3>NBL LIVE • 4.3.0 <button id="fold">Thu gọn</button></h3><div id="body">
 <p class="hint">Giỏ hàng và trả lời bình luận trên Chrome. Tin nhắn định kỳ và Chào khách cài trong app NBL LIVE.</p>
 <label>Tên chủ phòng trong bình luận<input id="owner" placeholder="Khánh Car Auto"></label>
 <label>Câu trả lời tự động<textarea id="rules" placeholder="bơm lốp;bom lop | Anh xem sản phẩm bơm lốp trong giỏ nhé."></textarea></label><p id="rulesHint" class="hint">Chưa có quy tắc. Chữ mẫu mờ không phải nội dung đã nhập.</p><p class="hint">Mỗi dòng: từ khóa | câu trả lời. Nhiều từ khóa cùng câu: ngăn bằng dấu ;</p>
@@ -104,19 +104,32 @@ if(key==='pin'){c.pinJobs=String(c.pins||'').trim()?NBLPins.parseProducts(c.pins
  // 4.1.11 (owner): all four times 0, or no product chosen = cycle OFF (inserts from the clip script still run).
  c.cycle=c.pinJobs.length>0&&times.some(id=>c[id]>0);
  if(c.cycle){if(times.some(id=>c[id]<1))throw Error('Ghim xáo trộn: để 0 cả 4 ô để tắt, hoặc điền đủ 4 ô (ít nhất 1 giây)');for(const pair of [['pinMin','pinMax'],['gapMin','gapMax']])NBLPins.validateRange(c[pair[0]],c[pair[1]]);}}
-if(key==='reply'){c.replyRules=NBL.parse(c.rules,'rule');if(!c.replyRules.length&&c.replyMode!=='suggest')throw Error('Chưa có câu trả lời theo từ khóa · nhập nội dung thật vào ô, chữ mẫu mờ chưa được tính');c.cooldown=Number(c.cooldown);if(!Number.isFinite(c.cooldown)||c.cooldown<15)throw Error('Nghỉ trả lời tối thiểu 15 giây');if(c.replyRules.some(x=>[...x.text].length>100))throw Error('Mỗi câu trả lời tối đa 100 ký tự');}return c;}
+if(key==='reply'){c.replyRules=NBL.parse(c.rules,'rule');if(!c.replyRules.length&&c.replyMode!=='suggest'&&c.replyMode!=='ai')throw Error('Chưa có câu trả lời theo từ khóa · nhập nội dung thật vào ô, chữ mẫu mờ chưa được tính');c.cooldown=Number(c.cooldown);if(!Number.isFinite(c.cooldown)||c.cooldown<15)throw Error('Nghỉ trả lời tối thiểu 15 giây');if(c.replyRules.some(x=>[...x.text].length>100))throw Error('Mỗi câu trả lời tối đa 100 ký tự');}return c;}
 function startModule(key,override){void saveConfig().catch(e=>log('Chưa lưu: '+e.message));if(tickBusy)return 'Đang xác nhận thao tác trước; thử lại sau vài giây.';try{if(key==='reply'){suggestions=[];renderSuggestions();}if(override)for(const id of fields)if(override[id]!=null)$(id).value=String(override[id]);const state=manager.start(key,()=>{const c=prepare(key);cfg=c;identity();liveTime();if(key==='pin'){const rows=numberRows();if(!rows.length)log('Chưa thấy ô số thứ tự nào trong giỏ; NBL sẽ tìm lại khi ghim.');if(!c.cycle)log('Ghim xáo trộn đang TẮT (để 0); chỉ chạy ghim chèn theo kịch bản clip.');}else{one(c.input);one(c.send);chat();if(!c.rows||!c.user||!c.text)throw Error('Chọn tên khách và câu hỏi trong dòng bình luận trước');}return c;});cfg=state.config;state.snapshot=identity();state.timerLast=liveTime();state.pinCycle=new NBLPins.Cycle(state.config.pinJobs||[]);state.nextPinAt=Date.now();state.detail=key==='pin'?'Đang kiểm tra món đã chọn':'Đang chờ bình luận mới';state.seen=new Set(key==='pin'?[]:chat().map(keyOf));connectionLost=false;renderModules();log('Bật '+key);return '';}catch(e){manager.stop(key,e.message);renderModules();log(key+': '+e.message);return e.message;}}
-function identity(){return one(cfg.account).textContent.trim();}
-function liveTime(){const s=one(cfg.live).textContent.match(/\b\d{2,}:\d{2}:\d{2}\b/);if(!s)throw Error('Không đọc được đồng hồ LIVE');return NBL.seconds(s[0]);}
+// 4.3.0 (owner, 28/10/2026): the extension finds everything itself (measured on the
+// LIVE dashboard 28/10/2026); a picked position from an older version is still used.
+function autoAccount(){const W=innerWidth;const handle=t=>/^[A-Za-z0-9._]{2,40}$/.test(t)&&!/^(VN|EN|LIVE|Flash|Sale)$/i.test(t);
+ const leaves=[...document.querySelectorAll('span,div')].filter(e=>!host.contains(e)&&e.children.length===0&&visible(e)&&handle((e.textContent||'').trim()));
+ const inHeader=e=>{for(let p=e.parentElement,i=0;p&&i<8;p=p.parentElement,i++){const c=String(p.className||'');if(/\bfixed\b/.test(c)&&/\bh-60\b|\bz-1\d\d\b/.test(c))return true;}return false;};
+ const byHeader=leaves.filter(inHeader);if(byHeader.length)return byHeader[byHeader.length-1];
+ const byPlace=leaves.filter(e=>{const r=e.getBoundingClientRect();return r.top<60&&r.left>W*0.55;});
+ if(!byPlace.length)throw Error('Chưa đọc được tên tài khoản TikTok Shop (chưa đăng nhập?)');return byPlace.sort((a,b)=>b.getBoundingClientRect().left-a.getBoundingClientRect().left)[0];}
+function autoLiveEl(){const c=[...document.querySelectorAll('span,div')].filter(e=>!host.contains(e)&&e.children.length===0&&visible(e)&&/^\d{2,}:\d{2}:\d{2}$/.test((e.textContent||'').trim()));if(c.length)return c[0];throw Error('Không đọc được đồng hồ LIVE trên trang');}
+const NUM_CELL='input[data-tid="m4b_input_number"]';
+function autoCards(){const out=[];for(const input of document.querySelectorAll(NUM_CELL)){if(!visible(input)||host.contains(input))continue;let el=input.parentElement,card=null;for(let i=0;el&&i<12;i++,el=el.parentElement){const inputs=el.querySelectorAll(NUM_CELL).length;if(inputs>1)break;if([...el.querySelectorAll('button,[role=button]')].some(b=>visible(b)&&buttonName(b).some(x=>/^(Ghim|Bỏ ghim|Pin|Unpin)( sản phẩm)?$/i.test(x)))){card=el;break;}}if(card&&!out.includes(card))out.push(card);}return out;}
+function autoTitle(card){const pick=[...card.querySelectorAll('[class*="text-body-m-regular"] span,[class*="text-body-m-regular"]')].filter(visible).map(e=>(e.textContent||'').trim()).filter(t=>t&&!/^Ghim$|^Bỏ ghim$|₫/.test(t));if(pick.length)return pick[0];const leaves=[...card.querySelectorAll('span,div')].filter(e=>e.children.length===0&&visible(e)).map(e=>(e.textContent||'').trim()).filter(t=>t.length>8&&!/₫|Lượt nhấp|Còn:|Ghim/.test(t));return leaves.sort((a,b)=>b.length-a.length)[0]||'';}
+function titleOf(card){if(cfg.productTitle){const t=relativeMatches(cfg.productTitle,card).filter(visible);if(t.length===1)return t[0].textContent.trim();}return autoTitle(card);}
+function identity(){return (cfg.account?one(cfg.account):autoAccount()).textContent.trim();}
+function liveTime(){const s=(cfg.live?one(cfg.live):autoLiveEl()).textContent.match(/\b\d{2,}:\d{2}:\d{2}\b/);if(!s)throw Error('Không đọc được đồng hồ LIVE');return NBL.seconds(s[0]);}
 const rowKeys=new WeakMap();let nextRowKey=0;
 // 4.0: a row without its own name/question (system line, gift, pinned notice) is skipped
 // instead of stopping the whole reply module; only a fully unreadable chat is an error.
 function chat(){if(!cfg.rows)return [];const rows=[...document.querySelectorAll(cfg.rows)].filter(visible);let bad=0;const out=[];for(const row of rows){let result;try{result={user:one(cfg.user,row).textContent.trim(),text:one(cfg.text,row).textContent.trim()};}catch(e){bad++;continue;}if(!result.user||!result.text){bad++;continue;}if(!rowKeys.has(row))rowKeys.set(row,++nextRowKey);Object.defineProperty(result,'key',{value:rowKeys.get(row)+'\u0000'+result.user+'\u0000'+result.text});out.push(result);}if(rows.length>=3&&!out.length)throw Error('Không đọc được tên/câu hỏi ở dòng bình luận nào; chọn lại vị trí trong dòng bình luận.');return out;}
 function keyOf(r){return r.key||r.user+'\u0000'+r.text;}
 function assertContext(){closeNotices();const warning=stillBlocked();if(warning)throw Error('Trang yêu cầu chú ý (captcha / xác minh / LIVE đã kết thúc); dừng mục và kiểm tra.');if(location.pathname!='/streamer/live/product/dashboard')throw Error('Đã rời bảng LIVE');if(identity()!==snapshot)throw Error('Tài khoản đã đổi');const t=liveTime();if(t<timerLast)throw Error('Đồng hồ LIVE quay lại: có thể đã đổi phiên');timerLast=t;}
-function productCards(){return [...document.querySelectorAll(cfg.products)].filter(visible);}
+function productCards(){return cfg.products?[...document.querySelectorAll(cfg.products)].filter(visible):autoCards();}
 function bindings(){try{const data=JSON.parse(cfg.productBindings||'[]');return Array.isArray(data)?data.filter(x=>Number.isSafeInteger(x.number)&&x.number>0&&typeof x.key==='string'&&typeof x.title==='string'):[];}catch(e){throw Error('Danh sách món đã chọn bị lỗi; bấm Chọn sản phẩm từ giỏ hiện tại rồi tích lại.');}}
-function cardKey(card){const title=one(cfg.productTitle,card).textContent.trim();if(!title)throw Error('Tên sản phẩm đang rỗng; chọn lại Tên sản phẩm trong ô.');const id=card.getAttribute('data-product-id')||card.getAttribute('data-id');return id?'id:'+id:'title:'+NBL.norm(title);}
+function cardKey(card){const title=titleOf(card);if(!title)throw Error('Tên sản phẩm đang rỗng; chọn lại Tên sản phẩm trong ô.');const id=card.getAttribute('data-product-id')||card.getAttribute('data-id');return id?'id:'+id:'title:'+NBL.norm(title);}
 function pin(product){
  const cards=productCards();
  if(product.mode==='number'){
@@ -128,7 +141,7 @@ function pin(product){
    if(known.length&&new Set(known.map(x=>x.number)).size===known.length){const hit=known.find(x=>x.number===product.number);if(hit)return hit.card;if(known.length===rows.length)return null;}}
   return cards[product.number-1]||null;
  }
- const nn=x=>NBL.norm(x).replace(/\s+/g,' '),want=nn(product.text),named=cards.map(card=>{const titles=relativeMatches(cfg.productTitle,card).filter(visible);return {card,title:titles.length===1?nn(titles[0].textContent):''};});
+ const nn=x=>NBL.norm(x).replace(/\s+/g,' '),want=nn(product.text),named=cards.map(card=>({card,title:nn(titleOf(card))}));
  const exact=named.filter(x=>x.title&&x.title===want);if(exact.length)return exact[0].card;
  const matches=named.filter(x=>x.title&&x.title.includes(want));if(matches.length>1)throw Error('Tên khớp nhiều sản phẩm: '+product.text);return matches[0]?.card||null;
 }
@@ -142,7 +155,7 @@ function pinned(card){
  if(label.length===1&&/^(chưa ghim|not pinned)$/i.test(label[0].textContent.trim()))return false;
  throw Error('Chưa nhận được nút Ghim/Bỏ ghim trong ô sản phẩm; chọn lại khung bao trọn tên và nút.');
 }
-function productIdentity(card){const title=one(cfg.productTitle,card).textContent.trim();return {card,title,key:card.getAttribute('data-product-id')||card.getAttribute('data-id')||NBL.norm(title)};}
+function productIdentity(card){const title=titleOf(card);return {card,title,key:card.getAttribute('data-product-id')||card.getAttribute('data-id')||NBL.norm(title)};}
 function trackedCard(item){if(!item)return null;if(item.card.isConnected&&productCards().includes(item.card)&&productIdentity(item.card).key===item.key)return item.card;const matches=productCards().filter(c=>productIdentity(c).key===item.key);if(matches.length>1)throw Error('Không phân biệt được sản phẩm đang ghim');return matches[0]||null;}
 let sleepers=[];
 const delay=ms=>new Promise(resolve=>sleepers.push({at:Date.now()+ms,resolve}));
@@ -165,7 +178,7 @@ document.addEventListener('wheel',e=>{if(!e.composedPath().includes(host))manual
 const nn=x=>NBL.norm(x).replace(/\s+/g,' ');
 function searchBox(){return [...document.querySelectorAll('input')].filter(visible).find(i=>!host.contains(i)&&/Tìm ID hoặc tên sản phẩm|Search.*(ID|product)/i.test(i.getAttribute('placeholder')||''))||null;}
 function numberSpec(el){const input=el.matches&&el.matches('input')?el:el.querySelector&&el.querySelector('input')||el;const s=selector(input,true);return /^[a-z]+\./.test(s)?s:'input';}
-function numberCells(){const search=searchBox();const spec=(cfg&&cfg.numberCell)||($('numberCell')&&$('numberCell').value)||'input';let cells=[];try{cells=[...document.querySelectorAll(spec)];}catch(e){cells=[];}if(cells.filter(e=>visible(e)&&readNumber(e)!==null).length<2)cells=[...document.querySelectorAll('input')];
+function numberCells(){const search=searchBox();const spec=(cfg&&cfg.numberCell)||($('numberCell')&&$('numberCell').value)||NUM_CELL;let cells=[];try{cells=[...document.querySelectorAll(spec)];}catch(e){cells=[];}if(cells.filter(e=>visible(e)&&readNumber(e)!==null).length<2)cells=[...document.querySelectorAll('input')];
  cells=cells.filter(e=>visible(e)&&!host.contains(e)&&e!==search).map(e=>{const v=readNumber(e);const r=e.getBoundingClientRect();return v===null?null:{el:e,number:v,x:r.left+r.width/2,top:r.top,bottom:r.bottom,right:r.right};}).filter(Boolean);
  if(!cells.length)return [];
  // the column = the x where most number boxes sit (the cart column), ±30 px
@@ -294,7 +307,7 @@ $('readProducts').onclick=()=>{
  const before=cfg;try{
   cfg=read();const cards=productCards(),area=$('productChoices');area.replaceChildren();
   if(!cards.length){log('Chưa đọc được sản phẩm. Chọn lại khung một ô sản phẩm bao trọn tên và nút.');return;}
-  const rows=cards.map((card,index)=>{const title=one(cfg.productTitle,card).textContent.trim(),key=cardKey(card);let number=null;if(cfg.productNumber){const labels=relativeMatches(cfg.productNumber,card).filter(visible);if(labels.length===1)number=readNumber(labels[0]);}return {title,key,number,index};});
+  const rows=cards.map((card,index)=>{const title=titleOf(card),key=cardKey(card);let number=null;if(cfg.productNumber){const labels=relativeMatches(cfg.productNumber,card).filter(visible);if(labels.length===1)number=readNumber(labels[0]);}return {title,key,number,index};});
   const native=rows.every(x=>x.number!==null)&&new Set(rows.map(x=>x.number)).size===rows.length;
   const keys=rows.map(x=>x.key);if(new Set(keys).size!==keys.length)throw Error('Hai ô sản phẩm không phân biệt được. Chọn lại khung từng món có mã riêng.');
   const old=bindings();const selected=NBLPins.parseProducts(cfg.pins,cfg.productMode);const chosenKeys=new Set(selected.flatMap(job=>job.mode==='name'?rows.filter(x=>NBL.norm(x.title)===NBL.norm(job.text)).map(x=>x.key):old.some(x=>x.number===job.number)?old.filter(x=>x.number===job.number).map(x=>x.key):[]));
@@ -527,7 +540,12 @@ let titlesAt=0,findResult={};
 // own captcha box, which is not always a [role=dialog].
 function captchaText(){try{const box=[...document.querySelectorAll('[role=dialog],[role=alertdialog],[role=alert],[id*=captcha i],[class*=captcha i],[class*=verify i],iframe[src*=captcha i],iframe[src*=verify i]')].filter(e=>visible(e)&&!host.contains(e)).find(e=>e.tagName==='IFRAME'||/captcha|xác minh|verify|verification|kéo thanh trượt|trượt để|ghép hình|drag the slider/i.test(e.textContent||'')||/captcha/i.test(String(e.id||'')+' '+String(e.className&&e.className.baseVal!==undefined?e.className.baseVal:e.className||'')));
  return box?(String(box.textContent||'').replace(/\s+/g,' ').trim().slice(0,150)||'Trang TikTok Shop đang hiện ô xác minh / captcha'):'';}catch(e){return '';}}
-function cartTitlesUpdate(c){return {};}   // 4.1.13: the app no longer checks scripts against the cart (owner: use "Tìm thử")
+let cartTitlesAt=0,cartTitlesLast="";
+function cartTitlesUpdate(c){   // 4.3.0: product names for the AI in NBL (every 30 s, only when changed)
+ if(Date.now()-cartTitlesAt<30000)return {};cartTitlesAt=Date.now();
+ let t=[];try{const old=cfg;cfg=c||read();try{t=productCards().map(titleOf).filter(Boolean).slice(0,200);}finally{cfg=old;}}catch(e){return {};}
+ const k=JSON.stringify(t);if(k===cartTitlesLast)return {};cartTitlesLast=k;return {cartTitles:t};
+}
 // 4.0 watchdog: if the app stops talking to this tab (app closed or crashed), stop
 // pinning/replying after 30 s instead of waiting forever with modules switched on.
 let lastTickAt=0,lastSentConfig='',lastSentConfigAt=0,runningSince=0,lastConnectionId='',connectionNeedsConfig=true;
@@ -553,13 +571,14 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  const acks=[];
  for(const c of message.commands||[]){if(handled.has(c.id))continue;handled.add(c.id);if(handled.size>500)handled.delete(handled.values().next().value);if(c.deadline*1000<Date.now()){acks.push({id:c.id,error:'Bỏ lệnh quá hạn'});continue;}let error='';if(c.action==='stop'){if(c.module==='all')cancelControl();manager.stop(c.module);if(c.module==='reply'||c.module==='all'){suggestions=[];renderSuggestions();}renderModules();}else if(c.action==='finish_live'){try{void finishLive(c).catch(e=>log(e.message));}catch(e){error=e.message;}}else if(c.action==='cart_check'){let n=-1;try{n=cartCount(read());}catch(e){}controlResult={id:c.id,state:'done',count:n};
 }else if(c.action==='find_product'){const id=c.id,text=String(c.text||'').slice(0,120);findResult={id,state:'running'};void exclusive(()=>findTest(text)).then(t=>{findResult={id,state:'done',text:t};},e=>{findResult={id,state:'failed',text:e.message};});
+}else if(c.action==='reload_extension'){if(running||controlBusy)error='Đang ghim/thêm giỏ; nạp lại sau';else{log('NBL vừa cập nhật: nạp lại tiện ích.');setTimeout(()=>{try{chrome.runtime.sendMessage({type:'reload_self'});}catch(e){}setTimeout(()=>location.reload(),2500);},500);}
 }else if(c.action==='clip_sync'){clipSync={position:Number(c.position)||0,duration:Number(c.duration)||0,playing:Boolean(c.playing),at:Number(c.at)||0,received:Date.now(),clip:String(c.clip||''),script:NBLPins.cleanScript(c.script)};try{$('insertState').textContent=clipSync.script.length?'Đang dùng kịch bản '+clipSync.script.length+' cờ của clip '+(c.clipName||'')+'.':'Clip đang phát chưa có kịch bản.';}catch(e){}
 }else if(c.action==='reload_page'){if(controlBusy)error='Đang thêm giỏ; chưa tải lại trang';else{if(running&&c.stopModules){manager.stop('all');renderModules();}if(running)error='Đang ghim/trả lời; không tải lại trang';else{log('App tải lại trang LIVE trước khi thêm giỏ / trước giờ phát.');report('hoat_dong','Chrome · Tải lại trang LIVE (chuẩn bị giỏ/phát)','');setTimeout(()=>location.reload(),1500);}}
 }else if(c.action==='prepare_bundle'){if(running&&c.stopModules&&!controlBusy){manager.stop('all');suggestions=[];renderSuggestions();renderModules();log('Tắt ghim/trả lời của phiên LIVE trước để chuẩn bị giỏ.');}if(controlBusy||running){error='Dừng tương tác và đợi thao tác chuẩn bị trước';controlResult={id:c.id,state:'failed',error,busy:'1'};}else void prepareBundle(c);}else if(c.action==='start'){if(message.closing){acks.push({id:c.id,error:'App đang đóng'});continue;}if(c.expectedAccount){const previousConfig=cfg;try{cfg=read();if(identity()!==c.expectedAccount)throw Error('Tài khoản khác với phiên đã gắn trong app.');}catch(e){error=e.message;}finally{cfg=previousConfig;}}if(!error){if(c.module==='reply'){suggestions=[];renderSuggestions();}error=startModule(c.module,c.config);}}acks.push({id:c.id,error});}
  let account='Chưa chọn tài khoản';try{const previousConfig=cfg;cfg=read();try{account=identity();}finally{cfg=previousConfig;}}catch(e){}
  // Return immediately; potentially slow confirmations don't block the connection heartbeat.
  void saveConfig().catch(()=>{});const current=read(),serialized=JSON.stringify(current);let config;if(connectionNeedsConfig||!message.configAck||serialized!==lastSentConfig||Date.now()-lastSentConfigAt>60000){config=current;connectionNeedsConfig=false;lastSentConfig=serialized;lastSentConfigAt=Date.now();}
- respond({account,accountVerified:Boolean(account&&account!=='Chưa chọn tài khoản'),modules:manager.status(),acks,...(config?{config}:{}),...cartTitlesUpdate(current),...(findResult.id?{findResult}:{}),captcha:captchaText(),control:controlResult,reports:takeReports()});void tick();return false;
+ respond({account,accountVerified:Boolean(account&&account!=='Chưa chọn tài khoản'),modules:manager.status(),acks,...(config?{config}:{}),...cartTitlesUpdate(current),...(findResult.id?{findResult}:{}),captcha:captchaText(),control:controlResult,reports:takeReports(),version:(chrome.runtime.getManifest?chrome.runtime.getManifest().version:'')});void tick();return false;
 });
 document.addEventListener('keydown',e=>{if(e.altKey&&e.shiftKey&&e.code==='KeyX'){stop('Dừng khẩn cấp bằng Alt+Shift+X');}});
 document.addEventListener('visibilitychange',()=>{if(!running)return;$('state').textContent=document.hidden?'Chạy nền qua app':'Đang chạy';log(document.hidden?'Chuyển tab: giữ lịch; bỏ các mốc quá hạn, không chạy bù':'Tab hiện lại: tiếp tục kiểm tra tài khoản/phiên');});

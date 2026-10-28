@@ -1,0 +1,37 @@
+plugins { id 'com.android.application' }
+
+def ks = System.getenv('NBL_KEYSTORE')
+
+android {
+    namespace 'vn.nbl.live'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'vn.nbl.live'
+        minSdk 26
+        targetSdk 35
+        versionCode Integer.parseInt(System.getenv('NBL_VERSION_CODE') ?: '430')
+        versionName System.getenv('NBL_VERSION_NAME') ?: '4.3.0'
+    }
+    signingConfigs {
+        release {
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('NBL_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('NBL_KEY_ALIAS')
+                keyPassword System.getenv('NBL_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (ks) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

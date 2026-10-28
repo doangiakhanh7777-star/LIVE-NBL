@@ -112,7 +112,7 @@ class StartStop(unittest.TestCase):
         p.on_started(j, 'Đã phát LIVE')
         self.assertEqual(sorted(p.enabled), ['greeting', 'message'])
         p.poll_chrome_modules(time.time()+11)
-        self.assertEqual([c['module'] for c in p.owner.bridge.commands], ['reply', 'pin'])
+        self.assertEqual([c['module'] for c in p.owner.bridge.commands], ['pin'])   # 4.3.0: comments are answered in Studio
 
     def test_stop_success_keeps_video_playing_and_closes_chrome_summary(self):
         # 4.1.2 (owner, 19/10/2026 02:40): NBL never stops the owner's NBL VIDEO.

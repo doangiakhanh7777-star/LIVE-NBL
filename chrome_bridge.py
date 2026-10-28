@@ -90,6 +90,12 @@ class ChromeBridge:
                     state['modules']={k:dict(running=bool(v.get('running')),error=str(v.get('error',''))[:500],detail=str(v.get('detail',''))[:500]) for k,v in modules.items() if k in ('pin','reply') and isinstance(v,dict)} if isinstance(modules,dict) else {};state['last']=time.monotonic()
                     if isinstance(reply.get('cartTitles'),list):state['cartTitles']=[str(x)[:200] for x in reply['cartTitles'][:300]]   # 4.1.11: check pin scripts
                     state['captcha']=str(reply.get('captcha') or '')[:200]   # 4.1.16: Telegram x5
+                    state['version']=str(reply.get('version') or '')[:20]     # 4.3.0: extension version (self-reload after update)
+                    asks=reply.get('aiAsk')                                  # 4.2.2: comments for the AI (Gemini)
+                    if isinstance(asks,list):
+                        queue=state.setdefault('aiQueue',[])
+                        for a in asks[:10]:
+                            if isinstance(a,dict) and str(a.get('text','')).strip() and len(queue)<30:queue.append(dict(id=str(a.get('id',''))[:40],user=str(a.get('user',''))[:80],text=str(a.get('text',''))[:300],at=time.time()))
                     fr=reply.get('findResult')
                     if isinstance(fr,dict):state['findResult']={k:str(v)[:400] for k,v in fr.items() if k in ('id','state','text')}   # 4.1.13: Tìm thử
                     control=reply.get('control',{});state['control']={k:str(v)[:500] for k,v in control.items() if k in ('id','state','error','bundle','added','total','skipped','count','index','busy')} if isinstance(control,dict) else {}
@@ -146,9 +152,9 @@ class ChromeBridge:
                 if command['action']=='stop':self._flush_unconfirmed=True
     def snapshot(self):
         with self.lock:
-            return {k:{a:copy.deepcopy(v) for a,v in s.items() if a in ('tab','instance','account','accountVerified','modules','control','config','configAck','ackErrors','cartTitles','findResult','captcha')} for k,s in self.clients.items() if time.monotonic()-s['last']<10}
+            return {k:{a:copy.deepcopy(v) for a,v in s.items() if a in ('tab','instance','account','accountVerified','modules','control','config','configAck','ackErrors','cartTitles','findResult','captcha','version')} for k,s in self.clients.items() if time.monotonic()-s['last']<10}
     def command(self,client,payload):
-        if payload.get('action') not in ('start','stop','prepare_bundle','finish_live','cart_check','reload_page','clip_sync','find_product'):raise ValueError('Lệnh không hợp lệ.')
+        if payload.get('action') not in ('start','stop','prepare_bundle','finish_live','cart_check','reload_page','clip_sync','find_product','reload_extension'):raise ValueError('Lệnh không hợp lệ.')
         if payload.get('module') not in ('pin','reply','all'):raise ValueError('Mục không hợp lệ.')
         with self.lock:
             if self.closing and payload.get('action')!='stop':raise ValueError('App đang đóng; không nhận lệnh chạy mới.')

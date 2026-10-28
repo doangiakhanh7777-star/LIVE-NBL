@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from PySide6.QtCore import QTimer, Qt, QUrl, QDateTime
-from PySide6.QtGui import QIcon, QDesktopServices, QPixmap
+from PySide6.QtGui import QIcon, QDesktopServices, QPixmap, QImage, QPainter, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget, QListWidgetItem, QTabWidget, QLineEdit, QTextEdit, QCheckBox, QComboBox, QSpinBox, QDoubleSpinBox, QFileDialog, QMessageBox, QFormLayout, QGroupBox, QSlider, QDateTimeEdit, QScrollArea, QGridLayout, QSizePolicy, QStyle, QToolButton, QMenu, QAbstractSpinBox, QDialog)
 from PySide6.QtMultimedia import QMediaDevices
 from model import load, validate, write_json, new_session
@@ -31,14 +31,14 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.2.1'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.0'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
         self.data = load(self.path, self.startup_notices.append)
         self.processes = {}; self.errors = {}; self.selected = 0; self.loading = False
         self.alarm_window=None;self.phone_error=''
-        self.phone_settings=NotificationSettings(DATA/'notifications.json');self.notifier=Notifier()
+        self.phone_settings=NotificationSettings(DATA/'notifications.json');self.notifier=Notifier();self.wrap_notifier()
         try:self.phone_config=self.phone_settings.load()
         except Exception:
             self.phone_config=dict(enabled=False,chat_id='',token='');self.phone_error='Chưa đọc được thiết lập điện thoại. Nhập lại mã bot và lưu trên Windows.'
@@ -60,27 +60,33 @@ class Console(QMainWindow):
         header.addLayout(titlebox); header.addStretch()
         self.fold_button = button('Thu gọn',self.toggle_compact); header.addWidget(self.fold_button)
         from hold_button import HoldButton
+        # 4.3.0: BẮT ĐẦU / DỪNG = ghim + AI tự bật khi LIVE (mặc định bật)
+        self.auto_btn=button('⏸ DỪNG',self.toggle_auto);self.auto_btn.setToolTip('Ghim + AI tự bật khi Studio LIVE. Bấm để tạm dừng / bật lại.');header.addWidget(self.auto_btn)
         header.addWidget(HoldButton('🛑 TẮT HẾT',self.emergency)); layout.addWidget(header_box)
         self.full_panel=QWidget(); body=QVBoxLayout(self.full_panel);body.setContentsMargins(0,0,0,0);body.setSpacing(8)
         self.sessions=QListWidget();self.sessions.hide();self.sessions.currentRowChanged.connect(self.switch)
         self.account_selector=QComboBox();self.account_selector.setObjectName('accountSelector');self.account_selector.setMinimumHeight(44);self.account_selector.currentIndexChanged.connect(self.sessions.setCurrentRow);body.addWidget(self.account_selector)
         self.account_status=QLabel('Chọn nick để bắt đầu');self.account_status.setObjectName('accountStatus');self.account_status.setWordWrap(True);body.addWidget(self.account_status)
         manage=QToolButton();manage.setText('Quản lý nick  ▾');manage.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup);menu=QMenu(manage)
-        for text,callback in [('+ Thêm nick',self.add_session),('Xóa nick',self.remove_session),('Xuất cấu hình',self.export),('Nhập cấu hình',self.import_config),('Xuất gói chẩn đoán (không kèm mã bí mật)',self.export_diagnostics)]:menu.addAction(text,callback)
+        for text,callback in [('+ Thêm nick',self.add_session),('Xóa nick',self.remove_session),('Xuất cấu hình',self.export),('Nhập cấu hình',self.import_config),('Xuất gói chẩn đoán (không kèm mã bí mật)',self.export_diagnostics),('Mở gói chẩn đoán NBL tự gom',lambda:((DATA/'chan_doan').mkdir(parents=True,exist_ok=True),QDesktopServices.openUrl(QUrl.fromLocalFile(str(DATA/'chan_doan')))))]:menu.addAction(text,callback)
         manage.setMenu(menu);connect=QToolButton();connect.setText('Kết nối nick  ▾');connect.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup);connect_menu=QMenu(connect)
-        connect_menu.addAction('Kết nối Chrome',lambda:self.navigation.setCurrentIndex(2))
-        connect_menu.addAction('Kết nối LIVE Studio',lambda:self.studio_panel.connect_current())
+        connect_menu.addAction('Kết nối Chrome',lambda:self.navigation.setCurrentIndex(max(0,self.navigation.findText('Giỏ hàng & ghim · TikTok Shop'))))
+        connect_menu.addAction('Kết nối lại TikTok LIVE Studio',lambda:(setattr(self.studio_panel,'auto_at',0),setattr(self.studio_panel,'auto_launched',False),self.log('Đang tìm và kết nối lại Studio…')))
         connect.setMenu(connect_menu);actions=QHBoxLayout();actions.addWidget(connect,1);actions.addWidget(manage,1);body.addLayout(actions)
         self.navigation=QComboBox();self.navigation.setObjectName('navigation');self.navigation.setMinimumHeight(42);body.addWidget(self.navigation)
+        # 4.2.2 (owner video 28/10/2026): the page list showed white text on white; the list gets its own colours
+        self.navigation.view().setStyleSheet('QListView{background:#ffffff;color:#1f3b52;font-weight:600;outline:0}QListView::item{min-height:32px;padding:4px 12px;color:#1f3b52}QListView::item:selected,QListView::item:hover{background:#f37021;color:#ffffff}')
         self.tabs=QTabWidget();self.tabs.tabBar().hide();self.navigation.currentIndexChanged.connect(self.tabs.setCurrentIndex);body.addWidget(self.tabs,1)
-        import pin_scripts;self.pin_store=pin_scripts.Store(DATA/'kich_ban_ghim.json');self.build_video();self.build_script();self.build_chrome();self.label_timer=QTimer(self);self.label_timer.timeout.connect(self.refresh_playlist_labels);self.label_timer.start(5000);self.build_obs();self.build_schedule();self.build_tools()
+        import pin_scripts;self.pin_store=pin_scripts.Store(DATA/'kich_ban_ghim.json');self.build_video();self.build_script();self.build_chrome();self.build_ai();self.label_timer=QTimer(self);self.label_timer.timeout.connect(self.refresh_playlist_labels);self.label_timer.start(5000);self.build_obs();self.build_schedule();self.build_tools()
         for form in self.findChildren(QFormLayout): form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
-        self.logbox=QTextEdit();self.logbox.setReadOnly(True);self.logbox.setMaximumHeight(80);self.logbox.hide();body.addWidget(self.logbox)
-        body.addWidget(button('Hiện / ẩn nhật ký',lambda:self.logbox.setVisible(not self.logbox.isVisible())))
+        # 4.3.0 (owner): the activity log is always shown
+        logtitle=QLabel('📋 Nhật ký hoạt động');logtitle.setObjectName('subtitle');body.addWidget(logtitle)
+        self.logbox=QTextEdit();self.logbox.setReadOnly(True);self.logbox.setMinimumHeight(90);self.logbox.setMaximumHeight(140);body.addWidget(self.logbox)
         layout.addWidget(self.full_panel,1)
         self.label=QLabel('Sẵn sàng');self.label.setWordWrap(True);layout.addWidget(self.label)
         from studio_panel import StudioPanel
         self.studio_panel=StudioPanel(self)
+        self.refresh_auto_btn()
         self.page('Lịch phát LIVE').addWidget(self.studio_panel)
         from studio_chat_panel import StudioChatPanel
         self.studio_chat=StudioChatPanel(self,self.studio_panel)
@@ -92,6 +98,7 @@ class Console(QMainWindow):
         for signal in (self.account.textEdited,self.volume.valueChanged,self.loop.toggled,self.shuffle.toggled,self.mute.toggled,self.device.currentIndexChanged):signal.connect(self.schedule_autosave)
         self.refresh_list(); self.sessions.setCurrentRow(0); self.fill()
         self.timer = QTimer(self); self.timer.timeout.connect(self.tick); self.timer.start(1000)
+        self.start_phone_api()
         for notice in self.startup_notices:
             self.log(notice);QMessageBox.warning(self,'Đã khôi phục cấu hình',notice)
         if sys.platform=='win32' and (BASE/'ocr_vendor').is_dir():
@@ -103,6 +110,12 @@ class Console(QMainWindow):
             threading.Thread(target=warm,daemon=True,name='ocr-warmup').start()
         if not self.chrome_available:
             self.log('Chrome chưa kết nối: cổng đang bận hoặc không mở được. Video và các mục khác vẫn hoạt động. Đóng chương trình chiếm cổng rồi mở lại app để kết nối Chrome.')
+    def toggle_auto(self):
+        on=not getattr(self.studio_panel,'auto_enabled',True);self.studio_panel.set_auto(on);self.refresh_auto_btn()
+        self.log('Ghim + AI tự động: '+('BẬT' if on else 'TẠM DỪNG'))
+    def refresh_auto_btn(self):
+        on=getattr(self.studio_panel,'auto_enabled',True)
+        self.auto_btn.setText('⏸ DỪNG' if on else '▶ BẮT ĐẦU');self.auto_btn.setObjectName('' if on else 'primary');self.auto_btn.style().unpolish(self.auto_btn);self.auto_btn.style().polish(self.auto_btn)
     def toggle_compact(self):
         if not self.compact:
             self.full_size=self.size();self.full_panel.hide();self.compact=True
@@ -206,32 +219,136 @@ class Console(QMainWindow):
         if selected and index<0:self.device.addItem('Thiết bị đã mất — chọn lại',selected);index=self.device.count()-1
         self.device.setCurrentIndex(max(0,index));self.device.blockSignals(False)
     def build_script(self):
-        v=self.page('Xem nội dung trên Chrome');self.pins=QTextEdit();self.rules=QTextEdit();self.messages=QTextEdit();self.messages.hide()
-        note=QLabel('Chỉnh ghim và quy tắc trả lời trong tiện ích Chrome. Bản sao bên dưới tự cập nhật khi kết nối đúng nick. Nhắn định kỳ chỉnh ở Tin nhắn & chào khách.');note.setWordWrap(True);v.addWidget(note)
-        for title,w in [('Sản phẩm đã chọn để ghim',self.pins),('Quy tắc trả lời trên Chrome',self.rules)]:v.addWidget(QLabel(title));w.setReadOnly(True);w.setMaximumHeight(150);v.addWidget(w)
-        v.addWidget(button('Sao chép mẫu tin từ bản cũ',lambda:QApplication.clipboard().setText(self.messages.toPlainText())))
-        v.addStretch()
+        # 4.3.0: no "Xem nội dung trên Chrome" page any more — the app is where things are set.
+        self.pins=QTextEdit();self.rules=QTextEdit();self.messages=QTextEdit()
+        for w in (self.pins,self.rules,self.messages):w.hide()
     def build_chrome(self):
-        v=self.page('Giỏ hàng & trả lời · Chrome')
-        info=QLabel('Giỏ hàng, chọn bộ sản phẩm, ghim và trả lời bình luận đều thực hiện trên Chrome. Cài tiện ích một lần; thiết lập các nút được dùng chung, nội dung lưu riêng theo nick.');info.setWordWrap(True);v.addWidget(info)
-        self.pair_code=QLineEdit(self.bridge.token);self.pair_code.setReadOnly(True);v.addWidget(QLabel('Mã ghép đôi — dán vào tiện ích Chrome trên máy này'));v.addWidget(self.pair_code)
-        v.addWidget(button('Sao chép mã',lambda:QApplication.clipboard().setText(self.bridge.token)))
-        v.addWidget(button('Mở thư mục tiện ích',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(BASE/'CHROME_NBL_LIVE')))))
-        v.addWidget(button('🌐 Mở Chrome & tự ghép nick này',lambda:self.open_chrome(self.current(),True),'primary'))
-        v.addWidget(button('Mở bảng LIVE (không ghép)',lambda:QDesktopServices.openUrl(QUrl('https://shop.tiktok.com/streamer/live/product/dashboard'))))
-        self.chrome_clients=QComboBox();v.addWidget(QLabel('Chrome đang kết nối với app'));v.addWidget(self.chrome_clients)
-        self.chrome_binding_label=QLabel('Chưa gắn tab cho phiên này');self.chrome_binding_label.setWordWrap(True);v.addWidget(self.chrome_binding_label)
-        v.addWidget(button('Dùng Chrome này cho nick đang chọn',self.bind_chrome,'primary'))
-        v.addWidget(button('Ngắt liên kết Chrome của nick này',self.unbind_chrome))
-        self.chrome_owner=QLineEdit();self.chrome_interval=QSpinBox();self.chrome_interval.setRange(60,86400);self.chrome_interval.setValue(300)
-        self.chrome_scheduled=QTextEdit();self.chrome_repeat=QCheckBox();self.chrome_cycle=QLineEdit('00:10:00');self.chrome_reply=QComboBox();self.chrome_reply.addItem('Tự gửi theo quy tắc','auto');self.chrome_reply.addItem('Gợi ý để duyệt trên Chrome','suggest');self.chrome_cooldown=QSpinBox();self.chrome_cooldown.setRange(15,86400);self.chrome_cooldown.setValue(60)
-        for w in (self.chrome_owner,self.chrome_interval,self.chrome_scheduled,self.chrome_repeat,self.chrome_cycle,self.chrome_reply,self.chrome_cooldown):w.hide()
+        # 4.3.0 (owner, 28/10/2026): the Chrome extension is only the bridge to the TikTok Shop
+        # LIVE dashboard; everything is set here. Pinning switches on by itself when the LIVE starts.
+        v=self.page('Giỏ hàng & ghim · TikTok Shop')
+        self.chrome_binding_label=QLabel('Chưa kết nối Chrome');self.chrome_binding_label.setWordWrap(True);self.chrome_binding_label.setObjectName('accountStatus');v.addWidget(self.chrome_binding_label)
+        v.addWidget(button('🌐 Mở Chrome & tự kết nối',lambda:self.open_chrome(self.current(),True),'primary'))
+        v.addWidget(button('Mở thư mục tiện ích (cài 1 lần)',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(BASE/'CHROME_NBL_LIVE')))))
+        box=QGroupBox('Ghim sản phẩm');f=QFormLayout(box);f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        self.pin_mode=QComboBox();self.pin_mode.addItem('Số thứ tự trong giỏ (1, 2, 3…)','number');self.pin_mode.addItem('Tên sản phẩm (3–4 chữ đầu)','name');f.addRow('Chọn sản phẩm theo',self.pin_mode)
+        self.pin_list=QTextEdit();self.pin_list.setPlaceholderText('Mỗi dòng một món, ví dụ:\n1\n3\n5');self.pin_list.setMaximumHeight(120);f.addRow('Sản phẩm muốn ghim (xáo trộn)',self.pin_list)
+        self.pin_times={}
+        for key,label in [('pinMin','Giữ ghim ít nhất (giây)'),('pinMax','Giữ ghim nhiều nhất (giây)'),('gapMin','Nghỉ ít nhất sau khi tháo (giây)'),('gapMax','Nghỉ nhiều nhất (giây)')]:
+            w=QSpinBox();w.setRange(0,86400);self.pin_times[key]=w;f.addRow(label,w)
+        hint=QLabel('Để cả 4 ô bằng 0 (hoặc không có món nào) = tắt ghim xáo trộn; ghim theo kịch bản cờ của clip vẫn chạy. Ghim TỰ BẬT khi phát LIVE, tự tắt khi kết thúc.');hint.setWordWrap(True);hint.setObjectName('subtitle');f.addRow(hint)
+        v.addWidget(box)
+        for w in [self.pin_mode,self.pin_list]+list(self.pin_times.values()):
+            (w.currentIndexChanged if isinstance(w,QComboBox) else w.textChanged if isinstance(w,QTextEdit) else w.valueChanged).connect(self.schedule_autosave)
         self.chrome_status={}
-        for key,title in [('pin','Ghim sản phẩm'),('reply','Trả lời bình luận')]:
-            box=QGroupBox(title);f=QVBoxLayout(box);lab=QLabel('Chưa bật');lab.setWordWrap(True);self.chrome_status[key]=lab;f.addWidget(lab)
-            row=QHBoxLayout();row.addWidget(button('BẬT / THỬ LẠI',lambda checked=False,k=key:self.chrome_action(k,'start'),'primary'));row.addWidget(button('DỪNG',lambda checked=False,k=key:self.chrome_action(k,'stop'),'danger'));f.addLayout(row);v.addWidget(box)
-        self.chrome_sync_label=QLabel('Đang chờ cấu hình từ Chrome');self.chrome_sync_label.setWordWrap(True);v.addWidget(self.chrome_sync_label)
-        note=QLabel('Ghim và trả lời dùng thiết lập lưu trực tiếp trên tiện ích Chrome. Nhắn định kỳ dùng LIVE Studio ở mục Tin nhắn & chào khách. Trong tiện ích, bấm Chọn ô nhập tin nhắn, Chọn nút gửi… một lần; các lần sau app nhớ lại. Không cần giữ tab ở phía trước; Chrome, tab và máy vẫn phải hoạt động.');note.setWordWrap(True);v.addWidget(note)
+        st=QGroupBox('Trạng thái ghim');sf=QVBoxLayout(st);lab=QLabel('Chưa bật');lab.setWordWrap(True);self.chrome_status['pin']=lab;sf.addWidget(lab)
+        row=QHBoxLayout();row.addWidget(button('BẬT / THỬ LẠI',lambda:self.chrome_action('pin','start'),'primary'));row.addWidget(button('DỪNG',lambda:self.chrome_action('pin','stop'),'danger'));sf.addLayout(row);v.addWidget(st)
+        # hidden: kept so older code paths and saved settings stay valid
+        self.chrome_clients=QComboBox();self.chrome_owner=QLineEdit();self.chrome_interval=QSpinBox();self.chrome_interval.setRange(60,86400)
+        self.chrome_scheduled=QTextEdit();self.chrome_repeat=QCheckBox();self.chrome_cycle=QLineEdit('00:10:00');self.chrome_reply=QComboBox();self.chrome_reply.addItem('auto','auto');self.chrome_cooldown=QSpinBox();self.chrome_cooldown.setRange(15,86400)
+        self.chrome_sync_label=QLabel()
+        for w in (self.chrome_clients,self.chrome_owner,self.chrome_interval,self.chrome_scheduled,self.chrome_repeat,self.chrome_cycle,self.chrome_reply,self.chrome_cooldown,self.chrome_sync_label):w.hide()
+        v.addStretch()
+    # ---------------- 4.3.0 (owner, 28/10/2026): AI trả lời bình luận + giọng đọc ----------------
+    def build_ai(self):
+        import ai_reply as A
+        from ai_engine import AIEngine
+        self.ai=AIEngine(self,DATA);cfg=self.ai.settings.load()
+        if not cfg.get('rules') and self.data.get('sessions'):
+            cfg['rules']=next((s.get('rules') or (s.get('chrome') or {}).get('rules','') for s in self.data['sessions'] if s.get('rules') or (s.get('chrome') or {}).get('rules')),'')   # từ khóa cũ của Chrome
+        v=self.page('Trả lời bình luận AI')
+        self.ai_on=QCheckBox('Bật AI trả lời bình luận khi LIVE (tự bật/tắt theo LIVE)');self.ai_on.setChecked(bool(cfg.get('enabled')));v.addWidget(self.ai_on)
+        self.ai_stats=QLabel(self.ai.summary());self.ai_stats.setWordWrap(True);self.ai_stats.setObjectName('accountStatus');v.addWidget(self.ai_stats)
+        kb=QGroupBox('Gemini API key');kf=QVBoxLayout(kb)
+        self.ai_keys=QLineEdit();self.ai_keys.setEchoMode(QLineEdit.EchoMode.Password);self.ai_keys.setPlaceholderText('Dán API key; nhiều key cách nhau dấu phẩy, rồi bấm Lưu key');kf.addWidget(self.ai_keys)
+        self.ai_key_count=QLabel('Đã lưu '+str(len(self.ai.settings.api_keys(cfg)))+' key (mã hóa, chỉ trên máy này)');kf.addWidget(self.ai_key_count)
+        row=QHBoxLayout();row.addWidget(button('Lưu key',self.ai_save_keys,'primary'));row.addWidget(button('Mở trang lấy key',lambda:QDesktopServices.openUrl(QUrl('https://aistudio.google.com/apikey'))));row.addWidget(button('Xóa key',self.ai_clear_keys,'danger'));kf.addLayout(row)
+        note=QLabel('Key tạo trong CÙNG một tài khoản Google dùng chung lượt miễn phí; muốn thêm lượt thì lấy key từ tài khoản Google khác.');note.setWordWrap(True);note.setObjectName('subtitle');kf.addWidget(note);v.addWidget(kb)
+        mb=QGroupBox('Cách trả lời');mf=QFormLayout(mb);mf.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        self.ai_mode=QComboBox()
+        for k,t in [('chu','Chữ — gửi vào bình luận Studio'),('giong','Giọng đọc — đọc vào LIVE, không gửi chữ'),('ca_hai','Chữ + giọng đọc')]:self.ai_mode.addItem(t,k)
+        self.ai_mode.setCurrentIndex(max(0,self.ai_mode.findData(cfg.get('mode','chu'))));mf.addRow('Kiểu trả lời',self.ai_mode)
+        self.ai_voice=QComboBox()
+        for k,t in A.VOICES:self.ai_voice.addItem(k+' · '+t,k)
+        self.ai_voice.setCurrentIndex(max(0,self.ai_voice.findData(cfg.get('voice','Kore'))));mf.addRow('Giọng đọc (Gemini, có tiếng Việt)',self.ai_voice)
+        self.ai_speed=QComboBox()
+        for k in A.SPEEDS:self.ai_speed.addItem(k+'x',k)
+        self.ai_speed.setCurrentIndex(max(0,self.ai_speed.findData(str(cfg.get('speed','1.0')))));mf.addRow('Tốc độ đọc',self.ai_speed)
+        row=QHBoxLayout();self.ai_preview_btn=button('▶ Nghe thử',self.ai_preview,'primary');row.addWidget(self.ai_preview_btn);row.addWidget(button('■ Dừng',lambda:self.ai.stop_preview()));mf.addRow(row)
+        self.ai_cooldown=QSpinBox();self.ai_cooldown.setRange(15,3600);self.ai_cooldown.setValue(int(cfg.get('cooldown',60)));self.ai_cooldown.setSuffix(' giây');mf.addRow('Nghỉ trước khi trả lời lại cùng một khách',self.ai_cooldown)
+        self.ai_rate=QSpinBox();self.ai_rate.setRange(1,60);self.ai_rate.setValue(int(cfg.get('max_per_minute',10)));self.ai_rate.setSuffix(' câu/phút');mf.addRow('Hỏi AI tối đa',self.ai_rate)
+        sound=QLabel('Giọng đọc phát ra cùng thiết bị âm thanh với NBL VIDEO của nick (cáp ảo nếu đang dùng) nên vào được LIVE; lúc đọc NBL tự giảm nhỏ tiếng video. Nghe thử phát ra loa máy.');sound.setWordWrap(True);sound.setObjectName('subtitle');mf.addRow(sound)
+        v.addWidget(mb)
+        pb=QGroupBox('Hướng dẫn cho AI (thông tin shop)');pf=QVBoxLayout(pb)
+        self.ai_prompt=QTextEdit();self.ai_prompt.setPlainText(cfg.get('prompt') or A.DEFAULT_PROMPT);self.ai_prompt.setMinimumHeight(130);pf.addWidget(self.ai_prompt)
+        hint=QLabel('💡 Ghi thông tin THẬT: giao hàng, bảo hành, cách xưng hô, ví dụ sản phẩm. AI tự biết danh sách sản phẩm trong giỏ.');hint.setWordWrap(True);hint.setObjectName('subtitle');pf.addWidget(hint)
+        row=QHBoxLayout();row.addWidget(button('↺ Khôi phục mặc định',lambda:self.ai_prompt.setPlainText(A.DEFAULT_PROMPT)));row.addWidget(button('💾 Lưu cấu hình',self.ai_save,'primary'));pf.addLayout(row);v.addWidget(pb)
+        rb=QGroupBox('Từ khóa trả lời sẵn (trả lời trước, không tốn lượt AI)');rf=QVBoxLayout(rb)
+        self.ai_rules=QTextEdit();self.ai_rules.setPlaceholderText('Mỗi dòng: từ khóa;từ khóa khác | câu trả lời\nví dụ: giá;bao nhiêu | Giá có trong giỏ hàng màu cam ạ');self.ai_rules.setPlainText(cfg.get('rules',''));self.ai_rules.setMaximumHeight(110);rf.addWidget(self.ai_rules);v.addWidget(rb)
+        tb=QGroupBox('Thử hỏi AI');tf=QVBoxLayout(tb);self.ai_question=QLineEdit();self.ai_question.setPlaceholderText('Gõ một câu bình luận, ví dụ: ship về Cần Thơ mấy ngày em?');tf.addWidget(self.ai_question)
+        self.ai_answer=QLabel('');self.ai_answer.setWordWrap(True);tf.addWidget(button('Hỏi thử',self.ai_try));tf.addWidget(self.ai_answer);v.addWidget(tb)
+        for w in (self.ai_on,):w.toggled.connect(self.ai_save)
+        for w in (self.ai_mode,self.ai_voice,self.ai_speed):w.currentIndexChanged.connect(self.ai_save)
+        for w in (self.ai_cooldown,self.ai_rate):w.valueChanged.connect(self.ai_save)
+        self.ai_save(quiet=True);v.addStretch()
+        self.ai_timer=QTimer(self);self.ai_timer.timeout.connect(lambda:self.ai_stats.setText(self.ai.summary()));self.ai_timer.start(2000)
+    def ai_cfg(self):
+        cfg=self.ai.settings.load()
+        cfg.update(enabled=self.ai_on.isChecked(),mode=self.ai_mode.currentData(),voice=self.ai_voice.currentData(),speed=self.ai_speed.currentData(),cooldown=self.ai_cooldown.value(),
+                   max_per_minute=self.ai_rate.value(),prompt=self.ai_prompt.toPlainText().strip(),rules=self.ai_rules.toPlainText().strip())
+        return cfg
+    def ai_save(self,*args,quiet=False):
+        if not hasattr(self,'ai_rate'):return
+        try:
+            self.ai.settings.save(self.ai_cfg())
+            if not quiet and not args:self.log('Đã lưu cấu hình AI trả lời bình luận.')
+            if not self.ai_on.isChecked():
+                for pid in list(self.ai.active):self.ai.stop(pid)
+            elif hasattr(self,'studio_panel'):
+                for p in self.studio_panel.profiles:
+                    if p['id'] in getattr(self.studio_panel,'hand_live',{}) or any(j['profile']==p['id'] and j['state']=='running' for j in self.studio_panel.jobs):self.ai.start(self.studio_panel.effective_profile(p))
+        except Exception as e:QMessageBox.warning(self,'AI',str(e))
+    def ai_save_keys(self):
+        cfg=self.ai_cfg();keys=self.ai.settings.set_keys(cfg,self.ai_keys.text())
+        if not keys:QMessageBox.information(self,'API key','Chưa thấy key hợp lệ (key Gemini dạng AIza…).');return
+        self.ai.settings.save(cfg);self.ai_keys.clear();self.ai_key_count.setText('Đã lưu '+str(len(keys))+' key (mã hóa, chỉ trên máy này)');self.log('Đã lưu '+str(len(keys))+' Gemini API key.')
+    def ai_clear_keys(self):
+        cfg=self.ai_cfg();cfg['keys']='';self.ai.settings.save(cfg);self.ai_key_count.setText('Chưa có key');self.log('Đã xóa Gemini API key.')
+    def ai_wait(self,future,done):
+        timer=QTimer(self)
+        def check():
+            if not future.done():return
+            timer.stop();timer.deleteLater()
+            try:done(future.result(),None)
+            except Exception as e:done(None,e)
+        timer.timeout.connect(check);timer.start(200)
+    def ai_preview(self):
+        self.ai_save(quiet=True);self.ai_preview_btn.setText('⏳ Đang tạo…');self.ai_preview_btn.setEnabled(False)
+        def done(wav,err):
+            self.ai_preview_btn.setText('▶ Nghe thử');self.ai_preview_btn.setEnabled(True)
+            if err:QMessageBox.warning(self,'Nghe thử',str(err));return
+            self.ai.play(wav,None,preview=True)
+        self.ai_wait(self.ai.preview_voice(self.ai_cfg(),None),done)
+    def ai_try(self):
+        q=self.ai_question.text().strip()
+        if not q:return
+        self.ai_answer.setText('Đang hỏi…')
+        p=self.studio_panel.current_profile() if hasattr(self,'studio_panel') else None
+        self.ai_wait(self.ai.test_ask(self.ai_cfg(),q,p),lambda r,e:self.ai_answer.setText(str(e) if e else r))
+    def pin_settings(self,session=None):
+        """4.3.0: the session's pin settings (migrated once from what the old extension kept)."""
+        s=session or self.current();p=s.get('pin')
+        if not isinstance(p,dict):
+            c=s.get('chrome',{}) or {}
+            def n(k,d):
+                try:return max(0,int(float(c.get(k,d))))
+                except (TypeError,ValueError):return d
+            p=dict(mode=c.get('productMode','number') if c.get('productMode') in ('number','name') else 'number',products=str(c.get('pins') or s.get('pins') or ''),
+                   pinMin=n('pinMin',30),pinMax=n('pinMax',40),gapMin=n('gapMin',30),gapMax=n('gapMax',40))
+            s['pin']=p
+        return p
+    def pin_command_config(self,session=None):
+        p=self.pin_settings(session)
+        return dict(pins=p['products'],productMode=p['mode'],pinMin=str(p['pinMin']),pinMax=str(p['pinMax']),gapMin=str(p['gapMin']),gapMax=str(p['gapMax']))
     def chrome_config(self):
         return dict(owner=self.chrome_owner.text().strip(),repeatPins='on' if self.chrome_repeat.isChecked() else 'off',cycle=self.chrome_cycle.text().strip(),replyMode=self.chrome_reply.currentData(),cooldown=str(self.chrome_cooldown.value()))
     def save_chrome(self):
@@ -295,9 +412,9 @@ class Console(QMainWindow):
         try:
             if not self.chrome_available:raise ValueError('Cầu nối Chrome chưa mở được. Các mục khác vẫn chạy; kiểm tra cổng kết nối rồi mở lại app.')
             self.save_chrome();binding=self.current().get('chrome_binding');client=resolve_binding(binding,self.bridge.snapshot())
-            if not binding:raise ValueError('Gắn tab Chrome với phiên này trước khi bật.')
+            if not binding:raise ValueError('Chrome chưa kết nối nick này: bấm Mở Chrome & tự kết nối.')
             if not client:raise ValueError('Tab/tài khoản đã gắn không còn kết nối. Không gửi lệnh sang tài khoản khác. Ghép đôi lại hoặc gắn lại đúng tab.')
-            self.bridge.command(client,dict(action=action,module=key,expectedAccount=binding['account']));self.log('Đã gửi '+action+' · '+key+'; chờ Chrome xác nhận.')
+            self.bridge.command(client,dict(action=action,module=key,expectedAccount=binding['account'],**({'config':self.pin_command_config()} if action=='start' else {})));self.log('Đã gửi '+action+' · '+key+'; chờ Chrome xác nhận.')
         except Exception as e:QMessageBox.warning(self,'Chrome',str(e))
     def chrome_tick(self,reset_selection=False):
         clients=self.bridge.snapshot();self.auto_bind_chrome(clients);binding=self.current().get('chrome_binding');resolved=resolve_binding(binding,clients)
@@ -309,10 +426,7 @@ class Console(QMainWindow):
             index=self.chrome_clients.findData(selected);self.chrome_clients.setCurrentIndex(index if index>=0 else 0);self.chrome_clients.blockSignals(False)
         st=clients.get(resolve_binding(binding,clients),{}) if binding else {}
         self.account_status.setText(('Chrome: đã kết nối · ' if st else 'Chrome: chưa kết nối · ')+(self.studio_panel.connection_status() if hasattr(self,'studio_panel') else 'Studio: chưa kết nối'))
-        self.chrome_binding_label.setText(('Đã gắn: '+binding['account']+' · tab '+str(binding['tab'])+(' · đang kết nối' if st else ' · chưa có kết nối đúng tab/tài khoản')) if binding else 'Chưa gắn tab cho phiên này')
-        if st and st.get('configAck'):
-            cfg=st.get('config',{});self.current()['chrome']={**self.current().get('chrome',{}),**cfg};self.chrome_sync_label.setText('Đã tự lưu cấu hình Chrome · '+st.get('account',''))
-            self.pins.setPlainText(cfg.get('pins',self.pins.toPlainText()));self.rules.setPlainText(cfg.get('rules',self.rules.toPlainText()))
+        self.chrome_binding_label.setText(('✓ Chrome đã kết nối · '+binding['account'] if st else 'Chrome chưa kết nối nick '+binding['account']+' · bấm Mở Chrome & tự kết nối') if binding else 'Chrome chưa kết nối · bấm Mở Chrome & tự kết nối')
         for key,lab in self.chrome_status.items():
             item=st.get('modules',{}).get(key,{})
             lab.setText(item.get('error') or ((item.get('detail') or 'Đang chạy') if item.get('running') else 'Đã dừng') if st else 'Mất / chưa có kết nối')
@@ -369,6 +483,8 @@ class Console(QMainWindow):
         v=self.page('Thiết lập & cảnh báo')
         self.awake=QCheckBox('Giữ máy thức · cho phép tắt màn hình');self.awake.setChecked(self.data.get('settings',{}).get('keep_awake',True));self.awake.toggled.connect(set_awake);v.addWidget(self.awake);set_awake(self.awake.isChecked())
         for title,desc,action in [
+            ('🧪 Chạy thử (không phát LIVE)','NBL đọc Studio, trang TikTok Shop, AI và app điện thoại rồi báo mục nào thấy / chưa thấy. Chỉ đọc, không bấm gì, không phát LIVE.',self.run_selfcheck),
+            ('Kiểm tra cập nhật NBL ngay','NBL tự kiểm tra bản mới khi mở và mỗi 6 giờ; tự cài lúc không LIVE, tự mở lại, giữ nguyên cài đặt.',lambda:self.check_update(manual=True)),
             ('Bật bộ báo động LIVE','Phát chuông khi đọc được cảnh báo cần xác minh; hiển thị cửa sổ cần chú ý.',self.open_alarm),
             ('Mở thư mục tiện ích Chrome','Chrome → chrome://extensions → Chế độ nhà phát triển → Tải tiện ích đã giải nén → chọn CHROME_NBL_LIVE.',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(BASE/'CHROME_NBL_LIVE')))),
             ('Mở hướng dẫn','Cách cài tiện ích, tách âm thanh và nhận thông báo điện thoại.',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(BASE/'HUONG_DAN_SU_DUNG.pdf' if (BASE/'HUONG_DAN_SU_DUNG.pdf').exists() else BASE/'HUONG_DAN_4.1.txt')))),
@@ -376,6 +492,11 @@ class Console(QMainWindow):
             ('Mở báo cáo hoạt động','Việc NBL đã làm: gửi tin, chào khách, tự đóng thông báo, ghép cửa sổ trò chuyện. Giữ 100 báo cáo mới nhất.',lambda:self.open_reports('hoat_dong')),
             ('Mở báo cáo lỗi','Việc chưa làm được, kèm ảnh Studio lúc lỗi. Giữ 100 báo cáo mới nhất, riêng với báo cáo hoạt động.',lambda:self.open_reports('loi'))]:
             v.addWidget(button(title,action,'primary'));lab=QLabel(desc);lab.setWordWrap(True);v.addWidget(lab)
+        group=QGroupBox('App điện thoại NBL (Android)');pv=QVBoxLayout(group)
+        lab=QLabel('Điện thoại và PC cùng Tailscale (hoặc cùng wifi). Cài APK NBL trên điện thoại → mở Camera quét mã QR dưới đây → app tự lưu PC này. Ai có mã QR là điều khiển được NBL: đừng gửi ảnh mã cho người lạ; lỡ lộ thì bấm Đổi mã.');lab.setWordWrap(True);pv.addWidget(lab)
+        self.phone_qr=QLabel();self.phone_qr.setAlignment(Qt.AlignmentFlag.AlignCenter);pv.addWidget(self.phone_qr)
+        self.phone_state=QLabel();self.phone_state.setWordWrap(True);self.phone_state.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse);pv.addWidget(self.phone_state)
+        row=QHBoxLayout();self.phone_on=QCheckBox('Cho phép điều khiển từ điện thoại');row.addWidget(self.phone_on);row.addWidget(button('🔁 Đổi mã (điện thoại cũ phải quét lại)',self.phone_new_token));pv.addLayout(row);v.addWidget(group)
         group=QGroupBox('Thông báo Android qua Telegram');form=QFormLayout(group)
         self.phone_enabled=QCheckBox('Gửi cảnh báo về điện thoại');self.phone_enabled.setChecked(self.phone_config['enabled']);form.addRow(self.phone_enabled)
         self.phone_token=QLineEdit(self.phone_config['token']);self.phone_token.setEchoMode(QLineEdit.EchoMode.Password);form.addRow('Token bot Telegram',self.phone_token)
@@ -419,6 +540,9 @@ class Console(QMainWindow):
         secret=self.phone_config.get('token','')
         if secret:text=text.replace(secret,'[ẩn mã bot]')
         self.logbox.append(html.escape(time.strftime('%H:%M:%S')+'  '+text));self.logger.info(text)
+        if not hasattr(self,'phone_log'):
+            import collections;self.phone_log=collections.deque(maxlen=400);self.phone_seq=0
+        self.phone_seq+=1;self.phone_log.append((self.phone_seq,time.time(),text))
         if self.logbox.document().blockCount()>500:self.logbox.document().setMaximumBlockCount(500)
     def refresh_list(self):
         self.sessions.blockSignals(True);self.account_selector.blockSignals(True);self.sessions.clear();self.account_selector.clear()
@@ -477,7 +601,9 @@ class Console(QMainWindow):
             if not self.loading:self.fill()
     def collect(self):
         if self.loading or not self.data['sessions']:return
-        s=self.current();s['chrome']={**s.get('chrome',{}),**self.chrome_config()};s.update(account=self.account.text().strip(),playlist=self.playlist_paths(),volume=self.volume.value(),device=self.device.currentData() or '',mute=self.mute.isChecked(),loop=True,shuffle=self.shuffle.isChecked(),pins=self.pins.toPlainText(),rules=self.rules.toPlainText(),messages=self.messages.toPlainText())
+        s=self.current();s['chrome']={**s.get('chrome',{}),**self.chrome_config()}
+        if hasattr(self,'pin_mode'):s['pin']=dict(mode=self.pin_mode.currentData(),products=self.pin_list.toPlainText().strip(),**{k:w.value() for k,w in self.pin_times.items()});s['pins']=s['pin']['products']
+        s.update(account=self.account.text().strip(),playlist=self.playlist_paths(),volume=self.volume.value(),device=self.device.currentData() or '',mute=self.mute.isChecked(),loop=True,shuffle=self.shuffle.isChecked(),rules=self.rules.toPlainText(),messages=self.messages.toPlainText())
         self.data['settings']=dict(keep_awake=self.awake.isChecked(),obs_host=self.host.text().strip(),obs_port=self.port.value(),live_minutes=self.live_minutes.value(),rest_minutes=self.rest_minutes.value(),repeat=self.repeat.isChecked())
     def save_current(self):
         self.collect();validate(self.data);write_json(self.path,self.data);self.refresh_list();self.log('Đã lưu phiên '+str(self.current()['number']))
@@ -487,6 +613,8 @@ class Console(QMainWindow):
         if s['device'] and self.device.findData(s['device'])<0:
             self.device.addItem('Thiết bị đã mất — chọn lại',s['device']);self.device.setCurrentIndex(self.device.count()-1)
         for key,w in [('pins',self.pins),('rules',self.rules),('messages',self.messages)]:w.setPlainText(s[key])
+        p=self.pin_settings(s);self.pin_mode.setCurrentIndex(max(0,self.pin_mode.findData(p['mode'])));self.pin_list.setPlainText(p['products'])
+        for k,w in self.pin_times.items():w.setValue(int(p.get(k,0)))
         c=s.get('chrome',{})
         self.chrome_owner.setText(c.get('owner',s.get('account','')))
         self.chrome_interval.setValue(int(c.get('interval',300)))
@@ -590,7 +718,185 @@ class Console(QMainWindow):
         try:write_json(self.path,self.data)
         except Exception as e:self.log('Đã dừng, nhưng chưa lưu được cấu hình: '+type(e).__name__)
         self.log('Đã gửi lệnh dừng tất cả: video, Chrome, lịch OBS và bộ báo động.')
+    # ---------------- 4.3.0 (owner): tự cập nhật ----------------
+    # ---------------- 4.3.0 (owner): app điện thoại ----------------
+    def start_phone_api(self):
+        import phone_api,phone_actions
+        self.phone_cfg=phone_api.Config(DATA/'phone_api.json')
+        self.phone_server=phone_api.Server(phone_actions.Actions(self),self.phone_cfg)
+        self.phone_timer=QTimer(self);self.phone_timer.timeout.connect(self.phone_server.drain);self.phone_timer.start(100)
+        cfg=self.phone_cfg.load();self.phone_on.blockSignals(True);self.phone_on.setChecked(bool(cfg.get('enabled')));self.phone_on.blockSignals(False)
+        self.phone_on.toggled.connect(self.phone_toggle)
+        if cfg.get('enabled'):self.phone_server.start()
+        self.phone_refresh()
+    def phone_toggle(self,on):
+        cfg=self.phone_cfg.load();cfg['enabled']=bool(on);self.phone_cfg.save(cfg)
+        if on:self.phone_server.start()
+        else:self.phone_server.stop()
+        self.log('App điện thoại: '+('cho phép' if on else 'đã tắt')+'.');self.phone_refresh()
+    def phone_new_token(self):
+        if QMessageBox.question(self,'Đổi mã ghép','Điện thoại đang ghép sẽ không điều khiển được nữa cho tới khi quét mã mới. Đổi mã?')!=QMessageBox.StandardButton.Yes:return
+        self.phone_cfg.new_token();self.log('Đã đổi mã ghép điện thoại.');self.phone_refresh()
+    def phone_refresh(self):
+        import phone_api,qr
+        cfg=self.phone_cfg.load();on=bool(cfg.get('enabled'))
+        if not on:
+            self.phone_qr.clear();self.phone_state.setText('Đang tắt điều khiển từ điện thoại.');return
+        hosts=phone_api.addresses();link=phone_api.pair_link(cfg['token'],cfg.get('port',phone_api.PORT),hosts)
+        m=qr.encode(link);n=len(m);scale=max(3,240//(n+8));img=QImage((n+8)*scale,(n+8)*scale,QImage.Format.Format_RGB32);img.fill(QColor('white'))
+        painter=QPainter(img)
+        for y,row in enumerate(m):
+            for x,dark in enumerate(row):
+                if dark:painter.fillRect((x+4)*scale,(y+4)*scale,scale,scale,QColor('black'))
+        painter.end();self.phone_qr.setPixmap(QPixmap.fromImage(img))
+        err=self.phone_server.error
+        self.phone_state.setText(('⚠ '+err if err else '✓ Đang mở cổng '+str(cfg.get('port',phone_api.PORT))+' cho điện thoại.')+'\nĐịa chỉ PC: '+', '.join(hosts)+'\nKhông quét được thì trong app chọn "Thêm PC" và nhập địa chỉ + mã: '+cfg['token'])
+    def run_selfcheck(self):
+        """4.3.0 chế độ chạy thử: reads Studio + TikTok Shop + AI + phone; clicks nothing."""
+        import threading,copy
+        sp=self.studio_panel;p=sp.current_profile();lines=['STUDIO']
+        profile=copy.deepcopy(sp.effective_profile(p)) if p and p.get('cdp') else None
+        if not p:lines.append('✗ Chưa kết nối Studio: mở TikTok LIVE Studio bằng icon trên màn hình, NBL tự kết nối.')
+        elif not p.get('cdp'):lines.append('✗ Nick đang dùng kiểu kết nối cũ (ảnh + chuột). Bấm menu → Kết nối lại TikTok LIVE Studio.')
+        self.log('Chạy thử: đang đọc Studio, Chrome, AI…')
+        box={}
+        def work():
+            try:
+                from studio_cdp import execute_cdp
+                box['studio']=execute_cdp(profile,'selfcheck')
+            except Exception as e:box['studio_error']=str(e)
+        if profile:
+            t=threading.Thread(target=work,daemon=True,name='nbl-selfcheck');t.start()
+        else:t=None
+        def finish():
+            if t and t.is_alive():QTimer.singleShot(300,finish);return
+            r=box.get('studio')
+            if box.get('studio_error'):lines.append('✗ '+box['studio_error'])
+            if r:
+                ok=lambda c:'✓' if c else '✗'
+                lines.append(ok(r.get('nickname'))+' Nick trên Studio: '+(r.get('nickname') or 'chưa đọc được (Studio đang ở trang chủ?)'))
+                lines.append(ok(r.get('hasButton'))+' Nút Phát LIVE / Kết thúc: '+('thấy' if r.get('hasButton') else 'KHÔNG thấy — Studio đổi giao diện?'))
+                lines.append(('● Đang LIVE' if r.get('living') else '○ Chưa LIVE')+(' · ô bình luận '+('thấy' if r.get('chatBox') else 'KHÔNG thấy') if r.get('living') else ''))
+                if r.get('comments',-1)>=0:lines.append('✓ Đọc khung chat: '+str(r['comments'])+' bình luận đang hiện')
+                else:lines.append('✗ Chưa đọc được khung chat')
+                if r.get('captcha'):lines.append('⚠ Captcha / xác minh đang hiện: '+str(r['captcha'])[:120])
+                for d in r.get('dialogs') or []:lines.append('⚠ Thông báo đang mở: '+d)
+            lines.append('');lines.append('TIKTOK SHOP (Chrome)')
+            from session_binding import resolve_binding
+            clients=self.bridge.snapshot();binding=self.current().get('chrome_binding')
+            bound=resolve_binding(binding,clients) if binding else None
+            if not clients:lines.append('✗ Chưa có tab trang LIVE TikTok Shop nào kết nối. Bấm "🌐 Mở Chrome & tự kết nối".')
+            else:
+                st=clients.get(bound) or next(iter(clients.values()))
+                try:want=json.loads((BASE/'CHROME_NBL_LIVE'/'manifest.json').read_text(encoding='utf-8')).get('version','')
+                except Exception:want=''
+                lines.append(('✓' if bound else '⚠')+' Tab trang LIVE: '+str(len(clients))+' tab'+('' if bound else ' (chưa gắn với nick này)'))
+                lines.append(('✓' if st.get('version')==want else '✗')+' Tiện ích Chrome: '+(st.get('version') or 'bản cũ')+('' if st.get('version')==want else ' (cần '+want+'; NBL tự nạp lại, chưa được thì cài lại tiện ích)'))
+                lines.append(('✓' if st.get('accountVerified') else '✗')+' Tài khoản trên trang Shop: '+str(st.get('account') or 'chưa đọc được'))
+                n=len(st.get('cartTitles') or [])
+                lines.append(('✓' if n else '⚠')+' Sản phẩm trong giỏ đọc được: '+str(n)+('' if n else ' (giỏ trống hoặc chưa tìm thấy thẻ sản phẩm)'))
+                pin=(st.get('modules') or {}).get('pin') or {}
+                if pin.get('error'):lines.append('✗ Ghim: '+pin['error'][:150])
+                if st.get('captcha'):lines.append('⚠ Captcha trên trang Shop: '+st['captcha'][:120])
+            lines.append('');lines.append('AI TRẢ LỜI BÌNH LUẬN')
+            cfg=self.ai.settings.load();keys=self.ai.settings.api_keys(cfg)
+            lines.append(('✓' if keys else '✗')+' Gemini API key: '+str(len(keys))+' key')
+            lines.append(('✓ Bật' if cfg.get('enabled') else '○ Tắt')+' · kiểu '+{'chu':'chữ','giong':'giọng đọc','ca_hai':'chữ + giọng'}.get(cfg.get('mode'),'?'))
+            if cfg.get('mode') in ('giong','ca_hai'):
+                dev=self.current().get('device') or ''
+                lines.append(('✓' if dev else '⚠')+' Giọng đọc phát chung thiết bị NBL VIDEO: '+(self.device.currentText() if dev else 'loa mặc định — chọn cáp ảo để giọng vào LIVE'))
+            lines.append('');lines.append('APP ĐIỆN THOẠI')
+            ps=getattr(self,'phone_server',None)
+            lines.append(('✓ Đang mở cổng cho điện thoại' if ps and ps.httpd else '✗ '+(ps.error if ps and ps.error else 'Đang tắt')))
+            text='\n'.join(lines);self.log('Kết quả chạy thử:\n'+text)
+            box2=QMessageBox(self);box2.setWindowTitle('Chạy thử NBL (không phát LIVE)');box2.setText(text);box2.open()
+        finish()
+    def wrap_notifier(self):
+        """4.3.0: every problem alert also gathers a diagnostic bundle by itself (max 1 / 30 min)."""
+        publish=self.notifier.publish
+        def wrapped(key,text,test=False):
+            result=publish(key,text,test)
+            if not test and str(key).split(':')[0] not in ('update','emergency_ok','info'):
+                import threading
+                def work():
+                    try:
+                        from diagnostics import auto
+                        path=auto(DATA,str(key)+': '+str(text))
+                        if path:self.auto_diag_path=str(path)
+                    except Exception:pass
+                threading.Thread(target=work,daemon=True,name='nbl-auto-diag').start()
+            return result
+        self.notifier.publish=wrapped
+    def check_update(self,manual=False):
+        if getattr(self,'update_busy',False):
+            if manual:QMessageBox.information(self,'Cập nhật','Đang kiểm tra / tải bản mới…')
+            return
+        import threading,updater
+        from diagnostics import VERSION
+        self.update_busy=True;self.update_result=None;self.update_manual=manual
+        def work():
+            try:
+                rel=updater.latest()
+                if not updater.newer(rel,VERSION):self.update_result=('none',rel);return
+                self.update_result=('found',rel)
+            except Exception as e:self.update_result=('error',str(e))
+        threading.Thread(target=work,daemon=True,name='nbl-update-check').start()
+    def update_tick(self):
+        now=time.time()
+        if now>=getattr(self,'update_next',now+90):self.update_next=now+6*3600;self.check_update()
+        if not hasattr(self,'update_next'):self.update_next=now+90
+        r=getattr(self,'update_result',None)
+        if not r:return
+        kind,val=r
+        if kind=='none':
+            self.update_result=None;self.update_busy=False
+            if getattr(self,'update_manual',False):QMessageBox.information(self,'Cập nhật','NBL đang là bản mới nhất.')
+        elif kind=='error':
+            self.update_result=None;self.update_busy=False;self.log('Kiểm tra cập nhật chưa được: '+val[:150])
+            if getattr(self,'update_manual',False):QMessageBox.warning(self,'Cập nhật','Chưa kiểm tra được: '+val[:300])
+        elif kind=='found':
+            if not self.update_safe():
+                if not getattr(self,'update_wait_noted',False):self.update_wait_noted=True;self.log('Có bản NBL '+val['version']+'; đợi lúc không LIVE / không có lịch trong 30 phút để tự cập nhật.')
+                return
+            self.update_result=None;self.log('Đang tải bản NBL '+val['version']+'…')
+            import threading,updater
+            def get():
+                try:self.update_result=('ready',updater.download(val,BASE/'_update'))
+                except Exception as e:self.update_result=('error',str(e))
+            threading.Thread(target=get,daemon=True,name='nbl-update-get').start();self.update_version=val['version']
+        elif kind=='ready':
+            self.update_result=None
+            if not self.update_safe():self.update_busy=False;return
+            import updater
+            try:
+                self.notifier.publish('update','NBL LIVE đang tự cập nhật lên bản '+str(getattr(self,'update_version',''))+'; mở lại sau khoảng 1–2 phút.')
+                self.log('Cài bản NBL '+str(getattr(self,'update_version',''))+'; NBL tự đóng rồi mở lại.')
+                updater.run_installer(val)
+                self._force_close=True;QTimer.singleShot(1500,self.close)
+            except Exception as e:self.update_busy=False;self.log('Chưa cài được bản mới: '+str(e))
+    def update_safe(self):
+        sp=getattr(self,'studio_panel',None)
+        if not sp:return False
+        now=time.time()
+        if sp.active():return False
+        if any(j['state'] in ('pending','start_retry') and j['start']-now<1800 for j in sp.jobs):return False
+        if getattr(sp,'hand_live',{}):return False
+        return True
+    def extension_reload_check(self,clients):
+        """After an update the extension in Chrome still runs the old files: ask it to load the new ones (once per tab)."""
+        try:
+            want=json.loads((BASE/'CHROME_NBL_LIVE'/'manifest.json').read_text(encoding='utf-8')).get('version','')
+        except Exception:return
+        asked=getattr(self,'ext_reload_asked',set())
+        for client,st in clients.items():
+            v=st.get('version','')
+            if v and want and v!=want and client not in asked:
+                try:self.bridge.command(client,dict(action='reload_extension',module='all'));asked.add(client);self.log('Tiện ích Chrome '+v+' → nạp lại bản '+want+'.')
+                except Exception:pass
+        self.ext_reload_asked=asked
     def tick(self):
+        self.update_tick()
+        self.extension_reload_check(self.bridge.snapshot())
         self.discover_accounts(self.bridge.snapshot())
         self.chrome_tick()
         for msg in self.notifier.drain():self.phone_status.setText(msg);self.log(msg)
@@ -670,7 +976,8 @@ class Console(QMainWindow):
         # Studio; closing NBL leaves it playing. The next NBL run finds it again
         # (video_commands: a window that reported in the last 3 s gets the commands).
         if self.alarm_window:self.alarm_window.close()
-        self.studio_chat.shutdown();self.studio_panel.shutdown();__import__('studio_vision_rpc').close_service();self.notifier.close();set_awake(False);self.bridge.close();self.obs.close()
+        getattr(self,'phone_server',None) and self.phone_server.stop()
+        self.studio_chat.shutdown();getattr(self,'ai',None) and self.ai.shutdown();self.studio_panel.shutdown();__import__('studio_vision_rpc').close_service();self.notifier.close();set_awake(False);self.bridge.close();self.obs.close()
         for handler in self.logger.handlers[:]:handler.close();self.logger.removeHandler(handler)
         super().closeEvent(event)
 

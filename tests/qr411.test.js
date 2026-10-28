@@ -21,13 +21,13 @@ async function tick(b,commands=[{id:'c1',action:'cart_check',module:'all'}]){
 }
 test('manifest has no QR login script and no login hosts',()=>{
  const m=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json'),'utf8'));
- assert.equal(m.version,'4.2.1');
+ assert.equal(m.version,'4.3.0');
  const all=JSON.stringify(m);assert.ok(!/shop_login|seller-vn|tiktok\.com\/login/.test(all));
  assert.equal(m.content_scripts.length,1);assert.ok(!fs.existsSync(path.join(dir,'shop_login.js')));
 });
 test('extension sources no longer handle QR login',()=>{
  for(const f of ['background.js','popup.js','popup.html','content.js'])assert.ok(!/shop_login|shopLogin|nbl-shop-login|loginSnapshot|loginCommand/.test(fs.readFileSync(path.join(dir,f),'utf8')),f);
- assert.match(fs.readFileSync(path.join(dir,'popup.js'),'utf8'),/url:\['https:\/\/shop\.tiktok\.com\/\*'\]/);
+ assert.match(fs.readFileSync(path.join(dir,'popup.js'),'utf8'),/url:\['https:\/\/shop\.tiktok\.com\/streamer\/live\/\*'\]/);   // 4.3.0: popup only shows the connection
 });
 test('only TikTok Shop pages can be paired',()=>{
  const b=background();

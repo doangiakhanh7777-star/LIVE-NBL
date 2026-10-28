@@ -33,7 +33,7 @@ def video_problem(session):
  lost=[x for x in playlist if not Path(x).is_file()]
  if lost:raise ValueError('Video không còn trong máy: '+lost[0]+' (trang Video & âm thanh). Chưa bấm gì trên Studio.')
 GROUP_GAP=30          # 4.2.0: the 2nd nick of a lịch nhóm starts 30 s later (one mouse)
-MAX_NICKS=2
+MAX_NICKS=1          # 4.3.0 (owner): 1 nick; lịch nhóm hidden, code kept
 def now_due(j):return time.time()>=j['start']
 POSTPONE=1800        # 4.1.7: a hand-started LIVE at schedule time is ended and the schedule moves 30 minutes
 # 4.2.0 (owner, 28/10/2026): the test LIVE that reset the cart (4.1.10–4.1.16) is gone.
@@ -46,13 +46,14 @@ STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử 
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.2.1 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.0 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
   self.profiles=saved['profiles'];self.controls=saved.get('controls',{}) if isinstance(saved.get('controls'),dict) else {}
   if not self.controls and self.profiles:self.controls={k:self.profiles[0][k] for k in CONTROL_FIELDS if self.profiles[0].get(k)}
   self.jobs=saved['jobs']
+  self.auto_enabled=self.controls.get('autoHelpers',True) is not False
   # 4.1.5: carts marked ready by 4.1.4 or older may hold the PREVIOUS schedule's
   # products; prepare them again (replace with the schedule's own set).
   for j in self.jobs:
@@ -77,8 +78,8 @@ class StudioPanel(QWidget):
   v=QVBoxLayout(self);notice=QLabel('Chọn nick ở đầu app. Kết nối cửa sổ LIVE Studio một lần; các nút đã chọn được dùng chung giữa các nick.');notice.setWordWrap(True);v.addWidget(notice)
   self.nick=QComboBox();self.nick.hide();v.addWidget(self.nick)
   self.connection_label=QLabel('Chưa kết nối LIVE Studio cho nick này');self.connection_label.setWordWrap(True);v.addWidget(self.connection_label)
-  b=QPushButton('⚡ Kết nối Studio tự động (không khoanh vùng)');b.setObjectName('primary');b.clicked.connect(self.connect_auto);v.addWidget(b)
-  b=QPushButton('Kết nối kiểu cũ (chọn cửa sổ, khoanh vùng)');b.clicked.connect(self.connect_current);v.addWidget(b)
+  # 4.3.0: no "Kết nối" button — NBL opens/finds Studio and connects by itself (auto_connect).
+  self.auto_at=0;self.auto_note=''
   from hold_button import HoldButton
   v.addWidget(HoldButton('🛑 Tắt LIVE nick này (giữ 2 giây)',self.emergency_current))
   self.start=QDateTimeEdit(QDateTime.currentDateTime().addSecs(300));self.end=QDateTimeEdit(QDateTime.currentDateTime().addSecs(3900))
@@ -91,7 +92,7 @@ class StudioPanel(QWidget):
   row=QHBoxLayout();row.addWidget(QLabel('Bộ sản phẩm số (1 = bộ đầu tiên trên Chrome)'));self.bundle_index=QSpinBox();self.bundle_index.setRange(0,200);self.bundle_index.setSpecialValueText('0 · giữ giỏ tự thêm tay');self.bundle_index.setValue(1);row.addWidget(self.bundle_index);v.addLayout(row)
   self.no_sales.toggled.connect(lambda on:self.bundle_index.setEnabled(not on))
   # 4.2.0 (owner, 28/10/2026): lịch nhóm — 2 nicks LIVE at the same time (max 2 per PC).
-  self.group=QCheckBox('Lịch nhóm: phát CÙNG GIỜ thêm 1 nick nữa (tối đa 2 nick)');v.addWidget(self.group)
+  self.group=QCheckBox('Lịch nhóm: phát CÙNG GIỜ thêm 1 nick nữa (tối đa 2 nick)');v.addWidget(self.group);self.group.hide()
   grow=QHBoxLayout();self.group_nick=QComboBox();self.group_bundle=QSpinBox();self.group_bundle.setRange(0,200);self.group_bundle.setValue(1);self.group_bundle.setSpecialValueText('0 · giỏ tay')
   grow.addWidget(QLabel('Nick 2'));grow.addWidget(self.group_nick,1);grow.addWidget(QLabel('bộ số'));grow.addWidget(self.group_bundle);self.group_box=QWidget();self.group_box.setLayout(grow);self.group_box.hide();v.addWidget(self.group_box)
   self.group.toggled.connect(lambda on:(self.group_box.setVisible(on),self.fill_group()))
@@ -105,6 +106,11 @@ class StudioPanel(QWidget):
   self.mouse_path.write_text('1',encoding='utf-8')
   for p in self.profiles:p['mousePermissionFile']=str(self.mouse_path)
   self.refresh_profiles();self.render();self.timer=QTimer(self);self.timer.timeout.connect(self.tick);self.timer.start(1000)
+  if os.name=='nt':
+   import threading
+   from studio_cdp import fix_shortcuts
+   def fix():self.icons_fixed=fix_shortcuts()   # logged from the Qt thread (auto_connect)
+   threading.Thread(target=fix,daemon=True,name='studio-icons').start()
  def save(self):
   if not self.stopped:write_json(self.path,dict(profiles=self.profiles,controls=self.controls,jobs=self.jobs,library=[self.clips.item(i).text() for i in range(self.clips.count())]))
  def refresh_profiles(self):
@@ -161,7 +167,7 @@ class StudioPanel(QWidget):
   used={int(q['cdpPort']) for q in self.profiles if q.get('cdpPort') and q is not current}
   port=int(current.get('cdpPort') or next(p for p in range(BASE_PORT,BASE_PORT+50) if p not in used))
   probe=dict(cdp=True,cdpPort=port,exePath=exe,_otherPorts=sorted(used))
-  self.status.setText('Đang mở/kết nối TikTok LIVE Studio (tối đa 90 giây)… Không cần làm gì.');self.connection_label.setText('Đang kết nối Studio tự động…')
+  self.status.setText('Đang mở TikTok LIVE Studio và chờ Studio tải xong (có thể mất 1–2 phút)… Không cần bấm gì.');self.connection_label.setText('Đang kết nối Studio tự động…')
   future=self.pool.submit_priority(20,execute,probe,'connect');timer=QTimer(self)
   def ready():
    if not future.done():return
@@ -369,6 +375,16 @@ class StudioPanel(QWidget):
  def session(self,p):
   session=next(s for s in self.owner.data['sessions'] if s['id']==p['session'])
   account=session.get('chrome_binding',{}).get('account')
+  if p.get('cdp'):
+   # 4.3.0 (owner, 28/10/2026): "giakhanhdoxe" (TikTok @, read on TikTok Shop) and "Khánh Car
+   # Auto" (display name, read in Studio) are the same nick: the pair is remembered the first
+   # time both are seen; afterwards only another @ is refused.
+   if account and not p.get('handle'):
+    p['handle']=account
+    try:self.save()
+    except Exception:pass
+   if account and p.get('handle') and not same_author(account,p['handle']):raise ValueError('Chrome đang là @'+account+', không phải @'+p['handle']+' của nick này. Đăng nhập đúng nick trên TikTok Shop.')
+   return session
   if account and not same_author(account,p['name']):raise ValueError('Nick Chrome đã thay đổi. Kết nối lại đúng cửa sổ LIVE Studio cho nick này trước.')
   return session
  def client(self,p):
@@ -378,6 +394,9 @@ class StudioPanel(QWidget):
    opener=getattr(self.owner,'open_chrome',None)
    if opener and any(j['profile']==p['id'] and j['state'] in ('pending','start_retry','running') for j in self.jobs):
     try:opener(s)
+    except Exception:pass
+   if any(j['profile']==p['id'] and (j['state']=='running' or j['state'] in ('pending','start_retry') and j['start']-time.time()<900) for j in self.jobs):
+    try:self.owner.notifier.publish('studio:'+p['id']+':chrome','⚠ '+str(p.get('name',''))+' · Chrome chưa kết nối trang LIVE TikTok Shop (Chrome tắt hoặc đăng nhập TikTok Shop hết hạn). NBL đã mở lại trang; đăng nhập lại nếu trang hỏi.')
     except Exception:pass
    raise ValueError('Chưa có đúng tab Chrome/nick kết nối.')
   return s,client
@@ -414,6 +433,17 @@ class StudioPanel(QWidget):
       try:widget.setPlaceholderText(str(e))
       except RuntimeError:pass
      continue
+    if jid=='autoconnect':
+     self.auto_connected(future,widget);continue
+    if jid=='studiocaptcha':
+     try:text=(future.result() or {}).get('captcha') or ''
+     except Exception:text=''
+     if text:
+      msg=str(widget)+' · ⚠ CAPTCHA / XÁC MINH trong TikTok LIVE Studio — vào giải ngay: '+text
+      if self.owner.notifier.alarm('captcha:studio:'+str(widget),msg):self.owner.log(msg);report('loi',str(widget),msg)
+     continue
+    if isinstance(jid,str) and jid.startswith('hand:'):
+     self.hand_result(jid[5:],future);continue
     if jid=='inspect':
      try:widget.setPlainText(json.dumps(future.result(),ensure_ascii=False,indent=2))
      except RuntimeError:pass
@@ -435,7 +465,9 @@ class StudioPanel(QWidget):
       if result.get('live'):
        if j.get('start_attempts'):self.on_started(j,'Studio đã LIVE sau lần bấm trước; nhận lại phiên');continue
        if time.time()-(j.get('cart') or {}).get('reset_at',0)<180:raise ValueError('Phiên phát thử reset giỏ vừa tắt, Studio chưa về nút Phát LIVE; thử lại sau 30 giây')
-       self.end_hand_live(j);continue
+       # 4.3.0 (owner, 28/10/2026): a LIVE started by hand at schedule time is TAKEN OVER
+       # (runs until the schedule's end), never ended and moved any more.
+       self.on_started(j,'Nick đang LIVE tay lúc tới giờ lịch: NBL nhận phiên này, chạy tới '+time.strftime('%H:%M',time.localtime(j['end'])));continue
       if not self.cart_ok(j):
        # 4.2.0: the hand LIVE seen earlier is over, but this schedule's cart is not
        # confirmed: back to waiting, never start.
@@ -508,6 +540,9 @@ class StudioPanel(QWidget):
    self.poll_clip(now)
    self.poll_captcha(now)
    self.poll_emergency(now)
+   self.poll_hand_live(now)
+   self.auto_connect(now)
+   self.poll_studio_captcha(now)
    for j,action in decisions(self.jobs,time.time(),self.cart_ready):
     try:
      p=self.profile(j['profile'])
@@ -606,6 +641,10 @@ class StudioPanel(QWidget):
     if cfg.get('auto_'+kind):
      try:self.owner.studio_chat.engine.enable(self.effective_profile(p),kind,cfg)
      except Exception as e:self.owner.log('Studio '+kind+': '+str(e))
+  ai=getattr(self.owner,'ai',None)
+  if ai and getattr(self,'auto_enabled',True):
+   try:ai.start(self.effective_profile(p))
+   except Exception as e:self.owner.log('AI: '+str(e))
   # Chrome's dashboard follows Studio a few seconds later; start pin/reply then.
   j['chrome_start_at']=time.time()+10;j['chrome_tries']=0
   if not p.get('vision',{}).get('enabled') and not p.get('cdp'):
@@ -647,7 +686,7 @@ class StudioPanel(QWidget):
     # 4.1.3: no reply rules on Chrome = the owner does not use auto-reply; not an error.
     if not j.get('reply_skipped') and re.search('Chưa có câu trả lời|Chưa có quy tắc',why('reply')):
      j['reply_skipped']=True;self.owner.log('Trả lời bình luận: chưa có quy tắc trên Chrome; bỏ qua, chỉ bật ghim.')
-    want=([] if j.get('reply_skipped') else ['reply'])+([] if j['no_sales'] else ['pin'])
+    want=[] if j['no_sales'] else ['pin']      # 4.3.0: comments are answered in Studio (AI), not on Chrome
     if all((modules.get(m) or {}).get('running') for m in want):j.pop('chrome_start_at',None);continue
     if j.get('chrome_tries',0)>=3:
      names={'pin':'Ghim','reply':'Trả lời'}
@@ -659,8 +698,9 @@ class StudioPanel(QWidget):
     if j['chrome_tries']>=3:j.pop('chrome_start_at',None);self.notify(j,'chrome','Chrome chưa sẵn sàng: '+str(e))
  def start_chrome_modules(self,j,include_pin=True):
   p=self.profile(j['profile']);session,client=self.client(p)
-  for module in (() if j.get('reply_skipped') else ('reply',))+(('pin',) if include_pin and not j['no_sales'] else ()):
-   try:self.owner.bridge.command(client,dict(action='start',module=module,expectedAccount=session.get('chrome_binding',{}).get('account') or p['name']))
+  for module in (('pin',) if include_pin and not j['no_sales'] else ()):
+   config=self.owner.pin_command_config(session) if hasattr(self.owner,'pin_command_config') else {}
+   try:self.owner.bridge.command(client,dict(action='start',module=module,config=config,expectedAccount=session.get('chrome_binding',{}).get('account') or p['name']))
    except Exception as e:self.owner.log('Chrome '+module+': '+str(e))
  # ---- cart (giỏ hàng) prepared on Chrome BEFORE the LIVE ----
  def cart_ready(self,j):
@@ -916,6 +956,8 @@ class StudioPanel(QWidget):
   for future,key in list(self.futures.items()):
    if key[0]==j['id'] and key[2] in ('start','preflight','bundle','collapse_chat') and future.cancel():del self.futures[future]
  def stop_chrome(self,j):
+  ai=getattr(self.owner,'ai',None)
+  if ai:ai.stop(j['profile'])
   if hasattr(self.owner,'studio_chat'):
    for kind in ('message','greeting'):self.owner.studio_chat.engine.stop(j['profile'],kind)
   try:p=self.profile(j['profile']);session,client=self.client(p);self.owner.bridge.command(client,dict(action='stop',module='all'))
@@ -958,6 +1000,117 @@ class StudioPanel(QWidget):
  def publish(self,key,text):
   try:self.owner.notifier.publish(key,text)
   except Exception:pass
+ # ---------------- 4.3.0 Studio tự kết nối (không nút) ----------------
+ def auto_connect(self,now):
+  """Owner, 28/10/2026: opening NBL is enough. NBL finds Studio (or opens it when it is not
+  running), waits until it is loaded, reads the nick and links it to the nick of NBL.
+  Studio already open without NBL's port: NBL says so and never closes it."""
+  if getattr(self,'icons_fixed',0):self.owner.log('Đã chỉnh '+str(self.icons_fixed)+' icon TikTok LIVE Studio để NBL tự kết nối.');self.icons_fixed=0
+  if os.name!='nt' or now<self.auto_at or any(k[0]=='autoconnect' for k in self.futures.values()):return
+  session=next((s for s in self.owner.data['sessions'] if s['id']==self.current_session_id),None)
+  if not session:return
+  current=self.current_profile() or {}
+  ok=self.connection_checks.get(current.get('id'),{})
+  if current.get('cdp') and ok.get('ok') and time.monotonic()-ok.get('at',0)<30:self.auto_at=now+30;return
+  self.auto_at=now+20
+  from studio_cdp import find_exe,BASE_PORT
+  exe=find_exe(current.get('exePath') or '')
+  if not exe:
+   if self.auto_note!='exe':self.auto_note='exe';self.owner.log('Chưa tìm thấy TikTok LIVE Studio trên máy (cài Studio vào thư mục mặc định).')
+   return
+  port=int(current.get('cdpPort') or BASE_PORT)
+  try:
+   # Studio is opened by NBL only once (when NBL starts); later NBL only looks for it.
+   f=self.pool.submit_priority(30,execute,dict(cdp=True,cdpPort=port,exePath=exe,noLaunch=getattr(self,'auto_launched',False)),'connect');self.futures[f]=('autoconnect',(session['id'],exe,port),'connect')
+   self.auto_launched=True
+  except Exception:pass
+ def auto_connected(self,future,info):
+  sid,exe,port=info
+  try:r=future.result()
+  except Exception as e:
+   text=str(e)
+   if text!=self.auto_note:self.auto_note=text;self.owner.log('Studio: '+text)
+   if 'KHÔNG phải do NBL mở' in text:
+    try:self.owner.notifier.publish('studio:noport','⚠ TikTok LIVE Studio đang mở nhưng không mở qua NBL nên NBL chưa đọc được. Đóng Studio (khi không LIVE) rồi mở lại bằng icon TikTok LIVE Studio.')
+    except Exception:pass
+   self.auto_at=time.time()+30;return
+  nick=r.get('nickname','')
+  session=next((s for s in self.owner.data['sessions'] if s['id']==sid),None)
+  if not nick or not session:return
+  current=next((p for p in self.profiles if p.get('session')==sid),None) or {}
+  value={**current,'id':current.get('id',uuid.uuid4().hex),'name':nick,'accountName':nick,'session':sid,'exePath':exe,'cdp':True,'cdpPort':port,
+         'interaction':current.get('interaction',session.get('studio_interaction',{})),'allowMouse':current.get('allowMouse',True),'mousePermissionFile':str(self.mouse_path)}
+  if current:self.profiles[self.profiles.index(current)]=value
+  else:self.profiles.append(value)
+  self.connection_checks[value['id']]=dict(ok=True,signature=(value.get('pid'),value.get('windowHandle'),value.get('exePath')),at=time.monotonic())
+  if self.auto_note!='ok:'+nick:self.auto_note='ok:'+nick;self.owner.log('Đã tự kết nối TikTok LIVE Studio: '+nick)
+  self.save();self.refresh_profiles();self.render();self.auto_at=time.time()+30
+ def poll_studio_captcha(self,now):
+  if now-getattr(self,'captcha_at',0)<20:return
+  self.captcha_at=now
+  for p in self.profiles:
+   if p.get('cdp') and not any(k[0]=='studiocaptcha' for k in self.futures.values()):
+    try:f=self.pool.submit_priority(48,execute,copy.deepcopy(self.effective_profile(p)),'captcha');self.futures[f]=('studiocaptcha',p.get('name',''),'captcha')
+    except Exception:pass
+ # ---------------- 4.3.0 LIVE bật tay: tự bật ghim + AI ----------------
+ def poll_hand_live(self,now):
+  """Owner, 28/10/2026: whenever Studio is LIVE (also started by hand), pinning and the
+  AI switch on by themselves and switch off when it ends. Read from inside Studio every
+  10 s; a nick with a schedule running is left to the schedule."""
+  if not hasattr(self,'hand_live'):self.hand_live={};self.hand_probe={}
+  for p in self.profiles:
+   if not p.get('cdp'):continue
+   if any(j['profile']==p['id'] and j['state'] in ACTIVE for j in self.jobs):
+    self.hand_live.pop(p['id'],None);continue
+   if now-self.hand_probe.get(p['id'],0)<10 or any(k[0]=='hand:'+p['id'] for k in self.futures.values()):continue
+   self.hand_probe[p['id']]=now
+   try:
+    f=self.pool.submit_priority(45,execute,copy.deepcopy(self.effective_profile(p)),'status',0,None);self.futures[f]=('hand:'+p['id'],None,'status')
+   except Exception:pass
+ def hand_result(self,pid,future):
+  p=self.profile(pid)
+  if not p:return
+  try:live=bool(future.result().get('live'))
+  except Exception as e:
+   from studio_cdp import StudioChanged
+   if isinstance(e,StudioChanged):
+    self.owner.log('Studio: '+str(e))
+    try:self.owner.notifier.publish('studio:changed:'+pid,'⚠ '+str(p.get('name',''))+' · '+str(e)+' NBL dừng tự thao tác; kiểm tra Studio.')
+    except Exception:pass
+   return
+  was=pid in self.hand_live
+  if live and not was:
+   self.hand_live[pid]=time.time()
+   if not getattr(self,'auto_enabled',True):self.owner.log(str(p.get('name',''))+' · Studio đang LIVE, nhưng BẮT ĐẦU đang tắt: chưa bật ghim/AI.');return
+   self.owner.log(str(p.get('name',''))+' · Studio đang LIVE (bật tay): tự bật ghim + AI.')
+   self.start_live_helpers(p)
+  elif not live and was:
+   self.hand_live.pop(pid,None);self.owner.log(str(p.get('name',''))+' · LIVE bật tay đã kết thúc: tắt ghim + AI.')
+   self.stop_live_helpers(p)
+ def start_live_helpers(self,p):
+  try:
+   session,client=self.client(p);config=self.owner.pin_command_config(session) if hasattr(self.owner,'pin_command_config') else {}
+   self.owner.bridge.command(client,dict(action='start',module='pin',config=config,expectedAccount=session.get('chrome_binding',{}).get('account') or p['name']))
+  except Exception as e:self.owner.log('Ghim: '+str(e))
+  ai=getattr(self.owner,'ai',None)
+  if ai:
+   try:ai.start(self.effective_profile(p))
+   except Exception as e:self.owner.log('AI: '+str(e))
+ def stop_live_helpers(self,p):
+  try:session,client=self.client(p);self.owner.bridge.command(client,dict(action='stop',module='all'))
+  except Exception:pass
+  ai=getattr(self.owner,'ai',None)
+  if ai:ai.stop(p['id'])
+ def set_auto(self,on):
+  """Nút BẮT ĐẦU / DỪNG: DỪNG tắt ghim + AI ngay và không tự bật lại; BẮT ĐẦU bật lại (nếu đang LIVE thì bật ngay)."""
+  self.auto_enabled=bool(on);self.controls['autoHelpers']=self.auto_enabled
+  try:self.save()
+  except Exception:pass
+  for p in self.profiles:
+   live=p['id'] in getattr(self,'hand_live',{}) or any(j['profile']==p['id'] and j['state']=='running' for j in self.jobs)
+   if not live:continue
+   if on:self.start_live_helpers(p)
+   else:self.stop_live_helpers(p)
  def poll_emergency(self,now):
   w=getattr(self,'emergency_watch',None)
   if not w:return

@@ -1,6 +1,6 @@
 (function(root){
 'use strict';
-const keys=['pin','reply'];
+const keys=['pin'];   // 4.3.0: trả lời bình luận chuyển sang Studio (AI trong app NBL)
 class Modules {
  constructor(){this.items=Object.fromEntries(keys.map(k=>[k,{running:false,error:'',generation:0}]));}
  start(key,prepare){if(!keys.includes(key))throw Error('Mục không hợp lệ');const old=this.items[key];old.running=false;old.generation++;try{const config=prepare();this.items[key]={running:true,error:'',generation:old.generation,config,started:Date.now(),prev:-1,done:new Set(),pending:[],replyAt:new Map(),seen:new Set()};return this.items[key];}catch(e){old.error=e.message;throw e;}}

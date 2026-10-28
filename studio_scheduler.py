@@ -74,7 +74,8 @@ def execute(profile,action,deadline=0,payload=None):
    try:return execute_cdp(profile,action,deadline,payload)
    except _NotTouched:
     # the image path is kept as a fallback for a nick that still has its regions
-    if not (profile.get('vision',{}).get('enabled') and profile.get('windowHandle') and action not in ('probe','connect')):raise
+    # 4.3.0 (owner): never take the mouse unless the owner switched the old way on
+    if not (profile.get('useMouse') and profile.get('vision',{}).get('enabled') and profile.get('windowHandle') and action not in ('probe','connect','chat_read','captcha')):raise
  # 4.1: with reading-by-image set up, starting and ending the LIVE also go through it.
  if action=='vision_capture' or (profile.get('vision',{}).get('enabled') and action in ('send','chat_check','greet_scan','greet','status','start','stop','close_summary','reset_live')):
   if not is_studio_window(profile):raise ValueError('Chọn đúng cửa sổ LIVE Studio trước.')

@@ -2,9 +2,10 @@ Unicode true
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "x64.nsh"
+!include "FileFunc.nsh"
 
 !define APP "NBL LIVE"
-!define VER "4.2.0"
+!define VER "4.3.0"
 !define UKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NBL_LIVE"
 
 Name "${APP} ${VER}"
@@ -18,7 +19,7 @@ BrandingText "${APP} ${VER}"
 ShowInstDetails show
 ShowUninstDetails show
 
-VIProductVersion "4.2.0.0"
+VIProductVersion "4.3.0.0"
 VIAddVersionKey /LANG=0 "ProductName" "${APP}"
 VIAddVersionKey /LANG=0 "FileDescription" "Cài đặt ${APP} ${VER}"
 VIAddVersionKey /LANG=0 "FileVersion" "${VER}"
@@ -69,6 +70,16 @@ Function CheckRunning
   Rename "$INSTDIR\runtime\python312.dll.nbl_check" "$INSTDIR\runtime\python312.dll"
   Goto free
   busy:
+  ; silent auto-update from NBL: NBL is closing by itself, wait up to 3 minutes, never ask
+  IfSilent 0 ask
+  IntOp $9 $9 + 1
+  IntCmp $9 90 giveup 0 giveup
+  Sleep 2000
+  Goto retry
+  giveup:
+  SetErrorLevel 2
+  Abort
+  ask:
   MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "NBL LIVE hoặc cửa sổ NBL VIDEO đang mở.$\r$\nĐóng hết rồi bấm Thử lại." IDRETRY retry
   Abort
   free:
@@ -76,9 +87,10 @@ FunctionEnd
 
 Section "NBL LIVE" SecMain
   SectionIn RO
+  StrCpy $9 0
   Call CheckRunning
   SetOutPath "$INSTDIR"
-  ; files of older NBL versions that 4.2.0 no longer uses (also the trimmed Qt/OCR parts)
+  ; files of older NBL versions that 4.3.0 no longer uses (also the trimmed Qt/OCR parts)
 !include "cleanup_old.nsh"
   Delete "$INSTDIR\HUONG_DAN_SU_DUNG.pdf"
   Delete "$INSTDIR\ocr_models\vi\.rec.onnx.aTBUPz"
@@ -92,6 +104,7 @@ Section "NBL LIVE" SecMain
   Delete "$INSTDIR\SHA256.json"
   Delete "$INSTDIR\cap_nhat.ps1"
   RMDir /r "$INSTDIR\__pycache__"
+  RMDir /r "$INSTDIR\_update"
   DetailPrint "Đang chép NBL LIVE (khoảng 400 MB)…"
   File /r "app\*.*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -111,15 +124,25 @@ Section "NBL LIVE" SecMain
   WriteRegStr HKLM "${UKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegDWORD HKLM "${UKEY}" "NoModify" 1
   WriteRegDWORD HKLM "${UKEY}" "NoRepair" 1
-  WriteRegDWORD HKLM "${UKEY}" "EstimatedSize" 449779
+  WriteRegDWORD HKLM "${UKEY}" "EstimatedSize" 376562
 
+  ; 4.3.0: app điện thoại — chỉ mở cổng 8766 cho Tailscale và mạng nhà
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="NBL LIVE dien thoai"'
+  nsExec::Exec 'netsh advfirewall firewall add rule name="NBL LIVE dien thoai" dir=in action=allow program="$INSTDIR\runtime\pythonw.exe" protocol=TCP localport=8766 remoteip=100.64.0.0/10,LocalSubnet profile=any'
   DetailPrint "Đang kiểm tra bản cài (tệp, thư viện video, OCR, tiện ích Chrome)…"
   nsExec::ExecToLog '"$INSTDIR\runtime\python.exe" "$INSTDIR\setup_verify.py"'
   Pop $0
   ${If} $0 != 0
-    MessageBox MB_ICONEXCLAMATION "Kiểm tra sau cài đặt CHƯA ĐẠT.$\r$\nĐừng chạy LIVE bằng bản này; gửi tệp SETUP_CHECK.log trong:$\r$\n$INSTDIR"
+    MessageBox MB_ICONEXCLAMATION "Kiểm tra sau cài đặt CHƯA ĐẠT.$\r$\nĐừng chạy LIVE bằng bản này; gửi tệp SETUP_CHECK.log trong:$\r$\n$INSTDIR" /SD IDOK
   ${Else}
     DetailPrint "Kiểm tra đạt."
+  ${EndIf}
+  ; auto-update: open NBL again after a silent install started with /RUN
+  ${GetParameters} $1
+  ClearErrors
+  ${GetOptions} $1 "/RUN" $2
+  ${IfNot} ${Errors}
+    Exec '"$INSTDIR\NBL_LIVE.exe"'
   ${EndIf}
 SectionEnd
 
@@ -128,6 +151,8 @@ Section "Uninstall"
   Delete "$DESKTOP\NBL LIVE.lnk"
   RMDir /r "$SMPROGRAMS\NBL LIVE"
 !include "uninstall_list.nsh"
+  RMDir /r "$INSTDIR\_update"
   RMDir "$INSTDIR"
+  nsExec::Exec 'netsh advfirewall firewall delete rule name="NBL LIVE dien thoai"'
   DeleteRegKey HKLM "${UKEY}"
 SectionEnd
