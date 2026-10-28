@@ -36,17 +36,15 @@ NBL LIVE (Windows, PySide6, Python nhúng trong runtime/)
 - Giao diện: nền xanh/trắng, cam Hermès `#f37021` (theme.py), trang dạng thẻ.
 - **Tắt khẩn cấp:** nút `🛑 TẮT HẾT` (giữ 2 giây) và `Tắt LIVE nick này` (trang Lịch). Hủy lịch chưa chạy, kết thúc mọi LIVE kể cả bật tay, tắt ghim/trả lời Chrome; Telegram báo kết quả + nhắc lên lịch lại (`StudioPanel.emergency / poll_emergency`).
 - **Lịch nhóm:** 2 nick cùng giờ, nick 2 phát sau 30 giây; tối đa 2 nick LIVE cùng lúc trên một máy (`GROUP_GAP`, `MAX_NICKS`).
-- Bộ cài nén LZMA solid 128 MB, bỏ phần Qt/OCR không dùng (`build/build_installer.py`): ~113 MB (cũ 187 MB).
+- Bộ cài nén LZMA solid 128 MB, bỏ phần Qt/OCR không dùng (`build/build_installer.py`): ~119 MB (cũ 187 MB).
 
 ## Lộ trình
 
 1. ~~4.2.0~~ (xong)
-2. ~~4.2.1 — kết nối Studio tự động (DevTools, `studio_cdp.py`) + Chrome tự mở và tự ghép (#nbl=<mã>)~~ (xong; chào khách qua kết nối mới chưa có)
-2. 4.2.1 — app Android "NBL thu nhỏ": giao diện như NBL PC, nhiều PC (ghép QR), có cắm cờ kịch bản ghim trên video; kết nối Tailscale; APK build bằng GitHub Actions.
-3. Kết nối Studio không dùng chuột (CDP).
-4. Tự mở Chrome + ghép mã.
-5. AI trả lời bình luận (Gemini) + giọng đọc.
-6. Khóa bản quyền.
+2. ~~4.2.1 — kết nối Studio tự động (DevTools, `studio_cdp.py`) + Chrome tự mở và tự ghép (`#nbl=<mã>`)~~ (xong; chào khách qua kết nối mới chưa có, trang tổng kết Studio được ghi vào `logs/studio_trang_ket_thuc_*.json` để làm tiếp)
+3. 4.2.2 — app Android "NBL thu nhỏ": giao diện như NBL PC, nhiều PC (ghép QR), có cắm cờ kịch bản ghim trên video; kết nối Tailscale; APK build bằng GitHub Actions.
+4. AI trả lời bình luận (Gemini) + giọng đọc.
+5. Khóa bản quyền (để sau).
 
 ## Làm việc
 
