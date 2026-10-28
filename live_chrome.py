@@ -37,8 +37,34 @@ def is_dashboard(url):
     return str(url or '').split('#')[0].split('?')[0].rstrip('/') == DASHBOARD
 
 
+def host_of(url):
+    try:
+        from urllib.parse import urlparse
+        return (urlparse(str(url)).hostname or '').lower()
+    except Exception:
+        return ''
+
+
+def kind(url):
+    """'dashboard' | 'login' (TikTok page where the owner must log in / the not-logged-in landing,
+    never touched by NBL) | 'tiktok' (other TikTok page after logging in) | 'blank' | 'other'."""
+    u = str(url or ''); h = host_of(u)
+    if is_dashboard(u):
+        return 'dashboard'
+    if u.startswith(('chrome://newtab', 'chrome://new-tab-page', 'about:blank')) or u in ('', 'about:blank'):
+        return 'blank'
+    tik = h.endswith(('tiktok.com', 'tiktokshop.com', 'tiktokglobalshop.com', 'tiktokcdn.com', 'tiktokv.com', 'byteoversea.com'))
+    if not tik:
+        return 'other'
+    low = u.lower()
+    # not logged in: shop.tiktok.com sends the dashboard to business.tiktokshop.com/…/creator/live
+    if h.startswith('business.') or any(k in low for k in ('login', 'passport', 'register', 'signup', 'oauth', 'verify', 'captcha', '/account/')):
+        return 'login'
+    return 'tiktok'
+
+
 def is_tiktok(url):
-    return str(url or '').startswith(('https://shop.tiktok.com/', 'https://seller', 'https://www.tiktok.com/login', 'https://www.tiktok.com/passport'))
+    return kind(url) in ('login', 'tiktok', 'dashboard')
 
 
 class Chrome:
@@ -141,7 +167,7 @@ class Watchdog:
     def start(self):
         self.wanted = True
         if not self.chrome.alive():
-            self.launcher(self.profile_dir, self.pair_url()); self.started_at = self.now()
+            self.launcher(self.profile_dir, self.pair_url()); self.started_at = self.opened_at = self.now()
 
     def step(self, busy=False):
         """busy: pinning / cart running — never reload a page that still answers."""
@@ -150,11 +176,10 @@ class Watchdog:
             if not (self.wanted or self.setup_done()):
                 return out
             if now - self.started_at > self.START_WAIT:
-                self.launcher(self.profile_dir, self.pair_url()); self.started_at = now; out['actions'].append('mở Chrome LIVE')
+                self.launcher(self.profile_dir, self.pair_url()); self.started_at = self.opened_at = now; out['actions'].append('mở Chrome LIVE')
             out['state'] = 'starting'; return out
         pages = self.chrome.pages()
         dash = [p for p in pages if is_dashboard(p.get('url'))]
-        login = [p for p in pages if is_tiktok(p.get('url')) and not is_dashboard(p.get('url'))]
         states = {}
         for p in dash:
             try:
@@ -172,11 +197,35 @@ class Watchdog:
                 except Exception:
                     pass
         if not keep:
-            if any(self._login(p) for p in login):
+            # 4.3.4 vá 1 (owner, 29/10 03:22): not logged in, TikTok sends the dashboard to its
+            # landing page; NBL used to open another dashboard tab every 30 s. Now: a TikTok
+            # page where the owner logs in is never touched and NO new tab is opened; duplicates
+            # of the same page are closed; a logged-in TikTok page / New Tab is turned into the
+            # dashboard (the same tab, at most once every 2 minutes).
+            seen = set()
+            for p in pages:
+                k = kind(p.get('url'))
+                if k in ('login', 'tiktok'):
+                    key = str(p.get('url')).split('#')[0]
+                    if key in seen:
+                        try:
+                            self.chrome.close(p['id']); out['actions'].append('đóng tab trùng')
+                        except Exception:
+                            pass
+                        continue
+                    seen.add(key)
+            pages = [p for p in self.chrome.pages()]
+            login = [p for p in pages if kind(p.get('url')) == 'login' or kind(p.get('url')) == 'tiktok' and self._login(p)]
+            if login:
                 out['state'] = 'login'; return out
-            if now - self.opened_at > 30:
+            target = next((p for p in pages if kind(p.get('url')) == 'tiktok'), None) or next((p for p in pages if kind(p.get('url')) == 'blank'), None)
+            if now - self.opened_at >= 120:
                 try:
-                    self.chrome.open(self.pair_url()); self.opened_at = now; out['actions'].append('mở trang LIVE')
+                    if target:
+                        self.chrome.navigate(target, self.pair_url()); out['actions'].append('chuyển tab sang trang LIVE')
+                    elif not [p for p in pages if kind(p.get('url')) != 'other']:
+                        self.chrome.open(self.pair_url()); out['actions'].append('mở trang LIVE')
+                    self.opened_at = now
                 except Exception as e:
                     out['error'] = str(e)
             out['state'] = 'loading'; return out

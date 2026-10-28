@@ -15,6 +15,7 @@ class FakeChrome:
     def close(self, i): self.tabs = [t for t in self.tabs if t['id'] != i]; self.log.append(('close', i))
     def page_state(self, t): return self.states.get(t['id'], {})
     def reload(self, t): self.log.append(('reload', t['id']))
+    def navigate(self, t, url): self.log.append(('nav', t['id']))
 
 
 class Watch(unittest.TestCase):
@@ -34,6 +35,7 @@ class Watch(unittest.TestCase):
     def test_exactly_one_tab_extra_closed_linked_kept(self):
         self.c.up = True; self.w.wanted = True
         r = self.tick(); self.assertIn('mở trang LIVE', r['actions']); self.assertEqual(len(self.c.tabs), 1)
+        self.c.tabs[0]['url'] = D
         self.tick(); self.assertEqual(len(self.c.tabs), 1)          # no second tab while loading
         self.c.tabs.append(dict(id='x', type='page', url=D)); self.c.states['x'] = dict(client='C1', beat=10_000, now=11_000)
         r = self.tick()
@@ -58,6 +60,23 @@ class Watch(unittest.TestCase):
         self.c.tabs = [dict(id='a', type='page', url=D)]; self.c.states = {}
         states = [self.tick(65)['state'] for _ in range(5)]
         self.assertIn('no_extension', states)
+
+    def test_not_logged_in_landing_never_opens_more_tabs(self):
+        # owner 29/10 03:22: TikTok sends the dashboard to business.tiktokshop.com when not logged in
+        self.w.start(); land = 'https://business.tiktokshop.com/us/creator/live'
+        self.c.tabs = [dict(id='a', type='page', url=land), dict(id='b', type='page', url=land), dict(id='c', type='page', url='chrome://newtab/')]
+        states = [self.tick(31)['state'] for _ in range(20)]
+        self.assertEqual(set(states), {'login'}); self.assertFalse(any(x[0] == 'open' for x in self.c.log))
+        self.assertEqual([t['id'] for t in self.c.tabs], ['a', 'c'])      # duplicate closed, login page untouched
+        self.assertFalse(any(x[0] == 'nav' for x in self.c.log))
+
+    def test_logged_in_page_or_new_tab_becomes_dashboard_not_a_new_tab(self):
+        self.w.start(); self.c.tabs = [dict(id='n', type='page', url='chrome://newtab/')]
+        self.tick(5); self.assertFalse(self.c.log)                       # 2 min grace after start
+        self.tick(130); self.assertEqual(self.c.log, [('nav', 'n')])
+        self.tick(30); self.assertEqual(self.c.log, [('nav', 'n')])      # at most once / 2 min
+        self.c.tabs = [dict(id='s', type='page', url='https://seller-vn.tiktok.com/homepage')]
+        self.tick(130); self.assertEqual(self.c.log[-1], ('nav', 's')); self.assertFalse(any(x[0] == 'open' for x in self.c.log))
 
     def test_dashboard_url_match(self):
         self.assertTrue(L.is_dashboard(D + '#nbl=x')); self.assertTrue(L.is_dashboard(D + '?a=1'))
