@@ -60,7 +60,7 @@ def main(src, deps, out, version):
     app.mkdir(parents=True)
     for f in src.iterdir():
         if f.name in SKIP_TOP: continue
-        (shutil.copytree(f, app / f.name, ignore=shutil.ignore_patterns('__pycache__', '*.pyc')) if f.is_dir() else shutil.copy2(f, app / f.name))
+        (shutil.copytree(f, app / f.name, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.*')) if f.is_dir() else shutil.copy2(f, app / f.name))
     for d in ('runtime', 'ocr_vendor'):
         shutil.copytree(deps / d, app / d, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '*.pyi'))
     removed = []
