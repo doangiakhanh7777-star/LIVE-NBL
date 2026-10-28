@@ -1,2 +1,8 @@
 __pycache__/
 *.pyc
+build/app/
+build/*.exe
+build/cleanup_old.nsh
+build/uninstall_list.nsh
+build/size_kb.txt
+SETUP_CHECK.log

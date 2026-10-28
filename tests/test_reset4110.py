@@ -28,82 +28,6 @@ def fail_add(p, j, now, error='Chưa thấy "Đã thêm x/y" sau khi chờ'):
     p.owner.bridge.control = dict(id=j['cart']['command'], state='failed', error=error); p.poll_cart(now + 1)
 
 
-class Reset(unittest.TestCase):
-    def test_after_3_failed_adds_the_4th_try_is_a_test_live(self):
-        now = time.time(); j = job(start=now + 3600); p = make([j])
-        for i in range(3): fail_add(p, j, now + i * 200)
-        self.assertTrue(j['cart']['reset_due'])
-        t = now + 601; j['cart']['probe'] = dict(at=t, live=False); p.poll_cart(t)
-        self.assertEqual(j['cart']['state'], 'resetting'); self.assertIn(('j1', 'reset_live'), p.submitted)
-        self.assertEqual(j['state'], 'pending')                              # NOT an official LIVE
-        self.assertTrue(any('phát thử LIVE' in a for a in p.alerts))
-
-    def test_after_the_test_live_the_cart_is_added_again_at_once_on_a_reloaded_page(self):
-        now = time.time(); j = job(start=now + 3600, cart=dict(state='resetting', attempts=3, next=0, reset_at=now)); p = make([j])
-        feed(p, j, 'reset_live', dict(live=False, reset=True))
-        self.assertEqual((j['state'], j['cart']['state']), ('pending', 'none'))
-        self.assertNotIn('started_at', j)
-        p.poll_cart(time.time() + 1)                                          # next app tick
-        acts = [c['action'] for c in p.owner.bridge.commands]
-        self.assertIn('finish_live', acts)                                    # Chrome "Chúc mừng" box
-        self.assertIn('reload_page', acts)                                    # then the add follows 20 s later
-        self.assertIn('summary_until', j)                                     # Studio end page watched
-
-    def test_a_reset_is_done_every_3_failures_without_limit(self):
-        now = time.time(); j = job(start=now + 9000); p = make([j])
-        for i in range(6): fail_add(p, j, now + i * 200); j['cart'].pop('reset_due', None) if i == 2 else None
-        self.assertTrue(j['cart']['reset_due'])
-
-    def test_errors_a_reset_cannot_fix_do_not_start_a_live(self):
-        now = time.time(); j = job(start=now + 3600); p = make([j])
-        for i in range(3): fail_add(p, j, now + i * 200, 'Không có bộ sản phẩm số 2 (danh sách ít bộ hơn)')
-        self.assertFalse(j['cart'].get('reset_due'))
-
-    def test_never_while_the_nick_is_live(self):
-        now = time.time(); j = job(start=now + 3600, cart=dict(state='failed', attempts=3, next=0, reset_due=True, probe=dict(at=now, live=True))); p = make([j])
-        p.poll_cart(now); self.assertNotIn(('j1', 'reset_live'), p.submitted)
-
-    def test_studio_unreadable_means_no_test_live(self):
-        now = time.time(); j = job(start=now + 3600, cart=dict(state='failed', attempts=3, next=0, reset_due=True, probe=dict(at=now, live=None), reloaded_at=now - 60)); p = make([j])
-        p.poll_cart(now); self.assertNotIn(('j1', 'reset_live'), p.submitted)
-        self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
-
-    def test_a_test_live_that_may_still_run_is_ended_by_itself(self):
-        now = time.time(); j = job(start=now + 3600, cart=dict(state='resetting', attempts=3, next=0, reset_at=now)); p = make([j])
-        err = RuntimeError('PHIÊN PHÁT THỬ CÒN ĐANG CHẠY'); err.touched = True
-        feed(p, j, 'reset_live', error=err)
-        self.assertEqual(j['cart']['state'], 'reset_stopping'); self.assertEqual(j['state'], 'pending')
-        p.submitted.clear(); p.poll_cart(time.time()); self.assertIn(('j1', 'reset_stop'), p.submitted)
-        feed(p, j, 'reset_stop', dict(live=False, confirmed=True))
-        self.assertEqual((j['state'], j['cart']['state']), ('pending', 'none'))   # never "Đã kết thúc"
-
-    def test_nothing_clicked_means_a_normal_retry(self):
-        now = time.time(); j = job(start=now + 3600, cart=dict(state='resetting', attempts=3, next=0)); p = make([j])
-        err = RuntimeError('Studio chưa đọc được'); err.touched = False
-        feed(p, j, 'reset_live', error=err)
-        self.assertEqual(j['cart']['state'], 'failed')
-
-    def test_still_unreadable_after_2_minutes_warns_loudly_and_goes_back_to_adding(self):
-        now = time.time(); j = job(start=now + 3600, cart=dict(state='reset_stopping', attempts=3, next=0, reset_stop_tries=7)); p = make([j])
-        err = RuntimeError('Không đọc được Studio'); err.touched = False
-        feed(p, j, 'reset_stop', error=err)
-        self.assertEqual(j['cart']['state'], 'failed'); self.assertTrue(any('KIỂM TRA TAY' in a for a in p.alerts))
-
-    def test_due_schedule_right_after_a_test_live_is_not_taken_for_a_hand_live(self):
-        now = time.time(); j = job(start=now - 5, end=now + 3600, state='preparing', prepare_phase='preflight', cart=dict(state='ready', verified=True, reset_at=now - 30))
-        p = make([j]); feed(p, j, 'preflight', dict(live=True))
-        self.assertEqual(j['state'], 'start_retry'); self.assertNotIn('takeover', j)
-
-    def test_app_closed_during_a_test_live_checks_studio_first(self):
-        src = (ROOT/'studio_panel.py').read_text(encoding='utf-8')
-        self.assertIn("if j['cart'].get('state') in ('resetting','reset_stopping'):j['cart'].update(state='reset_stopping',reset_stop_next=0)", src)
-
-    def test_harness_uses_the_same_rules_as_the_app(self):
-        src = (ROOT/'studio_panel.py').read_text(encoding='utf-8')
-        self.assertIn("NO_RESET=re.compile('Nick trên Chrome khác|Không có bộ sản phẩm số|chưa chọn bộ|Không tìm thấy bộ|Chưa có đúng tab|mất kết nối|giữ giỏ tự thêm tay|Nick Chrome đã thay đổi',re.I)", src)
-        self.assertIn('RESET_EVERY=3 ', src); self.assertIn('RESET_HOLD=5\n', src)
-
-
 class VisionReset(unittest.TestCase):
     def setUp(self):
         self.p = patch.object(V, 'report', lambda *a, **k: ''); self.p.start()
@@ -143,6 +67,6 @@ class LookAndGuide(unittest.TestCase):
     def test_app_is_orange(self):
         import theme
         self.assertIn('QWidget#header { background:qlineargradient', theme.STYLE)
-        self.assertIn('QPushButton#primary { background:qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #fb923c, stop:1 #f97316)', theme.STYLE)
+        self.assertIn('#f37021', theme.STYLE)          # 4.2.0: Hermès orange
         self.assertNotIn('#208fe1', theme.STYLE)
         self.assertIn("header_box.setObjectName('header')", (ROOT/'app.py').read_text(encoding='utf-8'))

@@ -1,0 +1,6 @@
+Build bo cai (Linux hoac Windows co NSIS 3):
+  python build/build_installer.py . . build 4.2.0      (nguon = thu muc repo, runtime/ va ocr_vendor/ o goc repo)
+  makensis build/launcher.nsi                          (tao build/app/NBL_LIVE.exe)
+  them NBL_LIVE.exe vao build/app/SETUP_FILES.json (sha256)
+  makensis build/setup.nsi                             (ra build/NBL_LIVE_Setup_4.2.0.exe, LZMA solid 128 MB)
+Doi phien ban: sua VER trong setup.nsi va launcher.nsi.

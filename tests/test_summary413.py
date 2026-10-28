@@ -24,6 +24,8 @@ class EndPage(T.FakeStudio):
     def __init__(self, screen, page='summary2', flash=0):
         super().__init__(screen); self.page = page; self.flash = flash; self.frames = 0
     def snapshot(self, account=True):
+        if account and self.screen in ('summary2', 'summary3'):
+            raise V.StudioAttention('Ảnh tên nick đã thay đổi (lệch 26.6, tương quan 0.82)')
         if self.screen == 'flash':
             self.frames += 1
             if self.frames > self.flash: self.screen = self.page
@@ -66,7 +68,7 @@ class EndPageTests(unittest.TestCase):
     def test_new_end_page_layout_is_recognised(self):
         for page in ('summary2', 'summary3'):
             s = session(EndPage(page))
-            self.assertEqual(s.screen_state(), 'summary', page)
+            self.assertEqual(s.screen_state(s.frame(account=False)), 'summary', page)
 
     def test_new_end_page_is_closed_with_its_x_not_the_window_x(self):
         fake = EndPage('summary2'); session(fake).close_summary()

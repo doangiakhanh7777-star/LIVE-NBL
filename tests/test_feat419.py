@@ -64,14 +64,14 @@ class StudioEndPage(unittest.TestCase):
         s = object.__new__(V.VisionSession)
         t = [0.0]; frames = iter([False, False, True])
         s.clock = lambda: t[0]; s.sleep = lambda d: t.__setitem__(0, t[0] + d)
-        s.frame = lambda: next(frames); s.summary_lines = lambda f: f; s.is_summary = lambda lines: lines
+        s.frame = lambda account=True: next(frames); s.summary_lines = lambda f: f; s.is_summary = lambda lines: lines
         closed = []; s.close_summary = lambda f: closed.append(f)
         self.assertEqual(s.cleanup_summary(20), dict(closed=True, seen=True)); self.assertEqual(closed, [True])
 
     def test_vision_gives_up_after_the_wait(self):
         s = object.__new__(V.VisionSession); t = [0.0]
         s.clock = lambda: t[0]; s.sleep = lambda d: t.__setitem__(0, t[0] + d)
-        s.frame = lambda: None; s.summary_lines = lambda f: []; s.is_summary = lambda lines: False
+        s.frame = lambda account=True: None; s.summary_lines = lambda f: []; s.is_summary = lambda lines: False
         self.assertEqual(s.cleanup_summary(10), dict(closed=False, seen=False))
 
 

@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.1.14'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.2.0'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -54,9 +54,13 @@ class Console(QMainWindow):
         layout = QVBoxLayout(central); layout.setContentsMargins(10,10,10,10); layout.setSpacing(8)
         header_box = QWidget(); header_box.setObjectName('header'); header = QHBoxLayout(header_box); header.setContentsMargins(10,6,8,6)
         logo = QLabel(); logo.setPixmap(QPixmap(str(BASE/'assets/logo.png')).scaled(46,46,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)); header.addWidget(logo)
-        title = QLabel('NBL LIVE'); title.setObjectName('title'); header.addWidget(title); header.addStretch()
+        titlebox=QVBoxLayout();titlebox.setSpacing(0);titlebox.setContentsMargins(0,0,0,0)
+        title = QLabel('NBL LIVE'); title.setObjectName('title'); titlebox.addWidget(title)
+        tag = QLabel('TikTok Live Studio'); tag.setObjectName('tag'); titlebox.addWidget(tag)
+        header.addLayout(titlebox); header.addStretch()
         self.fold_button = button('Thu gọn',self.toggle_compact); header.addWidget(self.fold_button)
-        header.addWidget(button('■',self.emergency,'danger')); layout.addWidget(header_box)
+        from hold_button import HoldButton
+        header.addWidget(HoldButton('🛑 TẮT HẾT',self.emergency)); layout.addWidget(header_box)
         self.full_panel=QWidget(); body=QVBoxLayout(self.full_panel);body.setContentsMargins(0,0,0,0);body.setSpacing(8)
         self.sessions=QListWidget();self.sessions.hide();self.sessions.currentRowChanged.connect(self.switch)
         self.account_selector=QComboBox();self.account_selector.setObjectName('accountSelector');self.account_selector.setMinimumHeight(44);self.account_selector.currentIndexChanged.connect(self.sessions.setCurrentRow);body.addWidget(self.account_selector)
@@ -67,7 +71,7 @@ class Console(QMainWindow):
         connect_menu.addAction('Kết nối Chrome',lambda:self.navigation.setCurrentIndex(2))
         connect_menu.addAction('Kết nối LIVE Studio',lambda:self.studio_panel.connect_current())
         connect.setMenu(connect_menu);actions=QHBoxLayout();actions.addWidget(connect,1);actions.addWidget(manage,1);body.addLayout(actions)
-        self.navigation=QComboBox();self.navigation.setMinimumHeight(42);body.addWidget(self.navigation)
+        self.navigation=QComboBox();self.navigation.setObjectName('navigation');self.navigation.setMinimumHeight(42);body.addWidget(self.navigation)
         self.tabs=QTabWidget();self.tabs.tabBar().hide();self.navigation.currentIndexChanged.connect(self.tabs.setCurrentIndex);body.addWidget(self.tabs,1)
         import pin_scripts;self.pin_store=pin_scripts.Store(DATA/'kich_ban_ghim.json');self.build_video();self.build_script();self.build_chrome();self.label_timer=QTimer(self);self.label_timer.timeout.connect(self.refresh_playlist_labels);self.label_timer.start(5000);self.build_obs();self.build_schedule();self.build_tools()
         for form in self.findChildren(QFormLayout): form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
@@ -108,7 +112,7 @@ class Console(QMainWindow):
             self.resize(self.full_size or self.size())
     def page(self, title):
         scroll=QScrollArea();scroll.setWidgetResizable(True)
-        w=QWidget();layout=QVBoxLayout(w);layout.setContentsMargins(8,8,8,8);layout.setSpacing(10)
+        w=QWidget();w.setObjectName('card');layout=QVBoxLayout(w);layout.setContentsMargins(14,14,14,14);layout.setSpacing(10)
         scroll.setWidget(w);self.tabs.addTab(scroll,title);self.navigation.addItem(title);return layout
     def build_video(self):
         v = self.page('Video & âm thanh'); form = QFormLayout();form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows); self.account = QLineEdit(); form.addRow('Tên hiển thị của nick trong NBL LIVE', self.account); v.addLayout(form)
@@ -531,17 +535,19 @@ class Console(QMainWindow):
         self.cycle_id=None;self.log('Đã hủy lịch OBS.')
     def emergency(self):
         if hasattr(self,'studio_chat'):self.studio_chat.engine.stop_all()
+        # 4.2.0 (owner, 28/10/2026): TẮT HẾT = end every LIVE (also by hand), cancel the
+        # schedules not started, Telegram gets the result. NBL VIDEO keeps playing.
         if hasattr(self,"studio_panel"):
-            try:self.studio_panel.stop_all()
-            except Exception as e:self.log('Studio cần dừng thủ công: '+str(e))
+            try:self.studio_panel.emergency(None)
+            except Exception as e:
+                try:self.studio_panel.stop_all()
+                except Exception as e2:self.log('Studio cần dừng thủ công: '+str(e2))
         for j in self.data.get('jobs',[]):
             if j['state']=='pending':j['state']='skipped'
         self.render_jobs()
         self.bridge.stop_all()
         if self.alarm_window:self.alarm_window.stop()
         self.cancel_cycle()
-        for s in self.data['sessions']:
-            if s['id'] in self.processes:self.command('stop',False,s)
         if self.obs.connected or self.obs.busy:self.obs.submit('emergency')
         try:write_json(self.path,self.data)
         except Exception as e:self.log('Đã dừng, nhưng chưa lưu được cấu hình: '+type(e).__name__)

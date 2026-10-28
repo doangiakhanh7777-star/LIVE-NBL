@@ -102,30 +102,58 @@ class HandLiveTakeover(unittest.TestCase):
         self.assertEqual(j['state'], 'running')
 
 
-class CartFallback(unittest.TestCase):
-    # 4.1.8: no 3-try limit any more; the cart is looked at when the LIVE is due.
+class StrictCart(unittest.TestCase):
+    # 4.2.0 (owner, 28/10/2026): NO VERIFIED CART = NO SALES LIVE. No old cart, no fallback.
     def failed(self, now):
         return job(start=now - 5, end=now + 3600, cart=dict(state='failed', attempts=3, next=now + 60, probe=dict(at=now, live=False), reloaded_at=now - 30))
 
-    def test_set_not_added_but_cart_has_products_goes_live(self):
+    def test_set_not_added_never_goes_live_even_with_products_in_the_cart(self):
         now = time.time(); j = self.failed(now); p = make([j])
-        p.poll_cart(now); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'cart_check')
-        p.owner.bridge.control = dict(id='cmd1', state='done', count='12'); p.poll_cart(now + 1)
-        self.assertTrue(p.cart_ready(j)); self.assertTrue(j['cart']['fallback'])
-        self.assertTrue(any('vẫn PHÁT với giỏ đang có (12' in a for a in p.alerts))
+        p.poll_cart(now)
+        self.assertNotIn('cart_check', [c['action'] for c in p.owner.bridge.commands])
+        self.assertFalse(p.cart_ready(j))
+        self.assertTrue(any('CHƯA PHÁT' in a for a in p.alerts))
 
-    def test_empty_cart_does_not_go_live_and_keeps_trying(self):
+    def test_failed_add_retries_on_a_reloaded_page(self):
         now = time.time(); j = self.failed(now); p = make([j])
-        p.poll_cart(now); p.owner.bridge.control = dict(id='cmd1', state='done', count='0'); p.poll_cart(now + 1)
-        self.assertFalse(p.cart_ready(j)); self.assertTrue(any('giỏ đang TRỐNG' in a for a in p.alerts))
-        j['cart']['probe'] = dict(at=now + 61, live=False); p.poll_cart(now + 61)
-        self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
+        p.cart_failed(j, j['cart'], 'lỗi', now)
+        self.assertEqual(j['cart']['reloaded_at'], 0)
+        j['cart']['probe'] = dict(at=now + 61, live=False)     # Studio seen NOT LIVE
+        p.poll_cart(now + 61); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'reload_page')
+        p.poll_cart(now + 82); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
 
-    def test_no_answer_from_chrome_is_looked_at_again(self):
-        now = time.time(); j = self.failed(now); p = make([j])
-        p.poll_cart(now); p.poll_cart(now + 30)
-        self.assertFalse(p.cart_ready(j)); self.assertNotIn('command', j['cart'])
-        p.poll_cart(now + 125); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'cart_check')
+    def test_added_set_is_checked_before_it_counts(self):
+        now = time.time(); j = job(start=now + 50, end=now + 3600); p = make([j])
+        j['cart'].update(command='cmd1', kind='add', until=now + 160, state='preparing'); p.owner.bridge.control = dict(id='cmd1', state='done', added=5, total=5)
+        p.poll_cart(now)
+        self.assertEqual(j['cart']['state'], 'ready'); self.assertFalse(p.cart_ready(j))
+        p.poll_cart(now + 1); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'cart_check')
+        p.owner.bridge.control = dict(id=j['cart']['command'], state='done', count='5'); p.poll_cart(now + 2)
+        self.assertTrue(p.cart_ready(j))
+
+    def test_unreadable_or_empty_cart_is_not_ready(self):
+        for count in ('-1', '0'):
+            now = time.time(); j = job(start=now + 100, end=now + 3600); p = make([j])
+            j['cart'].update(state='ready', verified=False, v420=True, for_bundle=2, count=0, command='cmd1', kind='check', until=now + 20)
+            p.owner.bridge.control = dict(id='cmd1', state='done', count=count); p.poll_cart(now)
+            self.assertFalse(p.cart_ready(j), count)
+
+    def test_old_fallback_or_other_bundle_is_not_ready(self):
+        now = time.time(); p = make([])
+        for cart in (dict(state='ready', verified=True, v420=True, for_bundle=2, count=9, fallback=True),
+                     dict(state='ready', verified=True, v420=True, for_bundle=1, count=9),
+                     dict(state='ready', verified=True, count=9)):
+            j = job(start=now - 5, cart=cart); self.assertFalse(p.cart_ok(j))
+
+    def test_hand_live_over_at_preflight_without_cart_does_not_start(self):
+        now = time.time(); j = job(start=now - 5, end=now + 3600, state='preparing', cart=dict(state='none', attempts=0, next=0, probe=dict(at=now, live=True)))
+        p = make([j]); feed(p, j, 'preflight', dict(live=False))
+        self.assertEqual(j['state'], 'pending'); self.assertEqual(p.played, [])
+
+    def test_slot_over_without_cart_is_dropped_and_told(self):
+        now = time.time(); j = job(start=now - 3000, end=now + 30, cart=dict(state='failed', attempts=9, next=now + 60, probe=dict(at=now, live=False)))
+        p = make([j]); p.tick()
+        self.assertEqual(j['state'], 'skipped'); self.assertTrue(any('BỎ LỊCH' in a and 'giỏ chưa xác nhận' in a for a in p.alerts))
 
 
 class Rebind(unittest.TestCase):

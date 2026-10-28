@@ -1064,9 +1064,21 @@ class VisionSession:
                 return [x, y, min(w, right-x), h]
         return [x, y, w, h]
 
-    def frame(self):
-        self.last_frame = self.native.snapshot()[0]
+    def frame(self, account=True):
+        # account=True keeps the old no-arg call so every existing stub still works;
+        # account=False (4.1.15) skips the nick-avatar check for end-page detection.
+        self.last_frame = (self.native.snapshot() if account else self.native.snapshot(False))[0]
         return self.last_frame
+
+    def end_state(self):
+        # 4.1.15 (owner log 27/10/2026 02:00): when the LIVE ends, Studio's end page
+        # ("Đã kết thúc! … người xem đã tham gia") covers the nick avatar, so the
+        # account-anchor check threw "Ảnh tên nick đã thay đổi" and every "Kết thúc"
+        # failed → false "LIVE CÓ THỂ VẪN ĐANG CHẠY". Read the end page WITHOUT that
+        # check (the window handle is already verified); only real broadcast actions
+        # (Phát LIVE / Kết thúc) still verify the nick, on the same frame.
+        frame = self.frame(account=False)
+        return frame, self.screen_state(frame)
 
     def scan_alerts(self, frame, fresh=False):
         """OCR the whole window except chat/input, at most every ALERT_TTL seconds.
@@ -1149,7 +1161,15 @@ class VisionSession:
                 return cached[1]
         frames = []
         for index in range(2):
-            frame = self.frame()
+            try:
+                frame = self.frame()
+            except StudioAttention:
+                f, state = self.end_state()        # end page covers the avatar → LIVE over
+                if state in ('summary', 'idle'):
+                    with _cache_lock:
+                        _live_cache[self.key] = (self.clock(), False)
+                    return False
+                raise
             mover = getattr(self.native, 'cursor_out_of', None)
             if index == 0 and mover and self.native.cursor_out_of(self.cfg['regions']['clock']):
                 frame = self.frame()  # pointer was on the timer: read a frame without hover
@@ -1259,7 +1279,7 @@ class VisionSession:
 
     def close_summary(self, frame=None):
         """Close the end-of-LIVE page with its X (right of "Trung tâm LIVE")."""
-        frame = frame if frame is not None else self.frame()
+        frame = frame if frame is not None else self.frame(account=False)
         lines = self.summary_lines(frame)
         if not self.is_summary(lines):
             return True
@@ -1283,7 +1303,7 @@ class VisionSession:
                 self.native.press_escape()
             for _ in range(6):
                 self.sleep(.7)
-                if not self.is_summary(self.summary_lines(self.frame())):
+                if not self.is_summary(self.summary_lines(self.frame(account=False))):
                     report('hoat_dong', self.account_name(), 'Đã đóng trang tổng kết LIVE trên Studio', '', frame)
                     return True
         raise ValueError('Chưa đóng được trang tổng kết LIVE trên Studio.')
@@ -1293,7 +1313,7 @@ class VisionSession:
         then open the end page; keep looking a few seconds and close it."""
         for _ in range(checks):
             self.sleep(1.5)
-            frame = self.frame()
+            frame = self.frame(account=False)
             if self.is_summary(self.summary_lines(frame)):
                 self.close_summary(frame)
                 return True
@@ -1305,7 +1325,7 @@ class VisionSession:
         after the LIVE ended, so the app calls this again and again for ~2 minutes."""
         end = self.clock() + wait
         while True:
-            frame = self.frame()
+            frame = self.frame(account=False)
             if self.is_summary(self.summary_lines(frame)):
                 self.close_summary(frame)
                 return dict(closed=True, seen=True)
@@ -1317,7 +1337,7 @@ class VisionSession:
         """4.1.10 (owner, 26/10/2026): the cart would not add 3 times → "phát LIVE rồi
         kết thúc ngay trong 5–10 giây" resets the cart on Chrome. One call: Phát LIVE,
         keep it `hold` seconds after the clock runs, Kết thúc LIVE. Never an official LIVE."""
-        state = self.screen_state()
+        state = self.end_state()[1]
         if state == 'summary':
             state = self._close_after_end()
         if state == 'live':
@@ -1336,17 +1356,17 @@ class VisionSession:
         raise StudioAttention('PHIÊN PHÁT THỬ CÒN ĐANG CHẠY: chưa kết thúc được (' + str(error) + ').')
 
     def start_live(self, dock=True):
-        state = self.screen_state()
+        frame, state = self.end_state()
         if state == 'summary':
-            self.close_summary(); state = self.screen_state()
+            self.close_summary(frame); frame, state = self.end_state()
         if state == 'live':
             return dict(live=True, already=True, confirmed=True)
         if state != 'idle':
             raise NotTouched('Chưa thấy nút "Phát LIVE" ở chỗ đồng hồ; chưa bấm gì.')
-        frame = self.last_frame
         button = [l for l in self._state_lines if 'phatlive' in compact(l['text'])]
         if len(button) != 1:
             raise NotTouched('Nút "Phát LIVE" chưa rõ; chưa bấm gì.')
+        self.native.verify_account(frame)        # the right nick before starting a broadcast
         self.click_line(button[0])
         report('hoat_dong', self.account_name(), 'Đã bấm Phát LIVE', '', frame)
         live = False
@@ -1380,10 +1400,10 @@ class VisionSession:
                 self.close_summary()
         except Exception:
             pass
-        return self.screen_state()
+        return self.screen_state(self.frame(account=False))
 
     def stop_live(self):
-        state = self.screen_state()
+        frame, state = self.end_state()
         if state == 'summary':
             state = self._close_after_end()
             return dict(live=False, confirmed=True, summaryOpen=state == 'summary')
@@ -1391,6 +1411,7 @@ class VisionSession:
             return dict(live=False, already=True, confirmed=True)
         if state != 'live':
             raise NotTouched('Chưa đọc được trạng thái LIVE; chưa bấm kết thúc.')
+        self.native.verify_account(frame)        # the right nick before ending the broadcast
         s = self.scale(); x, y, w, h = self.cfg['regions']['clock']
         self.native.click(x + w/2, y + h/2)
         self.sleep(.9)
@@ -1413,7 +1434,7 @@ class VisionSession:
         report('hoat_dong', self.account_name(), 'Đã bấm Kết thúc LIVE', '', frame)
         for _ in range(20):
             self.sleep(1.0)
-            state = self.screen_state()
+            state = self.end_state()[1]
             if state in ('summary', 'idle'):
                 break
         if state == 'summary':

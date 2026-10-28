@@ -76,7 +76,7 @@ class NeverStop(unittest.TestCase):
         self.assertEqual(j['clips'], [])
         src = (BASE / 'studio_panel.py').read_text(encoding='utf-8')
         body = src[src.index(' def create_job(self):'):src.index(' def selected_job(self):')]
-        self.assertIn('clips=[]', body); self.assertIn('video_problem(self.session(p))', body)
+        self.assertIn('clips=[]', body); self.assertIn('self.check_nick(p)', body); self.assertIn('video_problem(self.session(p))', src)
 
 
 class OneWindow(unittest.TestCase):

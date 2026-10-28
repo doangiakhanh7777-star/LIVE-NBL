@@ -32,6 +32,8 @@ class FakeStudio:
         self.screen = screen; self.log = []; self.touched = False; self.summary_x = summary_x
         if menu_lines is not None: SCREENS['menu_custom'] = menu_lines
     def snapshot(self, account=True):
+        if account and self.screen == 'summary':
+            raise V.StudioAttention('Ảnh tên nick đã thay đổi (lệch 26.6, tương quan 0.82)')
         im = Image.new('RGB', (W, H), (20, 20, 20))
         if self.screen == 'summary' and self.summary_x:
             from PIL import ImageDraw
@@ -52,6 +54,8 @@ class FakeStudio:
         elif self.screen == 'summary': self.screen = 'summary'
     def dock_chat_window(self):
         self.log.append('dock'); return ('Đã ghép cửa sổ Trò chuyện LIVE về Studio', None) if self.screen == 'live' else None
+    def verify_account(self, image):
+        return True
 
 
 def session(fake):
@@ -120,7 +124,7 @@ class StudioLive(unittest.TestCase):
     def test_screen_state_reads_button_clock_and_summary(self):
         for screen, want in (('idle', 'idle'), ('live', 'live'), ('summary', 'summary')):
             fake = FakeStudio(screen); s = session(fake)
-            self.assertEqual(s.screen_state(fake.snapshot()[0]), want)
+            self.assertEqual(s.screen_state(fake.snapshot(False)[0]), want)
 
     def test_health_reads_fps_and_upload(self):
         s = session(FakeStudio('live'))

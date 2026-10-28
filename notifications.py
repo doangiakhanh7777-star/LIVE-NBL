@@ -8,6 +8,7 @@ import re
 import sys
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -86,9 +87,24 @@ def telegram_send(config, text, opener=urllib.request.urlopen, api='https://api.
     return True
 
 
+# 4.1.16 (owner, 27/10/2026): "khi xuất hiện captcha là thông báo liên tục 5 lần".
+# A captcha / security check needs a person at once, so the same alert is sent 5 times
+# in a row (a few seconds apart, so the phone rings 5 times). At most one such burst per
+# source every 5 minutes, so a captcha that stays on screen does not flood the chat.
+CAPTCHA_BURST = 5
+CAPTCHA_GAP = 3.0
+CAPTCHA_COOLDOWN = 300.0
+
+
+def is_captcha(text):
+    t = unicodedata.normalize('NFD', str(text or ''))
+    t = ''.join(c for c in t if unicodedata.category(c) != 'Mn').replace('đ', 'd').replace('Đ', 'D').lower()
+    return bool(re.search(r'captcha|xac minh bao mat|xac minh danh tinh|ma xac minh|hoan thanh xac minh|can xac minh|de xac minh|keo thanh truot|ghep hinh|security verification|verify|verification', t))
+
+
 class Notifier:
-    def __init__(self, sender=telegram_send, clock=time.monotonic):
-        self.sender = sender; self.clock = clock; self.config = dict(enabled=False)
+    def __init__(self, sender=telegram_send, clock=time.monotonic, sleep=time.sleep):
+        self.sender = sender; self.clock = clock; self.sleep = sleep; self.config = dict(enabled=False)
         self.work = queue.Queue(maxsize=10); self.results = queue.Queue()
         self.lock = threading.Lock(); self.last = {}; self.generation = 0; self.closed = False
         self.thread = threading.Thread(target=self.run, daemon=True); self.thread.start()
@@ -98,7 +114,21 @@ class Notifier:
             while True:
                 try:self.work.get_nowait()
                 except queue.Empty:break
+    def alarm(self, key, text, times=CAPTCHA_BURST):
+        """Send `text` `times` times in a row (numbered), once per key every 5 minutes."""
+        with self.lock:
+            if self.closed or not self.config.get('enabled'):
+                return False
+            now = self.clock(); burst = 'burst:' + key
+            if now - self.last.get(burst, -1e9) < CAPTCHA_COOLDOWN:
+                return False
+            try:self.work.put_nowait((self.generation, dict(self.config), dict(text=text, times=int(times))))
+            except queue.Full:return False
+            self.last[burst] = now
+            return True
     def publish(self, key, text, test=False):
+        if not test and is_captcha(text):
+            return self.alarm(key, text)
         with self.lock:
             if self.closed or not self.config.get('enabled'):
                 return False
@@ -117,6 +147,14 @@ class Notifier:
             with self.lock:
                 if self.closed or generation != self.generation:continue
             try:
+                if isinstance(text, dict):
+                    for n in range(1, text['times'] + 1):
+                        with self.lock:
+                            if self.closed or generation != self.generation:break
+                        self.sender(config, '🚨 ' + text['text'] + ' (' + str(n) + '/' + str(text['times']) + ')')
+                        if n < text['times']:self.sleep(CAPTCHA_GAP)
+                    self.results.put('Đã gửi cảnh báo CAPTCHA tới Telegram ' + str(text['times']) + ' lần.')
+                    continue
                 self.sender(config, text)
                 self.results.put('Đã gửi cảnh báo tới Telegram.')
             except Exception as error:

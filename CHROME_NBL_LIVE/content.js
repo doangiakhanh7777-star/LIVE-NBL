@@ -4,7 +4,7 @@ if(document.getElementById('nbl-live-extension'))return;
 const host=document.createElement('div');host.id='nbl-live-extension';document.documentElement.append(host);
 const ui=host.attachShadow({mode:'open'});
 ui.innerHTML=`<style>:host{all:initial}section{position:fixed;right:12px;bottom:12px;width:min(390px,calc(100vw - 40px));max-height:84vh;overflow:auto;z-index:2147483647;background:#fff;color:#3b2414;padding:16px;border:2px solid #f97316;border-radius:20px;font:14px Arial;box-shadow:0 7px 28px #c2410c30}h3{margin:0 0 12px;cursor:move;touch-action:none;position:sticky;top:0;background:#fff;z-index:2;color:#ea580c}label{display:block;margin-top:11px;font-weight:600}input,textarea,select{box-sizing:border-box;width:100%;padding:9px;margin-top:5px;background:#fffaf4;color:#3b2414;border:1px solid #fdba74;border-radius:10px;font:14px Arial}textarea{height:76px}button{background:#fff1e3;color:#9a3412;border:1px solid #fdba74;border-radius:11px;padding:9px;margin:5px 4px 5px 0;cursor:pointer;font:13px Arial}button:hover{background:#fed7aa}pre{white-space:pre-wrap;font:12px Arial;max-height:160px;overflow:auto}.red{background:#fff0ed;color:#ae3723;border-color:#ffc0ad}.bar{background:#ff993f;color:#382100;border-color:#f28629}.step{display:flex;align-items:center;gap:6px;margin-top:5px}.step output{min-width:84px;text-align:center;background:#fff1e3;padding:8px;border-radius:10px}.step button{margin:0}.hint{font-size:12px;line-height:1.45;color:#526e80}.selectors{display:none}details{margin:14px 0;padding:10px;background:#fff7ed;border-radius:12px}summary{cursor:pointer;font-weight:600}.picked{font-size:12px;font-weight:400;color:#267440}</style>
-<section><h3>NBL LIVE • 4.1.14 <button id="fold">Thu gọn</button></h3><div id="body">
+<section><h3>NBL LIVE • 4.1.16 <button id="fold">Thu gọn</button></h3><div id="body">
 <p class="hint">Giỏ hàng và trả lời bình luận trên Chrome. Tin nhắn định kỳ và Chào khách cài trong app NBL LIVE.</p>
 <label>Tên chủ phòng trong bình luận<input id="owner" placeholder="Khánh Car Auto"></label>
 <label>Câu trả lời tự động<textarea id="rules" placeholder="bơm lốp;bom lop | Anh xem sản phẩm bơm lốp trong giỏ nhé."></textarea></label><p id="rulesHint" class="hint">Chưa có quy tắc. Chữ mẫu mờ không phải nội dung đã nhập.</p><p class="hint">Mỗi dòng: từ khóa | câu trả lời. Nhiều từ khóa cùng câu: ngăn bằng dấu ;</p>
@@ -520,6 +520,11 @@ async function finishLive(command){const c=read();if(command.expectedAccount&&on
 const handled=new Set();
 // 4.1.11: product names of the cart, every 15 s, so the app can check its pin scripts.
 let titlesAt=0,findResult={};
+// 4.1.16 (owner, 27/10/2026): a captcha / security check on the LIVE page is reported to
+// the app on every tick (the app sends it to Telegram 5 times in a row). Also TikTok's
+// own captcha box, which is not always a [role=dialog].
+function captchaText(){try{const box=[...document.querySelectorAll('[role=dialog],[role=alertdialog],[role=alert],[id*=captcha i],[class*=captcha i],[class*=verify i],iframe[src*=captcha i],iframe[src*=verify i]')].filter(e=>visible(e)&&!host.contains(e)).find(e=>e.tagName==='IFRAME'||/captcha|xác minh|verify|verification|kéo thanh trượt|trượt để|ghép hình|drag the slider/i.test(e.textContent||'')||/captcha/i.test(String(e.id||'')+' '+String(e.className&&e.className.baseVal!==undefined?e.className.baseVal:e.className||'')));
+ return box?(String(box.textContent||'').replace(/\s+/g,' ').trim().slice(0,150)||'Trang TikTok Shop đang hiện ô xác minh / captcha'):'';}catch(e){return '';}}
 function cartTitlesUpdate(c){return {};}   // 4.1.13: the app no longer checks scripts against the cart (owner: use "Tìm thử")
 // 4.0 watchdog: if the app stops talking to this tab (app closed or crashed), stop
 // pinning/replying after 30 s instead of waiting forever with modules switched on.
@@ -552,7 +557,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  let account='Chưa chọn tài khoản';try{const previousConfig=cfg;cfg=read();try{account=identity();}finally{cfg=previousConfig;}}catch(e){}
  // Return immediately; potentially slow confirmations don't block the connection heartbeat.
  void saveConfig().catch(()=>{});const current=read(),serialized=JSON.stringify(current);let config;if(connectionNeedsConfig||!message.configAck||serialized!==lastSentConfig||Date.now()-lastSentConfigAt>60000){config=current;connectionNeedsConfig=false;lastSentConfig=serialized;lastSentConfigAt=Date.now();}
- respond({account,accountVerified:Boolean(account&&account!=='Chưa chọn tài khoản'),modules:manager.status(),acks,...(config?{config}:{}),...cartTitlesUpdate(current),...(findResult.id?{findResult}:{}),control:controlResult,reports:takeReports()});void tick();return false;
+ respond({account,accountVerified:Boolean(account&&account!=='Chưa chọn tài khoản'),modules:manager.status(),acks,...(config?{config}:{}),...cartTitlesUpdate(current),...(findResult.id?{findResult}:{}),captcha:captchaText(),control:controlResult,reports:takeReports()});void tick();return false;
 });
 document.addEventListener('keydown',e=>{if(e.altKey&&e.shiftKey&&e.code==='KeyX'){stop('Dừng khẩn cấp bằng Alt+Shift+X');}});
 document.addEventListener('visibilitychange',()=>{if(!running)return;$('state').textContent=document.hidden?'Chạy nền qua app':'Đang chạy';log(document.hidden?'Chuyển tab: giữ lịch; bỏ các mốc quá hạn, không chạy bù':'Tab hiện lại: tiếp tục kiểm tra tài khoản/phiên');});

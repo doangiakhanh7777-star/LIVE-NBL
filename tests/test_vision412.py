@@ -61,8 +61,8 @@ class VisionRequired(unittest.TestCase):
     def test_saving_a_schedule_checks_the_regions(self):
         src = (BASE / 'studio_panel.py').read_text(encoding='utf-8')
         body = src[src.index(' def create_job(self):'):src.index(' def selected_job(self):')]
-        self.assertIn('vision_missing(self.effective_profile(p))', body)
-        self.assertLess(body.index('vision_missing'), body.index('add_job('))
+        self.assertIn('self.check_nick(p)', body); self.assertIn('vision_missing(self.effective_profile(p))', src)
+        self.assertLess(body.index('self.check_nick(p)'), body.index('add_job('))
 
 
 if __name__ == '__main__':

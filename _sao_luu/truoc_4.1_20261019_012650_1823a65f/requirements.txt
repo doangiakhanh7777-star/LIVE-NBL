@@ -1,4 +1,0 @@
-PySide6-Essentials==6.12.0
-PySide6-Addons==6.12.0
-obsws-python==1.8.0
-websockets>=15,<17
