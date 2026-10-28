@@ -18,17 +18,25 @@ jobs:
       - name: Khoa ky APK
         env:
           KS: ${{ secrets.NBL_KEYSTORE_BASE64 }}
+          PW: ${{ secrets.NBL_KEYSTORE_PASSWORD }}
+          AL: ${{ secrets.NBL_KEY_ALIAS }}
         run: |
           echo "NBL_VERSION_CODE=$((4300 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
-          if [ -z "$KS" ]; then echo "::warning::Chua co secret NBL_KEYSTORE_BASE64: chi build ban THU (khoa debug), khong dung de cai lau dai"; exit 0; fi
-          echo "$KS" | base64 -d > "$RUNNER_TEMP/nbl.jks"
+          if [ -z "$KS" ]; then echo "::warning::Chua co secret NBL_KEYSTORE_BASE64: chi build ban THU (khoa debug)"; exit 0; fi
+          # chu dan co the lan dau cach / xuong dong / ca dong ten secret: bo het
+          printf '%s' "$KS" | sed 's/NBL_KEYSTORE_BASE64//g' | tr -d ' \r\n\t' > "$RUNNER_TEMP/ks.b64"
+          echo "::notice::Secret NBL_KEYSTORE_BASE64 dai $(wc -c < "$RUNNER_TEMP/ks.b64") ky tu (dung la 5700 cho khoa NBL)"
+          if ! base64 -d "$RUNNER_TEMP/ks.b64" > "$RUNNER_TEMP/nbl.jks" 2>/dev/null; then echo "::error::NBL_KEYSTORE_BASE64 khong phai chuoi base64 hop le: dan lai DUNG dong dai duoi chu NBL_KEYSTORE_BASE64 trong file SECRETS_DAN_VAO_GITHUB.txt"; exit 1; fi
+          PW=$(printf '%s' "$PW" | tr -d ' \r\n\t'); AL=$(printf '%s' "$AL" | tr -d ' \r\n\t')
+          if [ -z "$PW" ] || [ -z "$AL" ]; then echo "::error::Thieu secret NBL_KEYSTORE_PASSWORD hoac NBL_KEY_ALIAS"; exit 1; fi
+          if ! keytool -list -keystore "$RUNNER_TEMP/nbl.jks" -storepass "$PW" -alias "$AL" >/dev/null 2>&1; then echo "::error::Mat khau (NBL_KEYSTORE_PASSWORD) hoac ten khoa (NBL_KEY_ALIAS, phai la: nbl) khong khop voi khoa"; exit 1; fi
+          echo "::notice::Khoa ky APK hop le"
           echo "NBL_KEYSTORE=$RUNNER_TEMP/nbl.jks" >> "$GITHUB_ENV"
+          echo "NBL_KEYSTORE_PASSWORD=$PW" >> "$GITHUB_ENV"
+          echo "NBL_KEY_ALIAS=$AL" >> "$GITHUB_ENV"
+          echo "NBL_KEY_PASSWORD=$PW" >> "$GITHUB_ENV"
       - name: Build APK
         working-directory: mobile
-        env:
-          NBL_KEYSTORE_PASSWORD: ${{ secrets.NBL_KEYSTORE_PASSWORD }}
-          NBL_KEY_ALIAS: ${{ secrets.NBL_KEY_ALIAS }}
-          NBL_KEY_PASSWORD: ${{ secrets.NBL_KEY_PASSWORD }}
         run: |
           if [ -n "$NBL_KEYSTORE" ]; then
             gradle assembleRelease --no-daemon
