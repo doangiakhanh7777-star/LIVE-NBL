@@ -53,6 +53,14 @@ QGroupBox { background:#ffffff; border:1px solid #cfe6fa; border-top:4px solid #
 QGroupBox::title { subcontrol-origin:margin; left:12px; color:#15639f; font-weight:700; padding:2px 8px; background:#eaf4fd; border-radius:8px; }
 QScrollArea,QTabWidget::pane { border:0; }
 QWidget#card { background:#ffffff; border:1px solid #cfe6fa; border-radius:14px; }
+QToolButton#navigation { background:#1f7fd0; color:#ffffff; font-weight:700; font-size:15px; border:0; border-radius:12px; padding:8px 14px; text-align:left; }
+QToolButton#navigation:hover { background:#15639f; }
+QToolButton#navigation::menu-indicator { image:none; width:0; }
+QMenu#navigationMenu { background:#ffffff; border:1px solid #bcd9f2; padding:6px; }
+QMenu#navigationMenu::item { color:#1f3b52; background:#ffffff; font-weight:600; padding:10px 18px 10px 30px; }
+QMenu#navigationMenu::item:selected { background:#f37021; color:#ffffff; }
+QMenu#navigationMenu::item:checked { color:#f37021; }
+QMenu#navigationMenu::item:checked:selected { color:#ffffff; }
 QComboBox#navigation { background:#1f7fd0; color:#ffffff; font-weight:700; border:0; border-radius:12px; padding:6px 14px; }
 QComboBox#navigation:hover { background:#15639f; }
 QComboBox QAbstractItemView { background:#ffffff; color:#1f3b52; border:1px solid #bcd9f2; outline:0; selection-background-color:#ffe3d0; selection-color:#8a3a12; }

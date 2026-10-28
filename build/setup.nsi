@@ -5,7 +5,7 @@ Unicode true
 !include "FileFunc.nsh"
 
 !define APP "NBL LIVE"
-!define VER "4.3.0"
+!define VER "4.3.1"
 !define UKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NBL_LIVE"
 
 Name "${APP} ${VER}"
@@ -19,7 +19,7 @@ BrandingText "${APP} ${VER}"
 ShowInstDetails show
 ShowUninstDetails show
 
-VIProductVersion "4.3.0.0"
+VIProductVersion "4.3.1.0"
 VIAddVersionKey /LANG=0 "ProductName" "${APP}"
 VIAddVersionKey /LANG=0 "FileDescription" "Cài đặt ${APP} ${VER}"
 VIAddVersionKey /LANG=0 "FileVersion" "${VER}"
@@ -90,7 +90,7 @@ Section "NBL LIVE" SecMain
   StrCpy $9 0
   Call CheckRunning
   SetOutPath "$INSTDIR"
-  ; files of older NBL versions that 4.3.0 no longer uses (also the trimmed Qt/OCR parts)
+  ; files of older NBL versions that 4.3.1 no longer uses (also the trimmed Qt/OCR parts)
 !include "cleanup_old.nsh"
   Delete "$INSTDIR\HUONG_DAN_SU_DUNG.pdf"
   Delete "$INSTDIR\ocr_models\vi\.rec.onnx.aTBUPz"
@@ -126,7 +126,7 @@ Section "NBL LIVE" SecMain
   WriteRegDWORD HKLM "${UKEY}" "NoRepair" 1
   WriteRegDWORD HKLM "${UKEY}" "EstimatedSize" 376562
 
-  ; 4.3.0: app điện thoại — chỉ mở cổng 8766 cho Tailscale và mạng nhà
+  ; 4.3.1: app điện thoại — chỉ mở cổng 8766 cho Tailscale và mạng nhà
   nsExec::Exec 'netsh advfirewall firewall delete rule name="NBL LIVE dien thoai"'
   nsExec::Exec 'netsh advfirewall firewall add rule name="NBL LIVE dien thoai" dir=in action=allow program="$INSTDIR\runtime\pythonw.exe" protocol=TCP localport=8766 remoteip=100.64.0.0/10,LocalSubnet profile=any'
   DetailPrint "Đang kiểm tra bản cài (tệp, thư viện video, OCR, tiện ích Chrome)…"

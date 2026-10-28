@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.0'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.1'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -73,9 +73,8 @@ class Console(QMainWindow):
         connect_menu.addAction('Kết nối Chrome',lambda:self.navigation.setCurrentIndex(max(0,self.navigation.findText('Giỏ hàng & ghim · TikTok Shop'))))
         connect_menu.addAction('Kết nối lại TikTok LIVE Studio',lambda:(setattr(self.studio_panel,'auto_at',0),setattr(self.studio_panel,'auto_launched',False),self.log('Đang tìm và kết nối lại Studio…')))
         connect.setMenu(connect_menu);actions=QHBoxLayout();actions.addWidget(connect,1);actions.addWidget(manage,1);body.addLayout(actions)
-        self.navigation=QComboBox();self.navigation.setObjectName('navigation');self.navigation.setMinimumHeight(42);body.addWidget(self.navigation)
-        # 4.2.2 (owner video 28/10/2026): the page list showed white text on white; the list gets its own colours
-        self.navigation.view().setStyleSheet('QListView{background:#ffffff;color:#1f3b52;font-weight:600;outline:0}QListView::item{min-height:32px;padding:4px 12px;color:#1f3b52}QListView::item:selected,QListView::item:hover{background:#f37021;color:#ffffff}')
+        from nav_button import NavButton
+        self.navigation=NavButton();self.navigation.setMinimumHeight(42);body.addWidget(self.navigation)
         self.tabs=QTabWidget();self.tabs.tabBar().hide();self.navigation.currentIndexChanged.connect(self.tabs.setCurrentIndex);body.addWidget(self.tabs,1)
         import pin_scripts;self.pin_store=pin_scripts.Store(DATA/'kich_ban_ghim.json');self.build_video();self.build_script();self.build_chrome();self.build_ai();self.label_timer=QTimer(self);self.label_timer.timeout.connect(self.refresh_playlist_labels);self.label_timer.start(5000);self.build_obs();self.build_schedule();self.build_tools()
         for form in self.findChildren(QFormLayout): form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
@@ -365,7 +364,7 @@ class Console(QMainWindow):
         as soon as the tab reads the TikTok Shop account."""
         now=time.time();opened=getattr(self,'chrome_opened',{})
         if not manual and now-opened.get(session['id'],0)<600:return False
-        opened[session['id']]=now;self.chrome_opened=opened;self.auto_bind=(session['id'],now)
+        opened[session['id']]=now;self.chrome_opened=opened;self.auto_bind=(session['id'],now,bool(manual))
         url='https://shop.tiktok.com/streamer/live/product/dashboard#nbl='+self.bridge.token
         exe=self.chrome_exe()
         try:
@@ -375,6 +374,22 @@ class Console(QMainWindow):
         self.log('Đã mở Chrome bảng LIVE cho nick '+str(session.get('number','')))
         if manual:QMessageBox.information(self,'Chrome','NBL đã mở Chrome ở trang Bảng điều khiển LIVE và tự ghép.\n\nLần đầu: đăng nhập TikTok Shop đúng nick (nếu Chrome hỏi). Khi tiện ích đọc được tài khoản, NBL tự gắn tab này cho nick đang chọn.\n\nNếu chưa cài tiện ích NBL trên Chrome này: chrome://extensions → bật Chế độ nhà phát triển → Tải tiện ích đã giải nén → chọn thư mục CHROME_NBL_LIVE (nút Mở thư mục tiện ích).')
         return True
+    def chrome_unbound_reason(self,clients,binding):
+        """4.3.0 (owner video 29/10/2026): say WHY the open TikTok Shop tab is not tied to the nick."""
+        if not clients:return ''
+        try:want=json.loads((BASE/'CHROME_NBL_LIVE'/'manifest.json').read_text(encoding='utf-8')).get('version','')
+        except Exception:want=''
+        states=list(clients.values())
+        if want and any(st.get('version')!=want for st in states):
+            return 'tiện ích Chrome đang là bản cũ ('+(states[0].get('version') or 'trước 4.3.0')+'). Vào chrome://extensions → bấm nút nạp lại (↻) ở NBL LIVE, rồi tải lại trang LIVE.'
+        bad=('Chưa chọn tài khoản','Chưa hiệu chỉnh','Không đọc được trang','Đang đọc trang','Chưa đăng nhập','Chưa xác định','')
+        names=[str(st.get('account') or '') for st in states]
+        if all(n in bad or st.get('accountVerified') is False for n,st in zip(names,states)):
+            return 'trang TikTok Shop chưa đọc được tên tài khoản ('+(names[0] or 'trống')+'). Tải lại trang LIVE; còn vậy thì gửi gói chẩn đoán.'
+        if binding and binding.get('account') and binding['account'] not in names:
+            return 'nick này đã gắn với tài khoản Shop "'+binding['account']+'", còn Chrome đang mở "'+', '.join(n for n in names if n not in bad)+'". Đúng tài khoản thì vào Giỏ hàng & ghim bấm "🌐 Mở Chrome & tự kết nối" để gắn lại.'
+        if len(states)>1:return 'đang mở '+str(len(states))+' tab trang LIVE; đóng bớt, chỉ giữ 1 tab.'
+        return 'bấm "🌐 Mở Chrome & tự kết nối" ở mục Giỏ hàng & ghim.'
     def auto_bind_chrome(self,clients):
         pending=getattr(self,'auto_bind',None)
         if not pending or time.time()-pending[1]>600:return
@@ -385,7 +400,8 @@ class Console(QMainWindow):
         free=[c for c,st in clients.items() if c not in taken and st.get('accountVerified') is not False and st.get('account') not in ('Chưa chọn tài khoản','Chưa hiệu chỉnh','Không đọc được trang','Đang đọc trang','Chưa đăng nhập','Chưa xác định','',None)]
         if len(free)!=1:return
         binding=make_binding(free[0],clients[free[0]])
-        if session.get('account') and session.get('chrome_binding') and binding['account']!=session['chrome_binding'].get('account'):return   # another nick's Chrome: never re-bound by itself
+        manual=len(pending)>2 and pending[2]
+        if not manual and session.get('account') and session.get('chrome_binding') and binding['account']!=session['chrome_binding'].get('account'):return   # another nick's Chrome: never re-bound by itself (the owner's own button may re-bind)
         session.pop('chrome_login_binding',None);session['chrome_binding']=binding;session['account']=binding['account']
         try:write_json(self.path,self.data)
         except Exception as e:self.log('Chưa lưu gắn Chrome: '+type(e).__name__)
@@ -425,6 +441,8 @@ class Console(QMainWindow):
             for client,st in clients.items():self.chrome_clients.addItem(st.get('account','Chưa hiệu chỉnh')+' · tab '+str(st.get('tab','?')),client)
             index=self.chrome_clients.findData(selected);self.chrome_clients.setCurrentIndex(index if index>=0 else 0);self.chrome_clients.blockSignals(False)
         st=clients.get(resolve_binding(binding,clients),{}) if binding else {}
+        why='' if st else self.chrome_unbound_reason(clients,binding)
+        if why and why!=getattr(self,'chrome_why_logged',''):self.chrome_why_logged=why;self.log('Chrome chưa gắn với nick: '+why)
         self.account_status.setText(('Chrome: đã kết nối · ' if st else 'Chrome: chưa kết nối · ')+(self.studio_panel.connection_status() if hasattr(self,'studio_panel') else 'Studio: chưa kết nối'))
         self.chrome_binding_label.setText(('✓ Chrome đã kết nối · '+binding['account'] if st else 'Chrome chưa kết nối nick '+binding['account']+' · bấm Mở Chrome & tự kết nối') if binding else 'Chrome chưa kết nối · bấm Mở Chrome & tự kết nối')
         for key,lab in self.chrome_status.items():
