@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TOOL NBL LIVE — Trợ lý LIVE",
-  "version": "4.3.4",
+  "version": "4.3.6",
   "description": "Cầu nối NBL LIVE với Bảng điều khiển LIVE của TikTok Shop (thêm giỏ, ghim). Thiết lập trong app NBL.",
   "permissions": [
     "storage",

@@ -80,15 +80,22 @@ const CLOSE_BUTTON=/^(OK|Đã hiểu|Tôi đã hiểu|Đóng|Bỏ qua|Để sau|
 const closedAt=new WeakMap();
 // 4.3.5 (owner 29/10 03:35): a new Chrome profile shows "Get AI-generated insights" on the LIVE
 // console (Continue), and, when its switch is touched, "Turn off real-time recommendations" (Turn off).
+// 4.3.5 vá (chủ 29/10): các hộp mời/gợi ý của TikTok che trang LIVE console — tự đóng,
+// KHÔNG đụng bảng "Thêm sản phẩm mới" của NBL (đang thêm giỏ) hay hộp cảnh báo quan trọng.
+const PROMO_TITLE=/AI-generated insights|Real-time recommendations|thông tin chi tiết (do|bằng) AI|đề xuất (theo )?thời gian thực|Ẩn giá sản phẩm|Hide (product )?price|tăng doanh số/i;
+const PROMO_SKIP=/Thêm sản phẩm mới|Add new products?|Bộ sản phẩm|product sets?|Kết thúc LIVE|has ended|captcha|xác minh|verify|thanh toán|payment|đăng xuất|log ?out/i;
 function closeAiInsights(){
  const dialogs=[...document.querySelectorAll('[role=dialog],[role=alertdialog],.arco-modal,.ant-modal,.arco-modal-wrapper')].filter(visible);
  for(const d of dialogs){
-  if(host.contains(d))continue;
+  if(host.contains(d)||(typeof controlBusy!=='undefined'&&controlBusy&&addDrawer&&addDrawer()&&addDrawer().contains(d)))continue;
   const text=(d.textContent||'').replace(/\s+/g,' ').trim();
+  if(!PROMO_TITLE.test(text)||PROMO_SKIP.test(text))continue;
   const buttons=[...d.querySelectorAll('button,[role=button]')].filter(visible);
-  const pick=re=>buttons.find(b=>buttonName(b).some(x=>re.test(x)));
-  if(/Turn off real-time recommendations|Tắt (các )?đề xuất (theo )?thời gian thực/i.test(text)){const b=pick(/^(Turn off|Tắt)$/i);if(b){b.click();log('Đã tự đóng hộp AI của TikTok (tắt đề xuất thời gian thực).');return true;}}
-  if(/AI-generated insights|Real-time recommendations|thông tin chi tiết (do|bằng) AI|đề xuất (theo )?thời gian thực/i.test(text)&&!/Turn off real-time/i.test(text)){const b=pick(/^(Continue|Tiếp tục)$/i);if(b){b.click();log('Đã tự đóng hộp "AI insights" của TikTok.');return true;}}
+  const pick=re=>buttons.find(b=>buttonName(b).some(x=>re.test(x.trim())));
+  // the confirm-to-turn-off step first (its title also matches PROMO_TITLE)
+  let b=/Turn off|Tắt đề xuất/i.test(text)&&pick(/^(Turn off|Tắt)$/i);
+  b=b||pick(/^(OK|Got it|Đã hiểu|Tôi đã hiểu|Đóng|Bỏ qua|Để sau|Continue|Tiếp tục|Skip)$/i);
+  if(b){const before=closedAt.get(d);if(before&&Date.now()-before<4000)continue;closedAt.set(d,Date.now());b.click();log('Đã tự đóng hộp gợi ý của TikTok: '+text.slice(0,80));return true;}
  }
  return false;
 }
@@ -135,6 +142,7 @@ function autoCards(){const out=[];for(const input of document.querySelectorAll(N
 function autoTitle(card){const pick=[...card.querySelectorAll('[class*="text-body-m-regular"] span,[class*="text-body-m-regular"]')].filter(visible).map(e=>(e.textContent||'').trim()).filter(t=>t&&!/^Ghim$|^Bỏ ghim$|^Pin$|^Unpin$|^Pinned$|₫/.test(t));if(pick.length)return pick[0];const leaves=[...card.querySelectorAll('span,div')].filter(e=>e.children.length===0&&visible(e)).map(e=>(e.textContent||'').trim()).filter(t=>t.length>8&&!/₫|Lượt nhấp|Còn:|Ghim|Clicks?|Stock|In stock|Pin/.test(t));return leaves.sort((a,b)=>b.length-a.length)[0]||'';}
 function titleOf(card){if(cfg.productTitle){const t=relativeMatches(cfg.productTitle,card).filter(visible);if(t.length===1)return t[0].textContent.trim();}return autoTitle(card);}
 function identity(){return (cfg.account?one(cfg.account):autoAccount()).textContent.trim();}
+function accountName(c){return (c&&c.account?one(c.account):autoAccount()).textContent.trim();}   // 4.3.5 vá: thêm bộ cũng tự dò tên nick như phần ghim
 function liveTime(){const s=(cfg.live?one(cfg.live):autoLiveEl()).textContent.match(/\b\d{2,}:\d{2}:\d{2}\b/);if(!s)throw Error('Không đọc được đồng hồ LIVE');return NBL.seconds(s[0]);}
 const rowKeys=new WeakMap();let nextRowKey=0;
 // 4.0: a row without its own name/question (system line, gift, pinned notice) is skipped
@@ -494,7 +502,7 @@ function rowTitle(radio){let el=radio;for(let i=0;i<6&&el;i++){el=el.parentEleme
 function nextPage(d){return [...d.querySelectorAll('.arco-pagination-item-next,[aria-label*=next i],[class*=next i]')].filter(visible).find(el=>!el.disabled&&!/disabled/i.test(String(el.className))&&el.getAttribute('aria-disabled')!=='true')||null;}
 async function waitFor(test,ms,valid){const end=Date.now()+ms;while(Date.now()<end){valid();const r=test();if(r)return r;await delay(250);}return null;}
 async function prepareBundle(command){const generation=++controlEpoch;controlOwner=generation;controlBusy=true;controlResult={id:command.id,state:'running'};const c=read();
- const valid=()=>{if(generation!==controlEpoch||connectionLost||Date.now()>command.deadline*1000)throw Error('Đã hủy hoặc hết thời gian thêm giỏ');if(command.expectedAccount&&one(c.account).textContent.trim()!==command.expectedAccount)throw Error('Nick trên Chrome khác nick của lịch; không thêm giỏ');};
+ const valid=()=>{if(generation!==controlEpoch||connectionLost||Date.now()>command.deadline*1000)throw Error('Đã hủy hoặc hết thời gian thêm giỏ');if(command.expectedAccount&&!NBL.norm(accountName(c)).includes(NBL.norm(command.expectedAccount))&&!NBL.norm(command.expectedAccount).includes(NBL.norm(accountName(c))))throw Error('Nick trên Chrome khác nick của lịch; không thêm giỏ');};
  try{valid();
   if(!command.preLive){const oldCfg=cfg;cfg=c;try{liveTime();}finally{cfg=oldCfg;}}
   try{await closeSummary();}catch(e){log(e.message);if(e.busy||summaryDialog())throw Object.assign(Error(e.busy?e.message:'Bảng tổng kết LIVE đang che trang; chưa thêm giỏ'),{busy:e.busy});}valid();
@@ -543,8 +551,8 @@ async function prepareBundle(command){const generation=++controlEpoch;controlOwn
   log('Đã thêm bộ sản phẩm ('+outcome.ok[1]+'/'+outcome.ok[2]+') · '+name);
  }catch(e){if(generation===controlEpoch&&controlResult.id===command.id){controlResult={id:command.id,state:'failed',error:e.message,...(e.busy?{busy:'1'}:{})};log('Giỏ hàng: '+e.message);}}
  finally{if(controlOwner===generation){controlBusy=false;controlOwner=0;}}}
-$('addBundle').onclick=()=>{if(running||controlBusy){log('Dừng các mục và đợi thao tác trước kết thúc rồi thêm bộ.');return;}const c=read();let account;try{account=one(c.account).textContent.trim();}catch(e){log(e.message);return;}const v=String(c.bundleName||'').trim(),n=/^\d+$/.test(v)?Number(v):0;void prepareBundle({id:'manual-'+Date.now(),expectedAccount:account,bundle:n?'':v,bundleIndex:n,preLive:true,deadline:Date.now()/1000+150});};
-async function finishLive(command){const c=read();if(command.expectedAccount&&one(c.account).textContent.trim()!==command.expectedAccount)throw Error('Nick khác; không đóng cửa sổ tổng kết');
+$('addBundle').onclick=()=>{if(running||controlBusy){log('Dừng các mục và đợi thao tác trước kết thúc rồi thêm bộ.');return;}const c=read();let account;try{account=accountName(c);}catch(e){log(e.message);return;}const v=String(c.bundleName||'').trim(),n=/^\d+$/.test(v)?Number(v):0;void prepareBundle({id:'manual-'+Date.now(),expectedAccount:account,bundle:n?'':v,bundleIndex:n,preLive:true,deadline:Date.now()/1000+150});};
+async function finishLive(command){const c=read();if(command.expectedAccount&&!NBL.norm(accountName(c)).includes(NBL.norm(command.expectedAccount))&&!NBL.norm(command.expectedAccount).includes(NBL.norm(accountName(c))))throw Error('Nick khác; không đóng cửa sổ tổng kết');
  // 4.1: the summary can appear seconds after Studio ends; it only has an X icon.
  const end=Date.now()+60000;while(Date.now()<end){if(summaryDialog()){await closeSummary();return;}await delay(1000);}}
 const handled=new Set();
@@ -574,7 +582,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  if(staleConnection||connectionChanged||message.closing){stop(message.closing?'App đang đóng; đã dừng các mục.':'Đã đổi kết nối hoặc mất kết nối quá 30 giây; bật lại các mục khi sẵn sàng.');}
  if(message.connectionId!==lastConnectionId){connectionNeedsConfig=true;lastConnectionId=message.connectionId||'';}
  lastTickAt=now;
- try{if(!controlBusy)closeAiInsights();}catch(e){}
+ try{closeAiInsights();}catch(e){}
  // 4.3.4: NBL's own Chrome reads which NBL connection this page has (exact tab link) and that it is alive
  try{const d=document.documentElement;d.setAttribute('data-nbl-client',String(message.connectionId||'').split(':').pop());d.setAttribute('data-nbl-beat',String(now));}catch(e){}
  let currentAccount='';try{currentAccount=one(read().account).textContent.trim();}catch(e){}

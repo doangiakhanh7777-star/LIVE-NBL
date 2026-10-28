@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"><title>LIVE</title></head>
+<body style="margin:0;font-family:sans-serif">
+<div class="h-60 fixed z-110" style="position:fixed;top:0;right:0;height:60px;padding:10px"><span id="acct">giakhanhdoxe</span></div>
+<div style="margin-top:80px">
+ <div id="cartempty">Chưa có sản phẩm</div>
+ <button id="addbtn" onclick="openDrawer()">Thêm sản phẩm</button>
+</div>
+<div id="promo" role="dialog" style="position:fixed;top:40px;left:40px;width:420px;height:220px;background:#eef;z-index:9999;padding:16px">
+  <h2>Ẩn giá sản phẩm để tăng doanh số</h2><p>Tạo sự háo hức và tăng tương tác</p>
+  <button onclick="this.closest('#promo').remove()">OK</button>
+  <button>Tìm hiểu thêm</button>
+</div>
+<div id="drawer" style="display:none" role="dialog" class="arco-drawer">
+  <h2>Thêm sản phẩm mới</h2>
+  <div role="tab" class="arco-tabs-header-title" onclick="showBundles()">Sản phẩm đơn lẻ</div>
+  <div role="tab" class="arco-tabs-header-title" onclick="showBundles()">Bộ sản phẩm TRỰC TIẾP</div>
+  <div id="bundles" style="display:none"></div>
+  <div id="willadd"></div>
+  <button id="confirm" style="display:none" onclick="doAdd()">Thêm sản phẩm</button>
+  <div id="added"></div>
+  <span aria-label="close" onclick="this.closest('#drawer').style.display='none'" style="position:absolute;top:4px;right:4px">x</span>
+</div>
+<script>
+function openDrawer(){document.getElementById('drawer').style.display='block';}
+function showBundles(){var b=document.getElementById('bundles');b.style.display='block';
+ if(b.dataset.done)return;b.dataset.done=1;
+ ['Bộ Combo Sạc','Bộ Phụ kiện','Bộ Giảm sóc'].forEach(function(name,i){
+  var lab=document.createElement('label');lab.className='arco-radio';
+  lab.innerHTML='<input type="radio" name="bundle"> '+name+' · '+(i+2)+' sản phẩm';
+  lab.querySelector('input').onclick=function(){pick(name,i+2);};
+  b.appendChild(lab);});}
+function pick(name,n){document.getElementById('willadd').textContent=n+' / '+n+' sản phẩm sẽ được thêm';document.getElementById('confirm').style.display='inline';}
+function doAdd(){var w=document.getElementById('willadd').textContent.match(/(\d+)/);document.getElementById('added').textContent='Đã thêm '+w[1]+'/'+w[1];}
+</script>
+</body></html>
