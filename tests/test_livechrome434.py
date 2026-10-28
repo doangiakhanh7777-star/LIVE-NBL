@@ -78,6 +78,12 @@ class Watch(unittest.TestCase):
         self.c.tabs = [dict(id='s', type='page', url='https://seller-vn.tiktok.com/homepage')]
         self.tick(130); self.assertEqual(self.c.log[-1], ('nav', 's')); self.assertFalse(any(x[0] == 'open' for x in self.c.log))
 
+    def test_after_login_callback_is_not_a_login_page(self):
+        self.assertEqual(L.kind('https://shop.tiktok.com/streamer/home?is_login_callback=1'), 'tiktok')
+        self.assertEqual(L.kind('https://business.tiktokshop.com/us/creator/live'), 'login')
+        self.assertEqual(L.kind('https://seller-vn.tiktok.com/account/login?x=1'), 'login')
+        self.assertEqual(L.kind('https://www.google.com/'), 'other')
+
     def test_dashboard_url_match(self):
         self.assertTrue(L.is_dashboard(D + '#nbl=x')); self.assertTrue(L.is_dashboard(D + '?a=1'))
         self.assertFalse(L.is_dashboard('https://shop.tiktok.com/streamer/live/product/dashboardx'))

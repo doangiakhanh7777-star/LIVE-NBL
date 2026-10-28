@@ -56,7 +56,8 @@ def kind(url):
     tik = h.endswith(('tiktok.com', 'tiktokshop.com', 'tiktokglobalshop.com', 'tiktokcdn.com', 'tiktokv.com', 'byteoversea.com'))
     if not tik:
         return 'other'
-    low = u.lower()
+    from urllib.parse import urlparse
+    low = (urlparse(u).path or '').lower()   # 4.3.5: only the path ("?is_login_callback=1" after logging in is not a login page)
     # not logged in: shop.tiktok.com sends the dashboard to business.tiktokshop.com/…/creator/live
     if h.startswith('business.') or any(k in low for k in ('login', 'passport', 'register', 'signup', 'oauth', 'verify', 'captcha', '/account/')):
         return 'login'
@@ -152,8 +153,11 @@ class Watchdog:
     RELOAD_GAP = 60     # s between two reloads of the dashboard
     START_WAIT = 45     # s to wait after starting Chrome before judging it
 
-    def __init__(self, profile_dir, pair_url, chrome=None, launcher=None, now=time.time):
+    def __init__(self, profile_dir, pair_url, chrome=None, launcher=None, now=time.time, serve=None, source=None, version=''):
+        """serve: bridge.serve(link, hello, label) — 4.3.5: NBL talks to the page itself (no extension).
+        source: () -> page code. Without serve (tests / old way) only the tabs are kept in order."""
         self.profile_dir = Path(profile_dir); self.pair_url = pair_url
+        self.serve = serve; self.source = source; self.version = version; self.link = None; self.link_thread = None
         self.chrome = chrome or Chrome(); self.launcher = launcher or launch; self.now = now
         self.started_at = 0; self.reload_at = 0; self.opened_at = 0; self.loaded = {}
         self.no_beat_reloads = 0; self.wanted = False
@@ -230,6 +234,7 @@ class Watchdog:
                     out['error'] = str(e)
             out['state'] = 'loading'; return out
         tab = keep[0]; st = states[tab['id']]
+        self.ensure_link(tab, out)
         if st.get('login'):
             out['state'] = 'login'; return out
         beat_age = (st.get('now', 0) - st.get('beat', 0)) / 1000 if st.get('beat') else None
@@ -256,6 +261,31 @@ class Watchdog:
             out['state'] = 'loading'
         return out
 
+    def ensure_link(self, tab, out):
+        """One direct line to the kept LIVE tab; a new one when the tab changed or the line died."""
+        if not self.serve:
+            return
+        import threading
+        alive = self.link_thread is not None and self.link_thread.is_alive()
+        if alive and self.link and self.link.target.get('id') == tab['id']:
+            return
+        if time.time() - getattr(self, 'link_at', 0) < 10:
+            return
+        self.link_at = time.time()
+        if self.link:
+            self.link.close()
+        link = PageLink(tab, self.source(), self.version)
+        def run():
+            try:
+                link.open()
+            except Exception as e:
+                link.close(); out.setdefault('error', 'Chưa nối được trang LIVE: ' + str(e)[:150]); return
+            hello = dict(tab=int(tab['id'][:7], 16) if all(c in '0123456789abcdefABCDEF' for c in tab['id'][:7]) else 1, instance=instance_id(self.profile_dir))
+            self.serve(link, hello, 'Chrome LIVE')
+        self.link = link
+        self.link_thread = threading.Thread(target=run, daemon=True, name='nbl-live-page'); self.link_thread.start()
+        out['actions'].append('nối trực tiếp trang LIVE')
+
     def _login(self, page):
         try:
             return bool(self.chrome.page_state(page).get('login'))
@@ -270,14 +300,155 @@ class Watchdog:
         self.chrome.reload(dash[0]); self.reload_at = self.now(); self.loaded[dash[0]['id']] = self.reload_at
         return True
 
-    def show_setup(self, extension_dir):
-        """One-time: open chrome://extensions in NBL's Chrome (the owner loads the extension folder)."""
-        self.start()
-        for _ in range(20):
-            if self.chrome.alive():
-                break
-            time.sleep(.5)
+
+
+# ---------------- 4.3.5: no extension any more — NBL puts the page code in itself ----------------
+SHIM = r"""
+(()=>{if(globalThis.__nblShim)return;globalThis.__nblShim=1;globalThis.__nblVersion='__VER__';
+const L=[],C=[],P='nbl:';
+const rd=k=>{try{const v=localStorage.getItem(P+k);return v==null?undefined:JSON.parse(v);}catch(e){return undefined;}};
+const local={
+ get:async keys=>{const all=()=>Object.keys(localStorage).filter(k=>k.startsWith(P)).map(k=>k.slice(P.length));
+  const ks=keys==null?all():Array.isArray(keys)?keys:typeof keys==='string'?[keys]:Object.keys(keys);const o={};
+  for(const k of ks){const v=rd(k);if(v!==undefined)o[k]=v;else if(keys&&typeof keys==='object'&&!Array.isArray(keys))o[k]=keys[k];}return o;},
+ set:async obj=>{for(const [k,v] of Object.entries(obj||{})){const old=rd(k);try{localStorage.setItem(P+k,JSON.stringify(v));}catch(e){}for(const f of C){try{f({[k]:{oldValue:old,newValue:v}},'local');}catch(e){}}}},
+ remove:async ks=>{for(const k of [].concat(ks))try{localStorage.removeItem(P+k);}catch(e){}}};
+const api={runtime:{id:'nbl-live',onMessage:{addListener:f=>L.push(f)},sendMessage:()=>Promise.resolve({ok:false}),getManifest:()=>({version:'__VER__'})},storage:{local,onChanged:{addListener:f=>C.push(f)}}};
+try{globalThis.chrome=api;}catch(e){}
+if(globalThis.chrome!==api)Object.defineProperty(globalThis,'chrome',{value:api,configurable:true,writable:true});
+globalThis.__nblCall=msg=>new Promise(res=>{let done=false,wait=false;const reply=v=>{if(!done){done=true;res(v===undefined?null:v);}};
+ for(const f of L){try{if(f(msg,{id:'nbl-live'},reply)===true)wait=true;}catch(e){reply({__error:String(e&&e.message||e)});}}
+ if(!wait)setTimeout(()=>reply(undefined),0);setTimeout(()=>reply({__error:'timeout'}),7000);});
+})();
+"""
+WRAP = r"""
+(()=>{const ok=()=>location.origin==='https://shop.tiktok.com'&&location.pathname.startsWith('/streamer/live/product/dashboard');
+const go=()=>{if(!ok()||globalThis.__nblStarted)return;globalThis.__nblStarted=1;
+__CODE__
+};
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go,{once:true});else go();
+setInterval(()=>{if(ok()&&document.readyState!=='loading')go();},2000);   // reached by clicking inside the site (no reload)
+})();
+"""
+
+
+def page_source(ext_dir, version):
+    """The same files the extension used (engine, modules, pin engine, content), with a tiny
+    stand-in for the chrome.* calls they make; run in an isolated world like an extension."""
+    ext_dir = Path(ext_dir)
+    code = '\n;\n'.join((ext_dir / f).read_text(encoding='utf-8') for f in ('engine.js', 'modules.js', 'pin_engine.js', 'content.js'))
+    return SHIM.replace('__VER__', version) + WRAP.replace('__CODE__', code)
+
+
+def instance_id(profile_dir):
+    import hashlib
+    return hashlib.md5(('nbl-live-chrome:' + str(profile_dir)).encode()).hexdigest()
+
+
+class PageLink:
+    """NBL's direct line to the LIVE tab of its own Chrome. Looks like an extension socket to
+    the bridge (send / recv / close): send() takes the tick, recv() returns the page's answer."""
+    WORLD = 'nbl'
+
+    def __init__(self, target, source, version, timeout=8):
+        import uuid
+        self.target = target; self.source = source; self.version = version; self.timeout = timeout
+        self.client_id = uuid.uuid4().hex; self.ws = None; self.n = 0; self.ctx = None; self.frame = None
+        self.pending = None; self.closed = False; self.worlds = []
+
+    # ---- DevTools ----
+    def _event(self, msg):
+        m = msg.get('method'); p = msg.get('params') or {}
+        if m == 'Runtime.executionContextCreated':
+            c = p.get('context') or {}
+            if c.get('name') == self.WORLD and (c.get('auxData') or {}).get('frameId') == self.frame:
+                self.worlds.append(c.get('id'))   # Chrome may make more than one "nbl" world; the one with our code is picked in find()
+        elif m == 'Runtime.executionContextDestroyed':
+            cid = p.get('executionContextId')
+            self.worlds = [w for w in self.worlds if w != cid]
+            if cid == self.ctx:
+                self.ctx = None
+        elif m == 'Runtime.executionContextsCleared':
+            self.ctx = None; self.worlds = []
+        elif m in ('Inspector.detached', 'Inspector.targetCrashed'):
+            self.closed = True
+
+    def cmd(self, method, params=None, timeout=None):
+        if self.closed:
+            raise ConnectionError('Tab LIVE đã đóng')
+        self.n += 1; n = self.n
+        self.ws.send(json.dumps({'id': n, 'method': method, 'params': params or {}}))
+        end = time.time() + (timeout or self.timeout)
+        while True:
+            left = end - time.time()
+            if left <= 0:
+                raise TimeoutError('Trang LIVE không trả lời (' + method + ')')
+            msg = json.loads(self.ws.recv(timeout=left))
+            if msg.get('id') == n:
+                if 'error' in msg:
+                    raise RuntimeError(str(msg['error'].get('message')))
+                return msg.get('result') or {}
+            self._event(msg)
+
+    def find(self):
+        """The isolated world that holds NBL's page code (None while the page is loading)."""
+        if self.ctx in self.worlds:
+            return self.ctx
+        self.ctx = None
+        for cid in reversed(self.worlds):
+            r = self.cmd('Runtime.evaluate', {'expression': '!!globalThis.__nblShim', 'contextId': cid, 'returnByValue': True}, 3)
+            if (r.get('result') or {}).get('value') is True:
+                self.ctx = cid; break
+        return self.ctx
+
+    def open(self):
+        from websockets.sync.client import connect
+        self.ws = connect(self.target['webSocketDebuggerUrl'], max_size=16 << 20, open_timeout=self.timeout)
+        self.frame = self.cmd('Page.getFrameTree')['frameTree']['frame']['id']
+        self.cmd('Page.enable'); self.cmd('Runtime.enable')       # Runtime.enable reports the worlds that exist
+        self.cmd('Page.addScriptToEvaluateOnNewDocument', {'source': self.source, 'worldName': self.WORLD})
+        if self.find():
+            v = self.eval('globalThis.__nblVersion||""')
+            if v != self.version:
+                self.cmd('Page.reload', {'ignoreCache': True}); self.ctx = None   # code of an older NBL in the page
+                return
+        else:
+            self.ctx = self.cmd('Page.createIsolatedWorld', {'frameId': self.frame, 'worldName': self.WORLD})['executionContextId']
+            self.worlds.append(self.ctx); self.eval(self.source)
+
+    def eval(self, expression, timeout=None):
+        r = self.cmd('Runtime.evaluate', {'expression': expression, 'contextId': self.ctx, 'awaitPromise': True, 'returnByValue': True}, timeout)
+        if r.get('exceptionDetails'):
+            raise RuntimeError(str((r['exceptionDetails'].get('exception') or {}).get('description') or r['exceptionDetails'].get('text'))[:300])
+        return (r.get('result') or {}).get('value')
+
+    # ---- what the bridge calls ----
+    def send(self, text):
+        self.pending = json.loads(text)
+
+    def recv(self, timeout=8):
+        msg, self.pending = self.pending, None
+        cmds = (msg or {}).get('commands') or []
+        idle = dict(account='Đang đọc trang', accountVerified=False, modules={}, acks=[], config={})
         try:
-            self.chrome.open('chrome://extensions/')
+            self.cmd('Runtime.evaluate', {'expression': '1'}, 3)   # lets the worlds of a reloaded page arrive
+            if not self.find():
+                return json.dumps(idle)
+            ready = self.eval('typeof __nblCall==="function"&&!!globalThis.__nblStarted', 3)
+            if not ready:
+                idle.update(account='Chưa mở bảng LIVE', acks=[dict(id=c.get('id'), error='Chưa mở bảng LIVE trong Chrome LIVE.') for c in cmds])
+                return json.dumps(idle)
+            r = self.eval('__nblCall(' + json.dumps(msg, ensure_ascii=False) + ')', min(timeout, 8))
+            if not isinstance(r, dict) or r.get('__error'):
+                return json.dumps(idle)
+            return json.dumps(r, ensure_ascii=False)
+        except (TimeoutError, RuntimeError):
+            return json.dumps(idle)
+
+    def close(self, *a):
+        self.closed = True
+        try:
+            if self.ws:
+                self.ws.close()
         except Exception:
             pass

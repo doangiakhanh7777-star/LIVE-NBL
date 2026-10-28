@@ -48,7 +48,7 @@ STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử 
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.4 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.5 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
@@ -401,7 +401,7 @@ class StudioPanel(QWidget):
     except Exception:pass
    if now-since>=120 and any(j['profile']==p['id'] and (j['state']=='running' or j['state'] in ('pending','start_retry') and j['start']-now<900) for j in self.jobs):
     state=getattr(self.owner,'live_chrome_state','')
-    why={'login':'TikTok Shop đòi đăng nhập lại: đăng nhập đúng nick trong cửa sổ Chrome LIVE.','no_extension':'Chrome LIVE chưa có tiện ích NBL: bấm "Cài tiện ích vào Chrome LIVE" trong NBL.'}.get(state,'NBL đang tự mở lại / tải lại Chrome LIVE.')
+    why={'login':'TikTok Shop đòi đăng nhập lại: đăng nhập đúng nick trong cửa sổ Chrome LIVE.','no_extension':'Trang LIVE trong Chrome LIVE chưa trả lời; NBL đang tự tải lại.'}.get(state,'NBL đang tự mở lại / tải lại Chrome LIVE.')
     try:self.owner.notifier.publish('studio:'+p['id']+':chrome','⚠ '+str(p.get('name',''))+' · Chrome LIVE chưa kết nối trang LIVE TikTok Shop hơn 2 phút. '+why)
     except Exception:pass
    raise ChromeWait('Chrome LIVE chưa sẵn sàng (đang mở / tải lại trang).') if now-since<120 else ValueError('Chưa có đúng tab Chrome/nick kết nối.')

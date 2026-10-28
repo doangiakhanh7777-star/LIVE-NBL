@@ -66,14 +66,23 @@ class ChromeBridge:
             if not isinstance(hello,dict) or not secrets.compare_digest(str(hello.get('token','')),self.token):ws.close(1008,'Pairing required');return
             if hello.get('protocol')!=PROTOCOL:self.log('Cập nhật tiện ích NBL 4.1 (Tải lại trong chrome://extensions) rồi tải lại trang LIVE.');ws.close(1008,'NBL 4.0.2 extension required');return
             if self.closing:ws.close(1001,'App closing');return
-            client=uuid.uuid4().hex
+        except Exception as e:
+            if not self.closed:self.log('Tab Chrome ngắt kết nối: '+str(e)[:200])
+            return
+        self.serve(ws,hello)
+    def serve(self,ws,hello,label='Chrome'):
+        """One connected page: tick → reply loop. ws: the extension socket, or (4.3.5) a
+        live_chrome.PageLink that answers through NBL's own Chrome (same send / recv / close)."""
+        client=None
+        try:
+            client=getattr(ws,'client_id','') or uuid.uuid4().hex
             with self.lock:
                 if len(self.clients)>=16:ws.close(1008,'Too many clients');return
                 instance=hello.get('instance','')
                 if not isinstance(instance,str) or (instance and not re.fullmatch('[a-f0-9]{32}',instance)):
                     ws.close(1008,'Invalid browser instance');return
                 self.clients[client]=dict(ws=ws,tab=hello.get('tab'),instance=instance,account='Đang đọc trang',configAck='',modules={},queue=[],last=time.monotonic())
-            self.log('Chrome đã ghép đôi · tab '+str(hello.get('tab')))
+            self.log(label+' đã ghép đôi · tab '+str(hello.get('tab')))
             while not self.closed:
                 with self.lock:
                     state=self.clients.get(client)

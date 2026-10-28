@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.4 · vá 1'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.5'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -98,7 +98,10 @@ class Console(QMainWindow):
         self.refresh_list(); self.sessions.setCurrentRow(0); self.fill()
         self.timer = QTimer(self); self.timer.timeout.connect(self.tick); self.timer.start(1000)
         import live_chrome
-        self.live_chrome=live_chrome.Watchdog(DATA/'chrome_live',lambda:live_chrome.DASHBOARD+'#nbl='+self.bridge.token)
+        from diagnostics import VERSION as NBL_VERSION
+        # 4.3.5: no extension in NBL's Chrome — NBL puts the page code into the LIVE tab itself
+        self.live_chrome=live_chrome.Watchdog(DATA/'chrome_live',lambda:live_chrome.DASHBOARD,serve=self.bridge.serve,
+            source=lambda:live_chrome.page_source(BASE/'CHROME_NBL_LIVE',NBL_VERSION),version=NBL_VERSION)
         self.start_phone_api()
         QTimer.singleShot(4000,self.one_nick_cleanup)
         for notice in self.startup_notices:
@@ -229,9 +232,8 @@ class Console(QMainWindow):
         # LIVE dashboard; everything is set here. Pinning switches on by itself when the LIVE starts.
         v=self.page('Giỏ hàng & ghim · TikTok Shop')
         self.chrome_binding_label=QLabel('Chưa kết nối Chrome');self.chrome_binding_label.setWordWrap(True);self.chrome_binding_label.setObjectName('accountStatus');v.addWidget(self.chrome_binding_label)
-        lab=QLabel('NBL dùng một Chrome RIÊNG chỉ để LIVE (không đụng Chrome thường của bạn). NBL tự mở, tự giữ đúng 1 trang LIVE, tự tải lại khi trang đơ, tự mở lại khi lỡ tắt. Lần đầu: đăng nhập TikTok Shop đúng nick và cài tiện ích NBL vào cửa sổ đó (1 lần).');lab.setWordWrap(True);v.addWidget(lab)
+        lab=QLabel('NBL dùng một Chrome RIÊNG chỉ để LIVE (không đụng Chrome thường của bạn). NBL tự mở, tự giữ đúng 1 trang LIVE, tự tải lại khi trang đơ, tự mở lại khi lỡ tắt. Lần đầu: đăng nhập TikTok Shop đúng nick trong cửa sổ đó (1 lần). Không cần cài tiện ích.');lab.setWordWrap(True);v.addWidget(lab)
         v.addWidget(button('🌐 Mở Chrome LIVE của NBL',lambda:self.open_chrome(self.current(),True),'primary'))
-        v.addWidget(button('🧩 Cài tiện ích vào Chrome LIVE (làm 1 lần)',self.live_chrome_setup))
         box=QGroupBox('Ghim sản phẩm');f=QFormLayout(box);f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
         self.pin_mode=QComboBox();self.pin_mode.addItem('Số thứ tự trong giỏ (1, 2, 3…)','number');self.pin_mode.addItem('Tên sản phẩm (3–4 chữ đầu)','name');f.addRow('Chọn sản phẩm theo',self.pin_mode)
         self.pin_list=QTextEdit();self.pin_list.setPlaceholderText('Mỗi dòng một món, ví dụ:\n1\n3\n5');self.pin_list.setMaximumHeight(120);f.addRow('Sản phẩm muốn ghim (xáo trộn)',self.pin_list)
@@ -371,16 +373,8 @@ class Console(QMainWindow):
             return False
         if manual:
             self.log('Đã mở Chrome LIVE của NBL.')
-            if not self.live_chrome.setup_done():QMessageBox.information(self,'Chrome LIVE (làm 1 lần)','NBL vừa mở một Chrome RIÊNG chỉ để LIVE.\n\n1. Đăng nhập TikTok Shop đúng nick LIVE trong cửa sổ đó.\n2. Bấm "🧩 Cài tiện ích vào Chrome LIVE" và làm theo hướng dẫn.\n\nXong 2 bước này NBL tự giữ trang LIVE, bạn không phải F5.')
+            if not self.live_chrome.setup_done():QMessageBox.information(self,'Chrome LIVE (làm 1 lần)','NBL vừa mở một Chrome RIÊNG chỉ để LIVE.\n\nĐăng nhập TikTok Shop đúng nick LIVE trong cửa sổ đó (nên chọn Tiếng Việt ở góc phải trang). Xong là NBL tự mở trang LIVE và tự nối, không cần cài tiện ích, không phải F5.')
         return True
-    def live_chrome_setup(self):
-        """One time: chrome://extensions in NBL's Chrome + the extension folder; Chrome no longer lets programs install it."""
-        import threading
-        threading.Thread(target=self.live_chrome.show_setup,args=(BASE/'CHROME_NBL_LIVE',),daemon=True).start()
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(BASE/'CHROME_NBL_LIVE')))
-        QMessageBox.information(self,'Cài tiện ích vào Chrome LIVE (1 lần)','Trong cửa sổ Chrome LIVE vừa mở trang Tiện ích:\n\n1. Bật "Chế độ dành cho nhà phát triển" (góc phải trên).\n2. Bấm "Tải tiện ích đã giải nén".\n3. Chọn thư mục:\n'+str(BASE/'CHROME_NBL_LIVE')+'\n(thư mục này cũng vừa được mở sẵn).\n\nXong thì đóng tab Tiện ích. NBL tự mở trang LIVE và tự kết nối.')
-    LIVE_CHROME_TEXT={'off':'Chrome LIVE chưa mở · bấm Mở Chrome LIVE của NBL','starting':'Đang mở Chrome LIVE…','loading':'Chrome LIVE đang tải trang LIVE…',
-        'login':'Chrome LIVE: TikTok Shop đòi ĐĂNG NHẬP — đăng nhập đúng nick trong cửa sổ Chrome LIVE','no_extension':'Chrome LIVE chưa có tiện ích NBL — bấm "Cài tiện ích vào Chrome LIVE" (1 lần)','ok':'Chrome LIVE đã kết nối'}
     def live_chrome_session(self):
         """The one nick that uses NBL's Chrome: the nick linked to TikTok LIVE Studio, else the nick shown."""
         sp=getattr(self,'studio_panel',None)
@@ -415,25 +409,12 @@ class Console(QMainWindow):
                         session['chrome_binding']=make_binding(client,st);write_json(self.path,self.data)
                         self.log('Chrome LIVE đã kết nối nick '+str(session.get('number',''))+' · tài khoản Shop: '+str(st.get('account','')))
                     except Exception as e:self.log('Chưa gắn được Chrome LIVE: '+str(e))
-                self.live_chrome_update_check(st)
         if state!=prev:
             if state in ('login','no_extension'):self.log(self.LIVE_CHROME_TEXT[state])
             if state=='login':
                 try:self.notifier.publish('livechrome:login','⚠ Chrome LIVE: TikTok Shop đòi đăng nhập lại. Đăng nhập đúng nick trong cửa sổ Chrome LIVE trên máy tính.')
                 except Exception:pass
         if res.get('error') and res.get('error')!=getattr(self,'live_chrome_err',''):self.live_chrome_err=res['error'];self.log('Chrome LIVE: '+res['error'][:200])
-    def live_chrome_update_check(self,st):
-        """After NBL updated, NBL's Chrome still runs the old extension files: restart that Chrome
-        (only when nothing runs and no LIVE is near); unpacked extensions load new files on start."""
-        try:want=json.loads((BASE/'CHROME_NBL_LIVE'/'manifest.json').read_text(encoding='utf-8')).get('version','')
-        except Exception:return
-        v=st.get('version','')
-        if not v or not want or v==want or time.time()-getattr(self,'live_chrome_restart_at',0)<600:return
-        if hasattr(self,'update_safe') and not self.update_safe():return
-        if any(m.get('running') for m in (st.get('modules') or {}).values()):return
-        self.live_chrome_restart_at=time.time();self.log('Tiện ích trong Chrome LIVE là bản '+v+', NBL có bản '+want+': khởi động lại Chrome LIVE để nạp bản mới.')
-        import threading
-        threading.Thread(target=self.live_chrome.chrome.quit,daemon=True).start()
     def bind_chrome(self):
         try:
             client=self.chrome_clients.currentData();clients=self.bridge.snapshot()
