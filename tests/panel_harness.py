@@ -26,6 +26,7 @@ def panel_class():
               RETRY_GAP=S.RETRY_GAP, STOP_TRIES=S.STOP_TRIES, report=lambda *a: reports.append(a))
     helpers = [copy.deepcopy(n) for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in ('vision_missing', 'video_problem', 'now_due')]
     # Module-level rules of the app itself (POSTPONE, PROBE_GAP, RESET_EVERY, RESET_HOLD, NO_RESET…).
+    helpers += [copy.deepcopy(n) for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'ChromeWait']   # 4.3.4
     helpers += [copy.deepcopy(n) for n in tree.body if isinstance(n, ast.Assign) and all(isinstance(t, ast.Name) and t.id in ('POSTPONE', 'PROBE_GAP', 'RESET_EVERY', 'RESET_HOLD', 'NO_RESET') for t in n.targets)]
     mod = ast.Module(body=helpers + [ast.ClassDef(name='Panel', bases=[], keywords=[], body=body, decorator_list=[])], type_ignores=[])
     exec(compile(ast.fix_missing_locations(mod), str(ROOT/'studio_panel.py'), 'exec'), ns)

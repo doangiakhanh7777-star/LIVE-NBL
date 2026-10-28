@@ -5,7 +5,7 @@
   const tabs=await chrome.tabs.query({url:['https://shop.tiktok.com/streamer/live/*']});
   const r=await chrome.runtime.sendMessage({type:'status'});const on=(r&&r.tabs||[]).filter(t=>t.connected);
   if(on.length){el.innerHTML='<span class="ok">✓ Đã kết nối NBL</span> · '+on.length+' trang LIVE';}
-  else if(tabs.length){el.innerHTML='<span class="no">Chưa kết nối.</span> Mở NBL LIVE, vào trang Giỏ hàng bấm "Mở Chrome &amp; tự ghép".';}
-  else{el.innerHTML='<span class="no">Chưa mở trang LIVE.</span> Mở NBL LIVE rồi bấm "Mở Chrome &amp; tự ghép".';}
+  else if(tabs.length){el.innerHTML='<span class="no">Chưa kết nối.</span> Mở NBL LIVE, bấm "Mở Chrome LIVE của NBL" (NBL dùng Chrome riêng).';}
+  else{el.innerHTML='<span class="no">Chưa mở trang LIVE.</span> Trang LIVE nằm trong Chrome LIVE riêng của NBL.';}
  }catch(e){el.textContent=e.message;}
 })();

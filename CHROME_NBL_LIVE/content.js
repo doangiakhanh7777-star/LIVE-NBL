@@ -559,6 +559,8 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  if(staleConnection||connectionChanged||message.closing){stop(message.closing?'App đang đóng; đã dừng các mục.':'Đã đổi kết nối hoặc mất kết nối quá 30 giây; bật lại các mục khi sẵn sàng.');}
  if(message.connectionId!==lastConnectionId){connectionNeedsConfig=true;lastConnectionId=message.connectionId||'';}
  lastTickAt=now;
+ // 4.3.4: NBL's own Chrome reads which NBL connection this page has (exact tab link) and that it is alive
+ try{const d=document.documentElement;d.setAttribute('data-nbl-client',String(message.connectionId||'').split(':').pop());d.setAttribute('data-nbl-beat',String(now));}catch(e){}
  let currentAccount='';try{currentAccount=one(read().account).textContent.trim();}catch(e){}
  if(currentAccount&&boundAccount&&currentAccount!==boundAccount){void switchAccount(currentAccount);respond({account:currentAccount,accountVerified:Boolean(currentAccount),modules:manager.status(),acks:(message.commands||[]).map(c=>({id:c.id,error:'Đang đổi nội dung theo nick; thử lại sau.'})),config:{},control:controlResult});return;}
  if(switchBusy){respond({account:currentAccount||'Đang đọc trang',accountVerified:Boolean(currentAccount),modules:manager.status(),acks:[],config:{},control:controlResult});return;}

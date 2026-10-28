@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.3'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.4'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -68,7 +68,7 @@ class Console(QMainWindow):
         self.account_selector=QComboBox();self.account_selector.setObjectName('accountSelector');self.account_selector.setMinimumHeight(44);self.account_selector.currentIndexChanged.connect(self.sessions.setCurrentRow);body.addWidget(self.account_selector)
         self.account_status=QLabel('Chọn nick để bắt đầu');self.account_status.setObjectName('accountStatus');self.account_status.setWordWrap(True);body.addWidget(self.account_status)
         manage=QToolButton();manage.setText('Quản lý nick  ▾');manage.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup);menu=QMenu(manage)
-        for text,callback in [('+ Thêm nick',self.add_session),('Xóa nick',self.remove_session),('Xuất cấu hình',self.export),('Nhập cấu hình',self.import_config),('Xuất gói chẩn đoán (không kèm mã bí mật)',self.export_diagnostics),('Mở gói chẩn đoán NBL tự gom',lambda:((DATA/'chan_doan').mkdir(parents=True,exist_ok=True),QDesktopServices.openUrl(QUrl.fromLocalFile(str(DATA/'chan_doan')))))]:menu.addAction(text,callback)
+        for text,callback in [('Xóa nick',self.remove_session),('Xuất cấu hình',self.export),('Nhập cấu hình',self.import_config),('Xuất gói chẩn đoán (không kèm mã bí mật)',self.export_diagnostics),('Mở gói chẩn đoán NBL tự gom',lambda:((DATA/'chan_doan').mkdir(parents=True,exist_ok=True),QDesktopServices.openUrl(QUrl.fromLocalFile(str(DATA/'chan_doan')))))]:menu.addAction(text,callback)
         manage.setMenu(menu);connect=QToolButton();connect.setText('Kết nối nick  ▾');connect.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup);connect_menu=QMenu(connect)
         connect_menu.addAction('Kết nối Chrome',lambda:self.navigation.setCurrentIndex(max(0,self.navigation.findText('Giỏ hàng & ghim · TikTok Shop'))))
         connect_menu.addAction('Kết nối lại TikTok LIVE Studio',lambda:(setattr(self.studio_panel,'auto_at',0),setattr(self.studio_panel,'auto_launched',False),self.log('Đang tìm và kết nối lại Studio…')))
@@ -97,7 +97,10 @@ class Console(QMainWindow):
         for signal in (self.account.textEdited,self.volume.valueChanged,self.loop.toggled,self.shuffle.toggled,self.mute.toggled,self.device.currentIndexChanged):signal.connect(self.schedule_autosave)
         self.refresh_list(); self.sessions.setCurrentRow(0); self.fill()
         self.timer = QTimer(self); self.timer.timeout.connect(self.tick); self.timer.start(1000)
+        import live_chrome
+        self.live_chrome=live_chrome.Watchdog(DATA/'chrome_live',lambda:live_chrome.DASHBOARD+'#nbl='+self.bridge.token)
         self.start_phone_api()
+        QTimer.singleShot(4000,self.one_nick_cleanup)
         for notice in self.startup_notices:
             self.log(notice);QMessageBox.warning(self,'Đã khôi phục cấu hình',notice)
         if sys.platform=='win32' and (BASE/'ocr_vendor').is_dir():
@@ -226,8 +229,9 @@ class Console(QMainWindow):
         # LIVE dashboard; everything is set here. Pinning switches on by itself when the LIVE starts.
         v=self.page('Giỏ hàng & ghim · TikTok Shop')
         self.chrome_binding_label=QLabel('Chưa kết nối Chrome');self.chrome_binding_label.setWordWrap(True);self.chrome_binding_label.setObjectName('accountStatus');v.addWidget(self.chrome_binding_label)
-        v.addWidget(button('🌐 Mở Chrome & tự kết nối',lambda:self.open_chrome(self.current(),True),'primary'))
-        v.addWidget(button('Mở thư mục tiện ích (cài 1 lần)',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(BASE/'CHROME_NBL_LIVE')))))
+        lab=QLabel('NBL dùng một Chrome RIÊNG chỉ để LIVE (không đụng Chrome thường của bạn). NBL tự mở, tự giữ đúng 1 trang LIVE, tự tải lại khi trang đơ, tự mở lại khi lỡ tắt. Lần đầu: đăng nhập TikTok Shop đúng nick và cài tiện ích NBL vào cửa sổ đó (1 lần).');lab.setWordWrap(True);v.addWidget(lab)
+        v.addWidget(button('🌐 Mở Chrome LIVE của NBL',lambda:self.open_chrome(self.current(),True),'primary'))
+        v.addWidget(button('🧩 Cài tiện ích vào Chrome LIVE (làm 1 lần)',self.live_chrome_setup))
         box=QGroupBox('Ghim sản phẩm');f=QFormLayout(box);f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
         self.pin_mode=QComboBox();self.pin_mode.addItem('Số thứ tự trong giỏ (1, 2, 3…)','number');self.pin_mode.addItem('Tên sản phẩm (3–4 chữ đầu)','name');f.addRow('Chọn sản phẩm theo',self.pin_mode)
         self.pin_list=QTextEdit();self.pin_list.setPlaceholderText('Mỗi dòng một món, ví dụ:\n1\n3\n5');self.pin_list.setMaximumHeight(120);f.addRow('Sản phẩm muốn ghim (xáo trộn)',self.pin_list)
@@ -358,65 +362,78 @@ class Console(QMainWindow):
             p=Path(base)/'Google'/'Chrome'/'Application'/'chrome.exe'
             if base and p.is_file():return str(p)
         return ''
-    def open_chrome(self,session,manual=False):
-        """Open the LIVE dashboard with the pairing code in the address (#nbl=…): the
-        NBL extension pairs that tab by itself; a nick without a Chrome tab gets it bound
-        as soon as the tab reads the TikTok Shop account."""
-        now=time.time();opened=getattr(self,'chrome_opened',{})
-        if not manual and now-opened.get(session['id'],0)<600:return False
-        opened[session['id']]=now;self.chrome_opened=opened;self.auto_bind=(session['id'],now,bool(manual))
-        url='https://shop.tiktok.com/streamer/live/product/dashboard#nbl='+self.bridge.token
-        exe=self.chrome_exe()
-        try:
-            if exe:subprocess.Popen([exe,url],creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-            else:QDesktopServices.openUrl(QUrl(url))
-        except Exception as e:self.log('Không mở được Chrome: '+str(e));return False
-        self.log('Đã mở Chrome bảng LIVE cho nick '+str(session.get('number','')))
-        if manual:QMessageBox.information(self,'Chrome','NBL đã mở Chrome ở trang Bảng điều khiển LIVE và tự ghép.\n\nLần đầu: đăng nhập TikTok Shop đúng nick (nếu Chrome hỏi). Khi tiện ích đọc được tài khoản, NBL tự gắn tab này cho nick đang chọn.\n\nNếu chưa cài tiện ích NBL trên Chrome này: chrome://extensions → bật Chế độ nhà phát triển → Tải tiện ích đã giải nén → chọn thư mục CHROME_NBL_LIVE (nút Mở thư mục tiện ích).')
+    def open_chrome(self,session=None,manual=False):
+        """4.3.4: start (or show) NBL's own Chrome; it never opens a tab in the owner's normal Chrome."""
+        try:self.live_chrome.start()
+        except Exception as e:
+            self.log('Không mở được Chrome LIVE: '+str(e))
+            if manual:QMessageBox.warning(self,'Chrome LIVE',str(e))
+            return False
+        if manual:
+            self.log('Đã mở Chrome LIVE của NBL.')
+            if not self.live_chrome.setup_done():QMessageBox.information(self,'Chrome LIVE (làm 1 lần)','NBL vừa mở một Chrome RIÊNG chỉ để LIVE.\n\n1. Đăng nhập TikTok Shop đúng nick LIVE trong cửa sổ đó.\n2. Bấm "🧩 Cài tiện ích vào Chrome LIVE" và làm theo hướng dẫn.\n\nXong 2 bước này NBL tự giữ trang LIVE, bạn không phải F5.')
         return True
-    def chrome_unbound_reason(self,clients,binding):
-        """4.3.0 (owner video 29/10/2026): say WHY the open TikTok Shop tab is not tied to the nick."""
-        if not clients:return ''
+    def live_chrome_setup(self):
+        """One time: chrome://extensions in NBL's Chrome + the extension folder; Chrome no longer lets programs install it."""
+        import threading
+        threading.Thread(target=self.live_chrome.show_setup,args=(BASE/'CHROME_NBL_LIVE',),daemon=True).start()
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(BASE/'CHROME_NBL_LIVE')))
+        QMessageBox.information(self,'Cài tiện ích vào Chrome LIVE (1 lần)','Trong cửa sổ Chrome LIVE vừa mở trang Tiện ích:\n\n1. Bật "Chế độ dành cho nhà phát triển" (góc phải trên).\n2. Bấm "Tải tiện ích đã giải nén".\n3. Chọn thư mục:\n'+str(BASE/'CHROME_NBL_LIVE')+'\n(thư mục này cũng vừa được mở sẵn).\n\nXong thì đóng tab Tiện ích. NBL tự mở trang LIVE và tự kết nối.')
+    LIVE_CHROME_TEXT={'off':'Chrome LIVE chưa mở · bấm Mở Chrome LIVE của NBL','starting':'Đang mở Chrome LIVE…','loading':'Chrome LIVE đang tải trang LIVE…',
+        'login':'Chrome LIVE: TikTok Shop đòi ĐĂNG NHẬP — đăng nhập đúng nick trong cửa sổ Chrome LIVE','no_extension':'Chrome LIVE chưa có tiện ích NBL — bấm "Cài tiện ích vào Chrome LIVE" (1 lần)','ok':'Chrome LIVE đã kết nối'}
+    def live_chrome_session(self):
+        """The one nick that uses NBL's Chrome: the nick linked to TikTok LIVE Studio, else the nick shown."""
+        sp=getattr(self,'studio_panel',None)
+        p=next((p for p in (sp.profiles if sp else []) if p.get('cdp')),None)
+        return next((s for s in self.data['sessions'] if p and s['id']==p.get('session')),None) or self.current()
+    def live_chrome_tick(self):
+        """Qt side: start the watchdog step in a thread, then use its result (exact tab -> nick link)."""
+        import threading
+        res=getattr(self,'live_chrome_result',None)
+        if res is not None:
+            self.live_chrome_result=None;self.live_chrome_apply(res)
+        t=getattr(self,'live_chrome_thread',None)
+        if (t is None or not t.is_alive()) and time.time()-getattr(self,'live_chrome_at',0)>=4:
+            self.live_chrome_at=time.time();clients=self.bridge.snapshot()
+            busy=any(any(m.get('running') for m in (st.get('modules') or {}).values()) or (st.get('control') or {}).get('state')=='running' for st in clients.values())
+            def work():
+                try:self.live_chrome_result=self.live_chrome.step(busy)
+                except Exception as e:self.live_chrome_result=dict(state='error',error=str(e),actions=[],client='')
+            self.live_chrome_thread=threading.Thread(target=work,daemon=True,name='nbl-live-chrome');self.live_chrome_thread.start()
+    def live_chrome_apply(self,res):
+        for a in res.get('actions') or []:self.log('Chrome LIVE: '+a+'.')
+        state=res.get('state','off');prev=getattr(self,'live_chrome_state','')
+        self.live_chrome_state=state
+        if state=='ok':
+            self.live_chrome_ok_at=time.time()
+            if not self.live_chrome.setup_done():self.live_chrome.mark_setup()
+            clients=self.bridge.snapshot();client=res.get('client','')
+            if client in clients:
+                st=clients[client];session=self.live_chrome_session()
+                if st.get('accountVerified') and resolve_binding(session.get('chrome_binding'),clients)!=client:
+                    try:
+                        session['chrome_binding']=make_binding(client,st);write_json(self.path,self.data)
+                        self.log('Chrome LIVE đã kết nối nick '+str(session.get('number',''))+' · tài khoản Shop: '+str(st.get('account','')))
+                    except Exception as e:self.log('Chưa gắn được Chrome LIVE: '+str(e))
+                self.live_chrome_update_check(st)
+        if state!=prev:
+            if state in ('login','no_extension'):self.log(self.LIVE_CHROME_TEXT[state])
+            if state=='login':
+                try:self.notifier.publish('livechrome:login','⚠ Chrome LIVE: TikTok Shop đòi đăng nhập lại. Đăng nhập đúng nick trong cửa sổ Chrome LIVE trên máy tính.')
+                except Exception:pass
+        if res.get('error') and res.get('error')!=getattr(self,'live_chrome_err',''):self.live_chrome_err=res['error'];self.log('Chrome LIVE: '+res['error'][:200])
+    def live_chrome_update_check(self,st):
+        """After NBL updated, NBL's Chrome still runs the old extension files: restart that Chrome
+        (only when nothing runs and no LIVE is near); unpacked extensions load new files on start."""
         try:want=json.loads((BASE/'CHROME_NBL_LIVE'/'manifest.json').read_text(encoding='utf-8')).get('version','')
-        except Exception:want=''
-        states=list(clients.values())
-        if want and any(st.get('version')!=want for st in states):
-            return 'tiện ích Chrome đang là bản cũ ('+(states[0].get('version') or 'trước 4.3.0')+'). Vào chrome://extensions → bấm nút nạp lại (↻) ở NBL LIVE, rồi tải lại trang LIVE.'
-        bad=('Chưa chọn tài khoản','Chưa hiệu chỉnh','Không đọc được trang','Đang đọc trang','Chưa đăng nhập','Chưa xác định','')
-        names=[str(st.get('account') or '') for st in states]
-        if all(n in bad or st.get('accountVerified') is False for n,st in zip(names,states)):
-            return 'trang TikTok Shop chưa đọc được tên tài khoản ('+(names[0] or 'trống')+'). Tải lại trang LIVE; còn vậy thì gửi gói chẩn đoán.'
-        if binding and binding.get('account') and binding['account'] not in names:
-            return 'nick này đã gắn với tài khoản Shop "'+binding['account']+'", còn Chrome đang mở "'+', '.join(n for n in names if n not in bad)+'". Đúng tài khoản thì vào Giỏ hàng & ghim bấm "🌐 Mở Chrome & tự kết nối" để gắn lại.'
-        if len(states)>1:return 'đang mở '+str(len(states))+' tab trang LIVE của các tài khoản Shop khác nhau; chỉ giữ tab của đúng tài khoản.'
-        return 'bấm "🌐 Mở Chrome & tự kết nối" ở mục Giỏ hàng & ghim.'
-    def auto_bind_chrome(self,clients):
-        """4.3.2 (owner, 29/10/2026 "sao nó lại không kết nối chrome"): one nick per PC, so
-        the TikTok Shop LIVE tab is tied to the nick by itself whenever it is not tied yet,
-        not only in the 10 minutes after NBL opened Chrome. Several tabs of the SAME Shop
-        account: the newest tab is used (the old one is left alone)."""
-        if not self.data['sessions'] or not clients:return
-        pending=getattr(self,'auto_bind',None)
-        if pending and time.time()-pending[1]>600:pending=self.auto_bind=None
-        session=next((s for s in self.data['sessions'] if pending and s['id']==pending[0]),None) or self.current()
-        if resolve_binding(session.get('chrome_binding'),clients):self.auto_bind=None;return
-        # 4.3.3: one nick per PC — a tab still tied to ANOTHER nick config (e.g. old nick 01) moves to the nick in use
-        moved=[s for s in self.data['sessions'] if s is not session and s.get('chrome_binding') and resolve_binding(s.get('chrome_binding'),clients)]
-        taken=set()
-        bad=('Chưa chọn tài khoản','Chưa hiệu chỉnh','Không đọc được trang','Đang đọc trang','Chưa đăng nhập','Chưa xác định','',None)
-        free=[c for c,st in clients.items() if c not in taken and st.get('accountVerified') is not False and st.get('account') not in bad]
-        if not free or len({clients[c].get('account') for c in free})!=1:return
-        client=max(free,key=lambda c:clients[c].get('tab') if type(clients[c].get('tab')) is int else -1)
-        try:binding=make_binding(client,clients[client])
-        except ValueError:return
-        old=(session.get('chrome_binding') or {}).get('account')
-        for other in moved:
-            if resolve_binding(other.get('chrome_binding'),clients)==client:other.pop('chrome_binding',None);self.log('Bỏ gắn Chrome ở nick '+str(other.get('number',''))+' (bản này chỉ chạy 1 nick; chuyển sang nick đang dùng).')
-        session.pop('chrome_login_binding',None);session['chrome_binding']=binding;session['account']=binding['account']
-        try:write_json(self.path,self.data)
-        except Exception as e:self.log('Chưa lưu gắn Chrome: '+type(e).__name__)
-        self.auto_bind=None;self.chrome_why_logged='';self.refresh_list()
-        self.log('Đã tự gắn Chrome (tài khoản Shop: '+binding['account']+') cho nick '+str(session.get('number',''))+(' · trước đây gắn '+old if old and old!=binding['account'] else '')+(' · đang mở '+str(len(free))+' tab, dùng tab mới nhất' if len(free)>1 else ''))
+        except Exception:return
+        v=st.get('version','')
+        if not v or not want or v==want or time.time()-getattr(self,'live_chrome_restart_at',0)<600:return
+        if hasattr(self,'update_safe') and not self.update_safe():return
+        if any(m.get('running') for m in (st.get('modules') or {}).values()):return
+        self.live_chrome_restart_at=time.time();self.log('Tiện ích trong Chrome LIVE là bản '+v+', NBL có bản '+want+': khởi động lại Chrome LIVE để nạp bản mới.')
+        import threading
+        threading.Thread(target=self.live_chrome.chrome.quit,daemon=True).start()
     def bind_chrome(self):
         try:
             client=self.chrome_clients.currentData();clients=self.bridge.snapshot()
@@ -439,12 +456,12 @@ class Console(QMainWindow):
         try:
             if not self.chrome_available:raise ValueError('Cầu nối Chrome chưa mở được. Các mục khác vẫn chạy; kiểm tra cổng kết nối rồi mở lại app.')
             self.save_chrome();binding=self.current().get('chrome_binding');client=resolve_binding(binding,self.bridge.snapshot())
-            if not binding:raise ValueError('Chrome chưa kết nối nick này: bấm Mở Chrome & tự kết nối.')
+            if not binding:raise ValueError('Chrome chưa kết nối nick này: bấm "🌐 Mở Chrome LIVE của NBL".')
             if not client:raise ValueError('Tab/tài khoản đã gắn không còn kết nối. Không gửi lệnh sang tài khoản khác. Ghép đôi lại hoặc gắn lại đúng tab.')
             self.bridge.command(client,dict(action=action,module=key,expectedAccount=binding['account'],**({'config':self.pin_command_config()} if action=='start' else {})));self.log('Đã gửi '+action+' · '+key+'; chờ Chrome xác nhận.')
         except Exception as e:QMessageBox.warning(self,'Chrome',str(e))
     def chrome_tick(self,reset_selection=False):
-        clients=self.bridge.snapshot();self.auto_bind_chrome(clients);binding=self.current().get('chrome_binding');resolved=resolve_binding(binding,clients)
+        clients=self.bridge.snapshot();binding=self.current().get('chrome_binding');resolved=resolve_binding(binding,clients)
         selected=resolved if reset_selection else self.chrome_clients.currentData()
         if selected not in clients:selected=resolved
         if not self.chrome_clients.view().isVisible():
@@ -452,10 +469,9 @@ class Console(QMainWindow):
             for client,st in clients.items():self.chrome_clients.addItem(st.get('account','Chưa hiệu chỉnh')+' · tab '+str(st.get('tab','?')),client)
             index=self.chrome_clients.findData(selected);self.chrome_clients.setCurrentIndex(index if index>=0 else 0);self.chrome_clients.blockSignals(False)
         st=clients.get(resolve_binding(binding,clients),{}) if binding else {}
-        why='' if st else self.chrome_unbound_reason(clients,binding)
-        if why and why!=getattr(self,'chrome_why_logged',''):self.chrome_why_logged=why;self.log('Chrome chưa gắn với nick: '+why)
         self.account_status.setText(('Chrome: đã kết nối · ' if st else 'Chrome: chưa kết nối · ')+(self.studio_panel.connection_status() if hasattr(self,'studio_panel') else 'Studio: chưa kết nối'))
-        self.chrome_binding_label.setText(('✓ Chrome đã kết nối · '+binding['account'] if st else 'Chrome chưa kết nối nick '+binding['account']+' · bấm Mở Chrome & tự kết nối') if binding else 'Chrome chưa kết nối · bấm Mở Chrome & tự kết nối')
+        lc=getattr(self,'live_chrome_state','off')
+        self.chrome_binding_label.setText('✓ Chrome LIVE đã kết nối · tài khoản Shop: '+binding['account'] if st and binding else self.LIVE_CHROME_TEXT.get(lc,'Chrome LIVE: '+lc))
         for key,lab in self.chrome_status.items():
             item=st.get('modules',{}).get(key,{})
             lab.setText(item.get('error') or ((item.get('detail') or 'Đang chạy') if item.get('running') else 'Đã dừng') if st else 'Mất / chưa có kết nối')
@@ -633,7 +649,7 @@ class Console(QMainWindow):
         s=self.current();s['chrome']={**s.get('chrome',{}),**self.chrome_config()}
         if hasattr(self,'pin_mode'):s['pin']=dict(mode=self.pin_mode.currentData(),products=self.pin_list.toPlainText().strip(),**{k:w.value() for k,w in self.pin_times.items()});s['pins']=s['pin']['products']
         s.update(account=self.account.text().strip(),playlist=self.playlist_paths(),volume=self.volume.value(),device=self.device.currentData() or '',mute=self.mute.isChecked(),loop=True,shuffle=self.shuffle.isChecked(),rules=self.rules.toPlainText(),messages=self.messages.toPlainText())
-        self.data['settings']=dict(keep_awake=self.awake.isChecked(),obs_host=self.host.text().strip(),obs_port=self.port.value(),live_minutes=self.live_minutes.value(),rest_minutes=self.rest_minutes.value(),repeat=self.repeat.isChecked())
+        self.data['settings']={**self.data.get('settings',{}),**dict(keep_awake=self.awake.isChecked(),obs_host=self.host.text().strip(),obs_port=self.port.value(),live_minutes=self.live_minutes.value(),rest_minutes=self.rest_minutes.value(),repeat=self.repeat.isChecked())}
     def save_current(self):
         self.collect();validate(self.data);write_json(self.path,self.data);self.refresh_list();self.log('Đã lưu phiên '+str(self.current()['number']))
         if self.current()['id'] in self.processes:self.command('settings',save=False)
@@ -663,15 +679,70 @@ class Console(QMainWindow):
     def add_session(self):
         if len(self.data['sessions'])>=16:QMessageBox.information(self,'Giới hạn','Tối đa 16 phiên cấu hình; số phiên phát đồng thời tùy sức máy.');return
         self.collect();used={s['number'] for s in self.data['sessions']};n=next(i for i in range(1,100) if i not in used);self.data['sessions'].append(new_session(n));self.selected=len(self.data['sessions'])-1;write_json(self.path,self.data);self.refresh_list();self.fill()
-    def remove_session(self):
-        if hasattr(self,'studio_panel') and any(p['session']==self.current()['id'] for p in self.studio_panel.profiles):QMessageBox.information(self,'Phiên đã liên kết Studio','Gỡ liên kết nick trong Lịch LIVE Studio trước khi xóa phiên.');return
-        if len(self.data['sessions'])==1:return
-        s=self.current()
-        clients=self.bridge.snapshot();bound=resolve_binding(s.get('chrome_binding'),clients)
-        chrome_active=bool(bound and any(m.get('running') for m in clients[bound].get('modules',{}).values()))
-        if chrome_active or s['id']==self.cycle_id or (s['id'] in self.processes and self.processes[s['id']].poll() is None):QMessageBox.information(self,'Phiên đang dùng','Dừng Chrome, đóng cửa sổ video và hủy lịch trước khi xóa.');return
-        if QMessageBox.question(self,'Xóa phiên','Xóa cấu hình phiên này? Video gốc không bị xóa.')!=QMessageBox.StandardButton.Yes:return
-        del self.data['sessions'][self.selected];self.selected=0;write_json(self.path,self.data);self.refresh_list();self.fill()
+    def remove_session(self,session=None,ask=True):
+        """4.3.4 (owner, 29/10/2026): any nick can be deleted, also one linked to TikTok LIVE Studio or
+        Chrome (NBL unlinks it first). Never during its LIVE. A backup of the settings is kept."""
+        s=session or self.current()
+        if len(self.data['sessions'])<=1:
+            if ask:QMessageBox.information(self,'Xóa nick','Phải còn ít nhất 1 nick.')
+            return False
+        sp=getattr(self,'studio_panel',None)
+        linked=[p for p in (sp.profiles if sp else []) if p.get('session')==s['id']]
+        ids={p['id'] for p in linked}
+        if sp and any(j['profile'] in ids and j['state'] in ('preparing','starting','running','stopping','recovering','attention','stop_retry') for j in sp.jobs) or any(i in getattr(sp,'hand_live',{}) for i in ids):
+            if ask:QMessageBox.information(self,'Nick đang LIVE','Nick này đang LIVE. Kết thúc LIVE trước rồi mới xóa nick.')
+            return False
+        pending=[j for j in (sp.jobs if sp else []) if j['profile'] in ids and j['state'] in ('pending','start_retry')]
+        if ask:
+            text='Xóa nick '+str(s.get('number',''))+' ('+str(s.get('account') or 'chưa đặt tên')+')?'
+            if linked:text+='\n\nNick này đang nối TikTok LIVE Studio: NBL gỡ nối trước khi xóa (Studio sẽ tự nối vào nick còn lại).'
+            if s.get('chrome_binding'):text+='\nNick này đang nối Chrome: NBL gỡ nối.'
+            if pending:text+='\n\n'+str(len(pending))+' lịch LIVE chưa chạy của nick này sẽ bị HỦY.'
+            text+='\n\nCó lưu bản sao cấu hình trước khi xóa.'
+            if QMessageBox.question(self,'Xóa nick',text)!=QMessageBox.StandardButton.Yes:return False
+        try:
+            backup=DATA/'sao_luu';backup.mkdir(parents=True,exist_ok=True);stamp=time.strftime('%Y%m%d_%H%M%S')
+            write_json(backup/('cau_hinh_truoc_xoa_nick_'+stamp+'.json'),self.data)
+            if sp:write_json(backup/('lich_studio_truoc_xoa_nick_'+stamp+'.json'),dict(profiles=sp.profiles,jobs=sp.jobs))
+        except Exception as e:
+            if ask:QMessageBox.warning(self,'Xóa nick','Chưa lưu được bản sao, không xóa: '+str(e))
+            return False
+        try:
+            client=resolve_binding(s.get('chrome_binding'),self.bridge.snapshot())
+            if client:self.bridge.command(client,dict(action='stop',module='all'))
+        except Exception:pass
+        if s['id']==self.cycle_id:self.cancel_cycle()
+        proc=self.processes.get(s['id'])
+        if proc is not None and proc.poll() is None:
+            try:proc.terminate()
+            except Exception:pass
+        if sp:
+            for j in pending:sp.cancel_pending_starts(j);j['state']='cancelled';j['error']='Hủy vì đã xóa nick'
+            for p in linked:sp.profiles.remove(p)
+            sp.auto_at=0;sp.auto_launched=True
+            try:sp.save()
+            except Exception:pass
+        index=self.data['sessions'].index(s);del self.data['sessions'][index]
+        self.selected=0 if self.selected==index else self.selected-1 if index<self.selected else min(self.selected,len(self.data['sessions'])-1)
+        write_json(self.path,self.data);self.refresh_list();self.fill()
+        if sp:sp.refresh_profiles();sp.render()
+        self.log('Đã xóa nick '+str(s.get('number',''))+(' (gỡ nối Studio/Chrome)' if linked or s.get('chrome_binding') else '')+(' · hủy '+str(len(pending))+' lịch' if pending else '')+'. Bản sao: '+str(DATA/'sao_luu'))
+        return True
+    def one_nick_cleanup(self):
+        """4.3.4: this version runs ONE nick; leftover nick settings from the multi-nick time are offered for deletion once."""
+        if len(self.data['sessions'])<=1 or self.data.get('settings',{}).get('one_nick_asked'):return
+        keep=self.live_chrome_session()
+        extra=[s for s in self.data['sessions'] if s is not keep]
+        names=', '.join('nick '+str(s.get('number',''))+(' ('+str(s.get('account'))+')' if s.get('account') else '') for s in extra)
+        answer=QMessageBox.question(self,'Bản này chỉ chạy 1 nick','NBL đang còn cấu hình nick thừa: '+names+'.\nGiữ lại nick '+str(keep.get('number',''))+' (đang dùng / đang nối Studio) và XÓA các nick thừa?\n\nCó lưu bản sao trước khi xóa.')
+        self.data.setdefault('settings',{})['one_nick_asked']=True
+        if answer==QMessageBox.StandardButton.Yes:
+            self.selected=self.data['sessions'].index(keep)
+            for s in extra:
+                self.selected=self.data['sessions'].index(keep);self.remove_session(s,ask=False)
+            self.selected=self.data['sessions'].index(keep);self.refresh_list();self.fill()
+        try:write_json(self.path,self.data)
+        except Exception:pass
     def add_video(self):
         paths,_=QFileDialog.getOpenFileNames(self,'Thêm video','','Video (*.mp4 *.mkv *.mov *.avi *.webm);;Tất cả (*)');existing=set(self.playlist_paths());self.add_playlist_items([p for p in paths if p not in existing])
     def remove_video(self):
@@ -814,7 +885,7 @@ class Console(QMainWindow):
             from session_binding import resolve_binding
             clients=self.bridge.snapshot();binding=self.current().get('chrome_binding')
             bound=resolve_binding(binding,clients) if binding else None
-            if not clients:lines.append('✗ Chưa có tab trang LIVE TikTok Shop nào kết nối. Bấm "🌐 Mở Chrome & tự kết nối".')
+            if not clients:lines.append('✗ Chrome LIVE: '+self.LIVE_CHROME_TEXT.get(getattr(self,"live_chrome_state","off"),"chưa sẵn sàng")+'')
             else:
                 st=clients.get(bound) or next(iter(clients.values()))
                 try:want=json.loads((BASE/'CHROME_NBL_LIVE'/'manifest.json').read_text(encoding='utf-8')).get('version','')
@@ -911,21 +982,9 @@ class Console(QMainWindow):
         if any(j['state'] in ('pending','start_retry') and j['start']-now<1800 for j in sp.jobs):return False
         if getattr(sp,'hand_live',{}):return False
         return True
-    def extension_reload_check(self,clients):
-        """After an update the extension in Chrome still runs the old files: ask it to load the new ones (once per tab)."""
-        try:
-            want=json.loads((BASE/'CHROME_NBL_LIVE'/'manifest.json').read_text(encoding='utf-8')).get('version','')
-        except Exception:return
-        asked=getattr(self,'ext_reload_asked',set())
-        for client,st in clients.items():
-            v=st.get('version','')
-            if v and want and v!=want and client not in asked:
-                try:self.bridge.command(client,dict(action='reload_extension',module='all'));asked.add(client);self.log('Tiện ích Chrome '+v+' → nạp lại bản '+want+'.')
-                except Exception:pass
-        self.ext_reload_asked=asked
     def tick(self):
         self.update_tick()
-        self.extension_reload_check(self.bridge.snapshot())
+        self.live_chrome_tick()
         self.discover_accounts(self.bridge.snapshot())
         self.chrome_tick()
         for msg in self.notifier.drain():self.phone_status.setText(msg);self.log(msg)

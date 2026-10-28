@@ -17,6 +17,13 @@ class Cart(unittest.TestCase):
         p.poll_cart(now + 101)
         self.assertNotIn('command', j['cart']); self.assertEqual((j['cart']['state'], j['cart']['attempts']), ('failed', 1))
 
+    def test_chrome_live_reloading_is_a_wait_not_a_failed_attempt(self):
+        now = time.time(); j = job(start=now + 3600); p = make([j])
+        Wait = p.poll_cart.__func__.__globals__['ChromeWait']
+        def reloading(prof): raise Wait('Chrome LIVE chưa sẵn sàng')
+        p.client = reloading; p.poll_cart(now)
+        self.assertEqual(j['cart'].get('attempts', 0), 0); self.assertGreaterEqual(j['cart']['next'], now + 15)
+
     def test_cart_command_also_switches_off_pin_and_reply_of_the_live_before(self):
         now = time.time(); j = job(start=now + 3600); p = make([j]); p.poll_cart(now)
         self.assertTrue(p.owner.bridge.commands[-1]['stopModules'])

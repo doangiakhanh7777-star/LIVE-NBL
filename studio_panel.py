@@ -42,11 +42,13 @@ POSTPONE=1800        # 4.1.7: a hand-started LIVE at schedule time is ended and 
 RESET_HOLD=5
 NO_RESET=re.compile('Nick trên Chrome khác|Không có bộ sản phẩm số|chưa chọn bộ|Không tìm thấy bộ|Chưa có đúng tab|mất kết nối|giữ giỏ tự thêm tay|Nick Chrome đã thay đổi',re.I)
 PROBE_GAP=60         # 4.1.7: how often a nick waiting for its cart is looked at on Studio
+class ChromeWait(ValueError):
+ pass   # 4.3.4: Chrome LIVE is reopening / reloading the page: wait, not a failed attempt
 STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử kết thúc lại','pending':'Chờ đến giờ','preparing':'Đang chuẩn bị','starting':'Đang mở LIVE','running':'Đang LIVE','stopping':'Đang kết thúc','finished':'Đã kết thúc','failed':'Cần kiểm tra','attention':'Cần kiểm tra','manual_stop':'Đã dừng thủ công','skipped':'Đã bỏ lịch quá giờ','cancelled':'Đã hủy','recovery_review':'Cần kiểm tra sau khi mở lại app','recovering':'Đang kiểm tra'}
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.3 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.4 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
@@ -390,15 +392,20 @@ class StudioPanel(QWidget):
  def client(self,p):
   s=self.session(p);client=resolve_binding(s.get('chrome_binding'),self.owner.bridge.snapshot())
   if not client:
-   # 4.2.1: no Chrome tab for this nick → NBL opens the dashboard and pairs it (max every 10 min)
+   # 4.3.4: NBL's own Chrome keeps the LIVE page by itself (opens / reloads the SAME tab).
+   # A short miss (page reloading) is a wait, not a failure; Telegram only after 2 minutes.
+   now=time.time();since=getattr(self,'chrome_missing_since',0) or now;self.chrome_missing_since=since
    opener=getattr(self.owner,'open_chrome',None)
    if opener and any(j['profile']==p['id'] and j['state'] in ('pending','start_retry','running') for j in self.jobs):
     try:opener(s)
     except Exception:pass
-   if any(j['profile']==p['id'] and (j['state']=='running' or j['state'] in ('pending','start_retry') and j['start']-time.time()<900) for j in self.jobs):
-    try:self.owner.notifier.publish('studio:'+p['id']+':chrome','⚠ '+str(p.get('name',''))+' · Chrome chưa kết nối trang LIVE TikTok Shop (Chrome tắt hoặc đăng nhập TikTok Shop hết hạn). NBL đã mở lại trang; đăng nhập lại nếu trang hỏi.')
+   if now-since>=120 and any(j['profile']==p['id'] and (j['state']=='running' or j['state'] in ('pending','start_retry') and j['start']-now<900) for j in self.jobs):
+    state=getattr(self.owner,'live_chrome_state','')
+    why={'login':'TikTok Shop đòi đăng nhập lại: đăng nhập đúng nick trong cửa sổ Chrome LIVE.','no_extension':'Chrome LIVE chưa có tiện ích NBL: bấm "Cài tiện ích vào Chrome LIVE" trong NBL.'}.get(state,'NBL đang tự mở lại / tải lại Chrome LIVE.')
+    try:self.owner.notifier.publish('studio:'+p['id']+':chrome','⚠ '+str(p.get('name',''))+' · Chrome LIVE chưa kết nối trang LIVE TikTok Shop hơn 2 phút. '+why)
     except Exception:pass
-   raise ValueError('Chưa có đúng tab Chrome/nick kết nối.')
+   raise ChromeWait('Chrome LIVE chưa sẵn sàng (đang mở / tải lại trang).') if now-since<120 else ValueError('Chưa có đúng tab Chrome/nick kết nối.')
+  self.chrome_missing_since=0
   return s,client
  def submit(self,j,action,payload=None):
   p=self.profile(j['profile'])
@@ -806,7 +813,7 @@ class StudioPanel(QWidget):
      if now<=cart.get('until',0):continue
      kind=cart.pop('kind',None);cart.pop('command',None)
      if kind in ('check','fallback'):continue
-    if now>=cart.get('next',0):self.cart_failed(j,cart,str(e),now)
+    if now>=cart.get('next',0):self.cart_failed(j,cart,str(e),now,transient=isinstance(e,ChromeWait))
  def cart_failed(self,j,cart,reason,now,transient=False):
   # 4.1.3: Chrome still busy (pin/reply of the LIVE that just ended, another cart
   # job) is not a failed attempt: try again in 20 s. Real failures are retried after
