@@ -18,6 +18,7 @@ from studio_vision_logic import NotTouched,same_author
 CONTROL_FIELDS={'liveIndicator','startButton','startConfirm','stopMenu','stopButton','stopConfirm','summaryClose','chatRegion','chatInput','chatSend','collapseImage'}
 OPTIONAL_FIELDS={'startConfirm','stopMenu','stopConfirm','summaryClose'}
 def vision_missing(profile):
+ if profile.get('cdp'):return ''          # 4.2.1: kết nối tự động needs no regions
  """4.1.2: '' when the nick can be started/ended by image; otherwise what to do."""
  vision=profile.get('vision') or {}
  if vision.get('enabled') and (vision.get('regions') or {}).get('clock'):return ''
@@ -45,7 +46,7 @@ STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử 
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.2.0 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.2.1 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
@@ -76,7 +77,8 @@ class StudioPanel(QWidget):
   v=QVBoxLayout(self);notice=QLabel('Chọn nick ở đầu app. Kết nối cửa sổ LIVE Studio một lần; các nút đã chọn được dùng chung giữa các nick.');notice.setWordWrap(True);v.addWidget(notice)
   self.nick=QComboBox();self.nick.hide();v.addWidget(self.nick)
   self.connection_label=QLabel('Chưa kết nối LIVE Studio cho nick này');self.connection_label.setWordWrap(True);v.addWidget(self.connection_label)
-  b=QPushButton('Kết nối / chọn nút trong LIVE Studio');b.clicked.connect(self.connect_current);v.addWidget(b)
+  b=QPushButton('⚡ Kết nối Studio tự động (không khoanh vùng)');b.setObjectName('primary');b.clicked.connect(self.connect_auto);v.addWidget(b)
+  b=QPushButton('Kết nối kiểu cũ (chọn cửa sổ, khoanh vùng)');b.clicked.connect(self.connect_current);v.addWidget(b)
   from hold_button import HoldButton
   v.addWidget(HoldButton('🛑 Tắt LIVE nick này (giữ 2 giây)',self.emergency_current))
   self.start=QDateTimeEdit(QDateTime.currentDateTime().addSecs(300));self.end=QDateTimeEdit(QDateTime.currentDateTime().addSecs(3900))
@@ -113,6 +115,10 @@ class StudioPanel(QWidget):
  def connection_status(self):
   p=self.current_profile()
   if not p:return 'Chưa kết nối LIVE Studio'
+  if p.get('cdp'):
+   ok=self.connection_checks.get(p['id'],{})
+   if time.monotonic()-ok.get('at',0)>20:return 'Studio: kết nối tự động · '+str(p.get('name',''))
+   return 'Studio: kết nối tự động ✓ · '+str(p.get('name','')) if ok.get('ok') else 'Studio: chưa mở · NBL tự mở khi tới giờ phát'
   state=self.connection_checks.get(p['id'],{})
   if state.get('signature')!=(p.get('pid'),p.get('windowHandle'),p.get('exePath')) or time.monotonic()-state.get('at',0)>20:return 'Studio: đã lưu · chưa kiểm tra cửa sổ'
   return 'Studio: cửa sổ đang mở' if state.get('ok') else 'Studio: mất cửa sổ · kết nối lại'
@@ -140,6 +146,43 @@ class StudioPanel(QWidget):
   return {**p,**{k:v for k,v in self.controls.items() if k in CONTROL_FIELDS},'accountAnchor':p.get('accountAnchor','')}
  def profile(self,key):return next((p for p in self.profiles if p['id']==key),None)
  def connect_current(self):self.edit_profile(False)
+ def connect_auto(self):
+  """4.2.1 (owner, 28/10/2026): NBL opens Studio itself and reads the nick from inside it."""
+  session=next((s for s in self.owner.data['sessions'] if s['id']==self.current_session_id),None)
+  if not session:QMessageBox.warning(self,'Chọn nick','Chọn nick ở đầu app trước.');return
+  current=self.current_profile() or {}
+  if current and any(j['profile']==current['id'] and j['state'] in ('preparing','starting','running','stopping','recovering') for j in self.jobs):QMessageBox.information(self,'Đang chạy','Nick này đang LIVE theo lịch; kết nối lại sau khi phiên kết thúc.');return
+  if not current and len(self.profiles)>=2:QMessageBox.information(self,'Tối đa 2 nick','Bản này hỗ trợ 2 nick. Gỡ liên kết nick cũ trước.');return
+  from studio_cdp import find_exe,BASE_PORT
+  exe=find_exe(current.get('exePath') or next((q.get('exePath','') for q in self.profiles if q.get('exePath')),''))
+  if not exe:
+   exe,_=QFileDialog.getOpenFileName(self,'Chọn file TikTok LIVE Studio.exe','C:/Program Files','TikTok LIVE Studio (*.exe)')
+   if not exe:return
+  used={int(q['cdpPort']) for q in self.profiles if q.get('cdpPort') and q is not current}
+  port=int(current.get('cdpPort') or next(p for p in range(BASE_PORT,BASE_PORT+50) if p not in used))
+  probe=dict(cdp=True,cdpPort=port,exePath=exe,_otherPorts=sorted(used))
+  self.status.setText('Đang mở/kết nối TikTok LIVE Studio (tối đa 90 giây)… Không cần làm gì.');self.connection_label.setText('Đang kết nối Studio tự động…')
+  future=self.pool.submit_priority(20,execute,probe,'connect');timer=QTimer(self)
+  def ready():
+   if not future.done():return
+   timer.stop();timer.deleteLater()
+   try:r=future.result()
+   except Exception as e:
+    self.status.setText('Chưa kết nối được: '+str(e));QMessageBox.warning(self,'Kết nối Studio tự động',str(e));self.refresh_profiles();return
+   nick=r.get('nickname','')
+   if not nick:
+    QMessageBox.information(self,'Vào màn hình phát','Studio đã mở và NBL đã kết nối được, nhưng Studio đang ở TRANG CHỦ nên chưa thấy tên nick.\n\nTrong Studio bấm nút "Phát LIVE" lớn ở trang chủ để vào màn hình phát (chưa lên sóng), rồi bấm lại "Kết nối Studio tự động".');self.status.setText('Vào màn hình phát của Studio rồi bấm Kết nối tự động lại.');return
+   expected=session.get('chrome_binding',{}).get('account') or session.get('account') or ''
+   if expected and not same_author(nick,expected) and QMessageBox.question(self,'Tên nick khác','Studio đang là nick "'+nick+'", nick đang chọn trong NBL là "'+expected+'". Vẫn gắn Studio này cho nick đang chọn?')!=QMessageBox.StandardButton.Yes:return
+   if any(q is not current and q.get('cdpPort')==port for q in self.profiles):QMessageBox.warning(self,'Trùng','Cổng này đã gắn nick khác.');return
+   value={**current,'id':current.get('id',uuid.uuid4().hex),'name':nick,'accountName':nick,'session':session['id'],'exePath':exe,'cdp':True,'cdpPort':port,
+          'interaction':current.get('interaction',session.get('studio_interaction',{})),'allowMouse':current.get('allowMouse',True),'mousePermissionFile':str(self.mouse_path)}
+   if current:self.profiles[self.profiles.index(current)]=value
+   else:self.profiles.append(value)
+   self.connection_checks.pop(value['id'],None);self.save();self.refresh_profiles();self.render()
+   self.status.setText('Đã kết nối tự động: '+nick+(' · đang LIVE' if r.get('live') else '')+'. Không cần khoanh vùng. Từ giờ để NBL mở Studio (đừng mở bằng icon ngoài Desktop).')
+   self.owner.log('Studio kết nối tự động: '+nick+' (cổng nội bộ '+str(port)+')')
+  timer.timeout.connect(ready);timer.start(300)
  def add_clips(self):
   files,_=QFileDialog.getOpenFileNames(self,'Chọn clip','','Video (*.mp4 *.mov *.mkv *.avi *.webm)');existing={self.clips.item(i).text() for i in range(self.clips.count())}
   for f in files:
@@ -330,7 +373,13 @@ class StudioPanel(QWidget):
   return session
  def client(self,p):
   s=self.session(p);client=resolve_binding(s.get('chrome_binding'),self.owner.bridge.snapshot())
-  if not client:raise ValueError('Chưa có đúng tab Chrome/nick kết nối.')
+  if not client:
+   # 4.2.1: no Chrome tab for this nick → NBL opens the dashboard and pairs it (max every 10 min)
+   opener=getattr(self.owner,'open_chrome',None)
+   if opener and any(j['profile']==p['id'] and j['state'] in ('pending','start_retry','running') for j in self.jobs):
+    try:opener(s)
+    except Exception:pass
+   raise ValueError('Chưa có đúng tab Chrome/nick kết nối.')
   return s,client
  def submit(self,j,action,payload=None):
   p=self.profile(j['profile'])
@@ -344,7 +393,7 @@ class StudioPanel(QWidget):
   except OSError:
    if action!='stop':raise
    self.owner.log('Chưa lưu được lịch; vẫn gửi lệnh kết thúc Studio.')
-  future=self.pool.submit_priority(0 if action in ('stop','reset_stop') else 5 if action=='reset_live' else 10 if action=='start' else 25 if action=='close_summary' else 20,execute,dict(copy.deepcopy(self.effective_profile(p)),_otherHandles=[str(q.get('windowHandle','')) for q in self.profiles if q is not p and q.get('windowHandle')]),'status' if action in ('preflight','live_probe') else 'stop' if action=='reset_stop' else action,j['end'] if action=='start' else 0,payload);self.futures[future]=(j['id'],None,action)
+  future=self.pool.submit_priority(0 if action in ('stop','reset_stop') else 5 if action=='reset_live' else 10 if action=='start' else 25 if action=='close_summary' else 20,execute,dict(copy.deepcopy(self.effective_profile(p)),_otherHandles=[str(q.get('windowHandle','')) for q in self.profiles if q is not p and q.get('windowHandle')],_otherPorts=[q['cdpPort'] for q in self.profiles if q is not p and q.get('cdpPort')]),'status' if action in ('preflight','live_probe') else 'stop' if action=='reset_stop' else action,j['end'] if action=='start' else 0,payload);self.futures[future]=(j['id'],None,action)
  def notify(self,j,key,text,kind='loi',image=None):
   p=self.profile(j['profile']);name=p['name'] if p else j['profile']
   self.owner.log(name+' · '+text)
@@ -471,7 +520,7 @@ class StudioPanel(QWidget):
       # without image regions is refused with what to do, before anything is clicked.
       missing=vision_missing(eff)
       if missing:raise ValueError(missing)
-      if any(not eff.get(k) for k in ('exePath','windowTitle','accountAnchor')):raise ValueError('Chưa kết nối đủ LIVE Studio cho nick '+str(p.get('name') or '')+' (cửa sổ, ảnh tên nick): bấm Kết nối LIVE Studio. Chưa bấm gì trên Studio.')
+      if not eff.get('cdp') and any(not eff.get(k) for k in ('exePath','windowTitle','accountAnchor')):raise ValueError('Chưa kết nối đủ LIVE Studio cho nick '+str(p.get('name') or '')+' (cửa sổ, ảnh tên nick): bấm Kết nối LIVE Studio. Chưa bấm gì trên Studio.')
       j['prepare_phase']='preflight';self.submit(j,'preflight')
      elif action=='stop':
       try:s,client=self.client(p);self.owner.bridge.command(client,dict(action='stop',module='all'))
@@ -559,7 +608,7 @@ class StudioPanel(QWidget):
      except Exception as e:self.owner.log('Studio '+kind+': '+str(e))
   # Chrome's dashboard follows Studio a few seconds later; start pin/reply then.
   j['chrome_start_at']=time.time()+10;j['chrome_tries']=0
-  if not p.get('vision',{}).get('enabled'):
+  if not p.get('vision',{}).get('enabled') and not p.get('cdp'):
    try:
     future=self.pool.submit_priority(25,execute,copy.deepcopy(self.effective_profile(p)),'collapse_chat',min(j['end'],time.time()+15));self.futures[future]=(j['id'],None,'collapse_chat')
    except Exception as e:self.owner.log('Thu cửa sổ trò chuyện: '+str(e))
@@ -793,7 +842,7 @@ class StudioPanel(QWidget):
   # 4.1.9 (owner, 26/10/2026): after EVERY LIVE end — another schedule or not — keep
   # looking at Studio for ~2.5 minutes and close its end page ("tab cuối cùng").
   p=self.profile(j['profile'])
-  if not p or not p.get('vision',{}).get('enabled'):return
+  if not p or not (p.get('vision',{}).get('enabled') or p.get('cdp')):return
   now=time.time();j['summary_until']=now+150;j['summary_next']=now+2;j.pop('summary_error',None)
  def poll_summary(self,now):
   for j in self.jobs:

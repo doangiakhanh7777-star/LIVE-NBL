@@ -1,10 +1,12 @@
 (async()=>{
 'use strict';
 if(document.getElementById('nbl-live-extension'))return;
+// 4.2.1: opened by NBL with #nbl=<code> → pair this tab by itself, then hide the code.
+{const m=/[#&]nbl=([a-f0-9]{32})/.exec(location.hash);if(m){try{chrome.runtime.sendMessage({type:'pair_self',token:m[1]});}catch(e){}history.replaceState(null,'',location.pathname+location.search);}}
 const host=document.createElement('div');host.id='nbl-live-extension';document.documentElement.append(host);
 const ui=host.attachShadow({mode:'open'});
 ui.innerHTML=`<style>:host{all:initial}section{position:fixed;right:12px;bottom:12px;width:min(390px,calc(100vw - 40px));max-height:84vh;overflow:auto;z-index:2147483647;background:#fff;color:#3b2414;padding:16px;border:2px solid #f97316;border-radius:20px;font:14px Arial;box-shadow:0 7px 28px #c2410c30}h3{margin:0 0 12px;cursor:move;touch-action:none;position:sticky;top:0;background:#fff;z-index:2;color:#ea580c}label{display:block;margin-top:11px;font-weight:600}input,textarea,select{box-sizing:border-box;width:100%;padding:9px;margin-top:5px;background:#fffaf4;color:#3b2414;border:1px solid #fdba74;border-radius:10px;font:14px Arial}textarea{height:76px}button{background:#fff1e3;color:#9a3412;border:1px solid #fdba74;border-radius:11px;padding:9px;margin:5px 4px 5px 0;cursor:pointer;font:13px Arial}button:hover{background:#fed7aa}pre{white-space:pre-wrap;font:12px Arial;max-height:160px;overflow:auto}.red{background:#fff0ed;color:#ae3723;border-color:#ffc0ad}.bar{background:#ff993f;color:#382100;border-color:#f28629}.step{display:flex;align-items:center;gap:6px;margin-top:5px}.step output{min-width:84px;text-align:center;background:#fff1e3;padding:8px;border-radius:10px}.step button{margin:0}.hint{font-size:12px;line-height:1.45;color:#526e80}.selectors{display:none}details{margin:14px 0;padding:10px;background:#fff7ed;border-radius:12px}summary{cursor:pointer;font-weight:600}.picked{font-size:12px;font-weight:400;color:#267440}</style>
-<section><h3>NBL LIVE • 4.1.16 <button id="fold">Thu gọn</button></h3><div id="body">
+<section><h3>NBL LIVE • 4.2.1 <button id="fold">Thu gọn</button></h3><div id="body">
 <p class="hint">Giỏ hàng và trả lời bình luận trên Chrome. Tin nhắn định kỳ và Chào khách cài trong app NBL LIVE.</p>
 <label>Tên chủ phòng trong bình luận<input id="owner" placeholder="Khánh Car Auto"></label>
 <label>Câu trả lời tự động<textarea id="rules" placeholder="bơm lốp;bom lop | Anh xem sản phẩm bơm lốp trong giỏ nhé."></textarea></label><p id="rulesHint" class="hint">Chưa có quy tắc. Chữ mẫu mờ không phải nội dung đã nhập.</p><p class="hint">Mỗi dòng: từ khóa | câu trả lời. Nhiều từ khóa cùng câu: ngăn bằng dấu ;</p>

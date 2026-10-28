@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.2.0'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.2.1'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -217,7 +217,8 @@ class Console(QMainWindow):
         self.pair_code=QLineEdit(self.bridge.token);self.pair_code.setReadOnly(True);v.addWidget(QLabel('Mã ghép đôi — dán vào tiện ích Chrome trên máy này'));v.addWidget(self.pair_code)
         v.addWidget(button('Sao chép mã',lambda:QApplication.clipboard().setText(self.bridge.token)))
         v.addWidget(button('Mở thư mục tiện ích',lambda:QDesktopServices.openUrl(QUrl.fromLocalFile(str(BASE/'CHROME_NBL_LIVE')))))
-        v.addWidget(button('Mở bảng LIVE',lambda:QDesktopServices.openUrl(QUrl('https://shop.tiktok.com/streamer/live/product/dashboard'))))
+        v.addWidget(button('🌐 Mở Chrome & tự ghép nick này',lambda:self.open_chrome(self.current(),True),'primary'))
+        v.addWidget(button('Mở bảng LIVE (không ghép)',lambda:QDesktopServices.openUrl(QUrl('https://shop.tiktok.com/streamer/live/product/dashboard'))))
         self.chrome_clients=QComboBox();v.addWidget(QLabel('Chrome đang kết nối với app'));v.addWidget(self.chrome_clients)
         self.chrome_binding_label=QLabel('Chưa gắn tab cho phiên này');self.chrome_binding_label.setWordWrap(True);v.addWidget(self.chrome_binding_label)
         v.addWidget(button('Dùng Chrome này cho nick đang chọn',self.bind_chrome,'primary'))
@@ -235,6 +236,43 @@ class Console(QMainWindow):
         return dict(owner=self.chrome_owner.text().strip(),repeatPins='on' if self.chrome_repeat.isChecked() else 'off',cycle=self.chrome_cycle.text().strip(),replyMode=self.chrome_reply.currentData(),cooldown=str(self.chrome_cooldown.value()))
     def save_chrome(self):
         self.collect();self.current()['chrome']={**self.current().get('chrome',{}),**self.chrome_config()};write_json(self.path,self.data);self.log('Đã lưu thiết lập Chrome theo phiên.')
+    # ---- 4.2.1 (owner, 28/10/2026): Chrome opened and paired by NBL itself ----
+    def chrome_exe(self):
+        for base in (os.environ.get('ProgramFiles',''),os.environ.get('ProgramFiles(x86)',''),os.environ.get('LOCALAPPDATA','')):
+            p=Path(base)/'Google'/'Chrome'/'Application'/'chrome.exe'
+            if base and p.is_file():return str(p)
+        return ''
+    def open_chrome(self,session,manual=False):
+        """Open the LIVE dashboard with the pairing code in the address (#nbl=…): the
+        NBL extension pairs that tab by itself; a nick without a Chrome tab gets it bound
+        as soon as the tab reads the TikTok Shop account."""
+        now=time.time();opened=getattr(self,'chrome_opened',{})
+        if not manual and now-opened.get(session['id'],0)<600:return False
+        opened[session['id']]=now;self.chrome_opened=opened;self.auto_bind=(session['id'],now)
+        url='https://shop.tiktok.com/streamer/live/product/dashboard#nbl='+self.bridge.token
+        exe=self.chrome_exe()
+        try:
+            if exe:subprocess.Popen([exe,url],creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            else:QDesktopServices.openUrl(QUrl(url))
+        except Exception as e:self.log('Không mở được Chrome: '+str(e));return False
+        self.log('Đã mở Chrome bảng LIVE cho nick '+str(session.get('number','')))
+        if manual:QMessageBox.information(self,'Chrome','NBL đã mở Chrome ở trang Bảng điều khiển LIVE và tự ghép.\n\nLần đầu: đăng nhập TikTok Shop đúng nick (nếu Chrome hỏi). Khi tiện ích đọc được tài khoản, NBL tự gắn tab này cho nick đang chọn.\n\nNếu chưa cài tiện ích NBL trên Chrome này: chrome://extensions → bật Chế độ nhà phát triển → Tải tiện ích đã giải nén → chọn thư mục CHROME_NBL_LIVE (nút Mở thư mục tiện ích).')
+        return True
+    def auto_bind_chrome(self,clients):
+        pending=getattr(self,'auto_bind',None)
+        if not pending or time.time()-pending[1]>600:return
+        session=next((s for s in self.data['sessions'] if s['id']==pending[0]),None)
+        if not session:self.auto_bind=None;return
+        if resolve_binding(session.get('chrome_binding'),clients):self.auto_bind=None;return
+        taken={resolve_binding(s.get('chrome_binding'),clients) for s in self.data['sessions'] if s.get('chrome_binding')}
+        free=[c for c,st in clients.items() if c not in taken and st.get('accountVerified') is not False and st.get('account') not in ('Chưa chọn tài khoản','Chưa hiệu chỉnh','Không đọc được trang','Đang đọc trang','Chưa đăng nhập','Chưa xác định','',None)]
+        if len(free)!=1:return
+        binding=make_binding(free[0],clients[free[0]])
+        if session.get('account') and session.get('chrome_binding') and binding['account']!=session['chrome_binding'].get('account'):return   # another nick's Chrome: never re-bound by itself
+        session.pop('chrome_login_binding',None);session['chrome_binding']=binding;session['account']=binding['account']
+        try:write_json(self.path,self.data)
+        except Exception as e:self.log('Chưa lưu gắn Chrome: '+type(e).__name__)
+        self.auto_bind=None;self.refresh_list();self.log('Đã tự gắn Chrome ('+binding['account']+') cho nick '+str(session.get('number','')))
     def bind_chrome(self):
         try:
             client=self.chrome_clients.currentData();clients=self.bridge.snapshot()
@@ -262,7 +300,7 @@ class Console(QMainWindow):
             self.bridge.command(client,dict(action=action,module=key,expectedAccount=binding['account']));self.log('Đã gửi '+action+' · '+key+'; chờ Chrome xác nhận.')
         except Exception as e:QMessageBox.warning(self,'Chrome',str(e))
     def chrome_tick(self,reset_selection=False):
-        clients=self.bridge.snapshot();binding=self.current().get('chrome_binding');resolved=resolve_binding(binding,clients)
+        clients=self.bridge.snapshot();self.auto_bind_chrome(clients);binding=self.current().get('chrome_binding');resolved=resolve_binding(binding,clients)
         selected=resolved if reset_selection else self.chrome_clients.currentData()
         if selected not in clients:selected=resolved
         if not self.chrome_clients.view().isVisible():

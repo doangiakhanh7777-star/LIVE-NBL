@@ -41,6 +41,7 @@ NBL LIVE (Windows, PySide6, Python nhúng trong runtime/)
 ## Lộ trình
 
 1. ~~4.2.0~~ (xong)
+2. ~~4.2.1 — kết nối Studio tự động (DevTools, `studio_cdp.py`) + Chrome tự mở và tự ghép (#nbl=<mã>)~~ (xong; chào khách qua kết nối mới chưa có)
 2. 4.2.1 — app Android "NBL thu nhỏ": giao diện như NBL PC, nhiều PC (ghép QR), có cắm cờ kịch bản ghim trên video; kết nối Tailscale; APK build bằng GitHub Actions.
 3. Kết nối Studio không dùng chuột (CDP).
 4. Tự mở Chrome + ghép mã.

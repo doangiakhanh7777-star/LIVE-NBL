@@ -65,6 +65,16 @@ def decisions(jobs,now,can_start=lambda j:True):
 def execute(profile,action,deadline=0,payload=None):
  if os.name!='nt':raise RuntimeError('Điều khiển LIVE Studio chỉ chạy trên Windows; chưa xác minh trên máy này.')
  required=['pid','windowTitle','exePath']
+ # 4.2.1 (owner, 28/10/2026): "kết nối tự động" — Studio is read and driven from the
+ # inside (DevTools port opened by NBL); no regions, no window, no mouse.
+ if profile.get('cdp'):
+  from studio_cdp import execute_cdp,CDP_ACTIONS
+  from studio_vision_logic import NotTouched as _NotTouched
+  if action in CDP_ACTIONS:
+   try:return execute_cdp(profile,action,deadline,payload)
+   except _NotTouched:
+    # the image path is kept as a fallback for a nick that still has its regions
+    if not (profile.get('vision',{}).get('enabled') and profile.get('windowHandle') and action not in ('probe','connect')):raise
  # 4.1: with reading-by-image set up, starting and ending the LIVE also go through it.
  if action=='vision_capture' or (profile.get('vision',{}).get('enabled') and action in ('send','chat_check','greet_scan','greet','status','start','stop','close_summary','reset_live')):
   if not is_studio_window(profile):raise ValueError('Chọn đúng cửa sổ LIVE Studio trước.')
@@ -177,6 +187,7 @@ def is_studio_window(window):
 
 def message_capability(profile):
  """Validate stored descriptors without sending or touching Studio."""
+ if profile.get('cdp'):return True,''     # 4.2.1: comment box read from inside Studio
  if profile.get('vision',{}).get('enabled'):
   from studio_vision_logic import validate_regions
   try:validate_regions(profile['vision'],('input','send','chat','clock'))

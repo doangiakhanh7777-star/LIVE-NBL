@@ -39,6 +39,9 @@ class StudioInteractions:
   s=self.state(p['id']);required=['pid','windowTitle','exePath','accountAnchor','liveIndicator','startButton','chatRegion']
   if kind=='message':required+=['chatInput','chatSend']
   if p.get('vision',{}).get('enabled'):required=['pid','windowTitle','exePath','accountAnchor']
+  if p.get('cdp'):
+   required=['exePath']
+   if kind=='greeting' and not p.get('vision',{}).get('enabled'):raise ValueError('Chào khách qua kết nối tự động chưa có ở bản này (bản sau có). Muốn dùng ngay: khoanh vùng Studio như cũ.')
   if any(not p.get(k) for k in required):raise ValueError('Trong Kết nối LIVE Studio, chọn tên nick, đồng hồ LIVE, khung trò chuyện và các nút cần dùng trước.')
   if kind=='message':
    ready,reason=message_capability(p)

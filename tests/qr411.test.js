@@ -21,7 +21,7 @@ async function tick(b,commands=[{id:'c1',action:'cart_check',module:'all'}]){
 }
 test('manifest has no QR login script and no login hosts',()=>{
  const m=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json'),'utf8'));
- assert.equal(m.version,'4.1.16');
+ assert.equal(m.version,'4.2.1');
  const all=JSON.stringify(m);assert.ok(!/shop_login|seller-vn|tiktok\.com\/login/.test(all));
  assert.equal(m.content_scripts.length,1);assert.ok(!fs.existsSync(path.join(dir,'shop_login.js')));
 });
@@ -51,4 +51,14 @@ test('a tab outside the LIVE dashboard refuses commands without disconnecting',a
  const b=background({url:'https://shop.tiktok.com/homepage',content:async()=>({})});
  const s=await tick(b);
  assert.equal(s.closed,0);assert.equal(s.sent[1].acks[0].error,'Chưa mở bảng LIVE của nick này.');
+});
+
+test('4.2.1: dashboard opened by NBL pairs itself from #nbl=<code>, only on shop.tiktok.com', () => {
+ const fs = require('fs'), path = require('path');
+ const bg = fs.readFileSync(path.join(__dirname, '..', 'CHROME_NBL_LIVE', 'background.js'), 'utf8');
+ const ct = fs.readFileSync(path.join(__dirname, '..', 'CHROME_NBL_LIVE', 'content.js'), 'utf8');
+ assert.match(bg, /message\.type==='pair_self'/);
+ assert.match(bg, /officialUrl\(sender\.tab\.url/);
+ assert.match(ct, /\[#&\]nbl=\(\[a-f0-9\]\{32\}\)/);
+ assert.match(ct, /history\.replaceState/);
 });

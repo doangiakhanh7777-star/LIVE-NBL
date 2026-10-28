@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><style>.hide{display:none}</style></head><body>
+<span class="nickname-qepexz">Khánh Car Auto</span>
+<div class="d-performance-item-U1Dp4i"><div class="d-performance-item-key-Z8r41X">Tải lên:</div><div class="d-performance-item-val-bQvy_m" id="up">0 kbps</div></div>
+<div class="d-performance-item-U1Dp4i"><div class="d-performance-item-key-Z8r41X">FPS:</div><div class="d-performance-item-val-bQvy_m" id="fps">0/30</div></div>
+<button id="b" data-testid="main-start-live-button" class="tt-live-ButtonV4 live-btn-loFCqI" style="width:95px;height:36px"><span>Phát LIVE</span></button>
+<div id="menu" class="hide"><div class="tt-live-dropdown-option" id="end"><div class="tt-live-dropdown-option-label">Kết thúc LIVE</div></div><div class="tt-live-dropdown-option"><div class="tt-live-dropdown-option-label">Tạm dừng LIVE</div></div></div>
+<div id="dlg" role="dialog" class="hide">Kết thúc phát trực tiếp? <button id="now">Kết thúc ngay</button><button>Hủy</button></div>
+<div id="sum" role="dialog" class="hide">Phiên LIVE đã kết thúc. Thời lượng 00:01:00 <button id="close">Đóng</button></div>
+<div id="live-chat"><div class="tt-live-editor-textarea" contenteditable="true" style="width:200px;height:20px"></div><button aria-label="Gửi bình luận" class="tt-live-comment-input-post-button" id="send">></button></div>
+<div id="log"></div>
+<script>
+let live=false,t=0;const b=document.getElementById('b');
+function render(){ if(live){b.className='tt-live-ButtonV4 live-btn-loFCqI living-RfcdOE';b.innerHTML='<div class="live-btn-duration-XS20Vy">00:00:0'+(t%10)+'</div>';document.getElementById('up').textContent='1825 kbps';document.getElementById('fps').textContent='30/30'} else {b.className='tt-live-ButtonV4 live-btn-loFCqI';b.innerHTML='<span>Phát LIVE</span>'} }
+setInterval(()=>{t++;render()},1000);
+b.addEventListener('click',()=>{ if(!live){setTimeout(()=>{live=true;render()},1500)} else {document.getElementById('menu').className=''} });
+document.getElementById('end').addEventListener('click',()=>{document.getElementById('menu').className='hide';document.getElementById('dlg').className=''});
+document.getElementById('now').addEventListener('click',()=>{document.getElementById('dlg').className='hide';setTimeout(()=>{live=false;render();document.getElementById('sum').className=''},1000)});
+document.getElementById('close').addEventListener('click',()=>{document.getElementById('sum').className='hide'});
+document.getElementById('send').addEventListener('click',()=>{const e=document.querySelector('.tt-live-editor-textarea');document.getElementById('log').textContent+='|'+e.innerText;e.innerText=''});
+</script></body></html>

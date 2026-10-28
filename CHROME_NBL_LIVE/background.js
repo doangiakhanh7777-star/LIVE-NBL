@@ -49,7 +49,7 @@ function open(state){
    if(dashboardUrl(tab.url)){
     let version;try{version=await contentMessage(state.tabId,{type:'version'},1000);}catch(e){}
     if(version?.protocol===PROTOCOL)response=await contentMessage(state.tabId,message)||response;
-    else response.acks=commands.map(c=>({id:c.id,error:'Tải lại trang LIVE để dùng tiện ích 4.1.16.'}));
+    else response.acks=commands.map(c=>({id:c.id,error:'Tải lại trang LIVE để dùng tiện ích 4.2.1.'}));
    }else response.acks=commands.map(c=>({id:c.id,error:'Chưa mở bảng LIVE của nick này.'}));
   }catch(e){
    // 4.1.1: a slow or reloading LIVE tab used to close the socket here ("Tab Chrome
@@ -70,6 +70,12 @@ function open(state){
  socket.onerror=()=>{};
 }
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
+ // 4.2.1 (owner, 28/10/2026): NBL opens the LIVE dashboard with #nbl=<code>; the page
+ // pairs itself, no popup and no pasting. Only a shop.tiktok.com tab can ask this.
+ if(message.type==='pair_self'){
+  if(!sender.tab||!officialUrl(sender.tab.url||'')||!/^[a-f0-9]{32}$/.test(String(message.token||''))){respond({ok:false});return;}
+  message={type:'pair',tabId:sender.tab.id,token:message.token};
+ }
  if(message.type==='pair'){
   connect(message.tabId,message.token).then(async()=>{await storePair(async()=>{const {nblPairs={}}=await chrome.storage.local.get('nblPairs');nblPairs[String(message.tabId)]={tabId:message.tabId,token:message.token};const {nblSkip=[]}=await chrome.storage.local.get('nblSkip');await chrome.storage.local.set({nblPairs,nblToken:message.token,nblSkip:nblSkip.filter(id=>id!==message.tabId)});});respond({ok:true});}).catch(e=>respond({ok:false,error:e.message}));return true;
  }
