@@ -375,6 +375,8 @@ class Console(QMainWindow):
             self.log('Đã mở Chrome LIVE của NBL.')
             if not self.live_chrome.setup_done():QMessageBox.information(self,'Chrome LIVE (làm 1 lần)','NBL vừa mở một Chrome RIÊNG chỉ để LIVE.\n\nĐăng nhập TikTok Shop đúng nick LIVE trong cửa sổ đó (nên chọn Tiếng Việt ở góc phải trang). Xong là NBL tự mở trang LIVE và tự nối, không cần cài tiện ích, không phải F5.')
         return True
+    LIVE_CHROME_TEXT={'off':'Chrome LIVE chưa mở · bấm Mở Chrome LIVE của NBL','starting':'Đang mở Chrome LIVE…','loading':'Chrome LIVE đang tải trang LIVE…',
+        'login':'Chrome LIVE: TikTok Shop đòi ĐĂNG NHẬP — đăng nhập đúng nick trong cửa sổ Chrome LIVE','no_extension':'Chrome LIVE: trang LIVE chưa trả lời, NBL đang tự tải lại','ok':'Chrome LIVE đã kết nối'}
     def live_chrome_session(self):
         """The one nick that uses NBL's Chrome: the nick linked to TikTok LIVE Studio, else the nick shown."""
         sp=getattr(self,'studio_panel',None)
