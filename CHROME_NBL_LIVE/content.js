@@ -3,7 +3,13 @@
 if(document.getElementById('nbl-live-extension'))return;
 // 4.2.1: opened by NBL with #nbl=<code> → pair this tab by itself, then hide the code.
 {const m=/[#&]nbl=([a-f0-9]{32})/.exec(location.hash);if(m){try{chrome.runtime.sendMessage({type:'pair_self',token:m[1]});}catch(e){}history.replaceState(null,'',location.pathname+location.search);}}
-const host=document.createElement('div');host.id='nbl-live-extension';host.style.display='none';document.documentElement.append(host);   // 4.3.0: cầu nối — không hiện gì trên trang, mọi thiết lập nằm trong app NBL
+const host=document.createElement('div');host.id='nbl-live-extension';host.style.display='none';document.documentElement.append(host);   // 4.3.0: cầu nối — ẩn; nút nhỏ dưới mở bảng chọn vị trí khi tự dò sai
+// 4.3.7 (owner 29/10): chỉ hiện trong Chrome LIVE riêng của NBL (không phải Chrome thường của chủ).
+try{const launch=document.createElement('div');launch.setAttribute('data-nbl-launch','1');launch.textContent='⚙ NBL vị trí';
+ launch.style.cssText='position:fixed;right:10px;bottom:10px;z-index:2147483646;background:#f97316;color:#fff;font:600 12px/1 sans-serif;padding:7px 11px;border-radius:9px;cursor:pointer;opacity:.8;box-shadow:0 1px 5px rgba(0,0,0,.4);user-select:none';
+ launch.onmouseenter=()=>launch.style.opacity='1';launch.onmouseleave=()=>launch.style.opacity='.8';
+ launch.onclick=()=>{const show=host.style.display==='none';host.style.display=show?'':'none';launch.textContent=show?'⚙ Ẩn bảng NBL':'⚙ NBL vị trí';if(show){const d=ui.querySelector('details');if(d)d.open=true;}};
+ document.documentElement.append(launch);}catch(e){}
 const ui=host.attachShadow({mode:'open'});
 ui.innerHTML=`<style>:host{all:initial}section{position:fixed;right:12px;bottom:12px;width:min(390px,calc(100vw - 40px));max-height:84vh;overflow:auto;z-index:2147483647;background:#fff;color:#3b2414;padding:16px;border:2px solid #f97316;border-radius:20px;font:14px Arial;box-shadow:0 7px 28px #c2410c30}h3{margin:0 0 12px;cursor:move;touch-action:none;position:sticky;top:0;background:#fff;z-index:2;color:#ea580c}label{display:block;margin-top:11px;font-weight:600}input,textarea,select{box-sizing:border-box;width:100%;padding:9px;margin-top:5px;background:#fffaf4;color:#3b2414;border:1px solid #fdba74;border-radius:10px;font:14px Arial}textarea{height:76px}button{background:#fff1e3;color:#9a3412;border:1px solid #fdba74;border-radius:11px;padding:9px;margin:5px 4px 5px 0;cursor:pointer;font:13px Arial}button:hover{background:#fed7aa}pre{white-space:pre-wrap;font:12px Arial;max-height:160px;overflow:auto}.red{background:#fff0ed;color:#ae3723;border-color:#ffc0ad}.bar{background:#ff993f;color:#382100;border-color:#f28629}.step{display:flex;align-items:center;gap:6px;margin-top:5px}.step output{min-width:84px;text-align:center;background:#fff1e3;padding:8px;border-radius:10px}.step button{margin:0}.hint{font-size:12px;line-height:1.45;color:#526e80}.selectors{display:none}details{margin:14px 0;padding:10px;background:#fff7ed;border-radius:12px}summary{cursor:pointer;font-weight:600}.picked{font-size:12px;font-weight:400;color:#267440}</style>
 <section><h3>NBL LIVE • 4.3.0 <button id="fold">Thu gọn</button></h3><div id="body">
@@ -22,6 +28,7 @@ ui.innerHTML=`<style>:host{all:initial}section{position:fixed;right:12px;bottom:
 <button id="save">Lưu ngay</button><button id="check">Kiểm tra kết nối trang</button><button id="start" class="bar">Bật các mục</button><button id="stop" class="red">Dừng các mục</button><div id="modules"></div>
 <details><summary>Sao lưu và vị trí bảng</summary><button id="export">Xuất bản sao cài đặt</button><button id="import">Nhập bản sao cài đặt</button><input id="importFile" type="file" accept=".json" hidden><button id="resetPosition">Đưa bảng về góc dưới bên phải</button></details><p id="state">Đã dừng</p><pre id="log"></pre></div></section>`;
 const $=id=>ui.getElementById(id);
+try{const h3=ui.querySelector('h3');if(h3&&h3.childNodes[0])h3.childNodes[0].textContent='NBL LIVE • '+(chrome.runtime.getManifest?chrome.runtime.getManifest().version:'')+' ';}catch(e){}
 const setupLabels={account:'Tên tài khoản',live:'Đồng hồ LIVE',input:'Ô nhập tin nhắn',send:'Nút gửi tin nhắn',rows:'Một dòng bình luận gồm tên và câu hỏi',user:'Tên khách trong dòng bình luận',text:'Câu hỏi trong dòng bình luận',products:'Một ô sản phẩm trong giỏ',productTitle:'Tên sản phẩm trong ô',numberCell:'Một ô số thứ tự (cột số bên trái mỗi món)',productNumber:'Số thứ tự trong ô sản phẩm — không bắt buộc',pinned:'Trạng thái ghim — không bắt buộc',unpinButton:'Nút Bỏ ghim trong ô sản phẩm — nếu có',bundleOpen:'Nút Thêm sản phẩm',bundleTab:'Mục Bộ sản phẩm TRỰC TIẾP — nếu có',bundleConfirm:'Nút xác nhận Thêm sản phẩm',bundleReady:'Danh sách sản phẩm trong phiên LIVE'};
 const sharedFields=Object.keys(setupLabels),relativeParents={user:'rows',text:'rows',productTitle:'products',productNumber:'products',pinned:'products',unpinButton:'products'};
 for(const [id,label] of Object.entries(setupLabels)){const row=document.createElement('div'),button=document.createElement('button'),status=document.createElement('span'),input=document.createElement('input'),advanced=document.createElement('label');button.textContent='Chọn '+label;button.dataset[relativeParents[id]?'relative':'pick']=id;if(relativeParents[id])button.dataset.parent=relativeParents[id];status.id=id+'Picked';status.className='picked';status.textContent='Chưa chọn';row.append(button,status);$('pickFields').append(row);input.id=id;advanced.textContent=label+' — mã vị trí';advanced.append(input);$('advancedFields').append(advanced);}
@@ -523,7 +530,7 @@ async function prepareBundle(command){const generation=++controlEpoch;controlOwn
   if(!open)throw Error('Chưa thấy nút "Thêm sản phẩm" trên bảng LIVE');
   open.click();
   const d=await waitFor(addDrawer,6000,valid);if(!d)throw Error('Bấm Thêm sản phẩm nhưng chưa mở bảng "Thêm sản phẩm mới"');
-  const tab=byText(/^Bộ sản phẩm TRỰC TIẾP$|^LIVE product sets?$/i,d)[0]||(c.bundleTab&&safeOne(c.bundleTab));
+  const tab=(c.bundleTab&&safeOne(c.bundleTab))||byText(/^Bộ sản phẩm TRỰC TIẾP$|^LIVE product sets?$/i,d)[0];   // 4.3.7: vị trí chủ chọn tay được ưu tiên
   if(!tab)throw Error('Chưa thấy mục "Bộ sản phẩm TRỰC TIẾP"');
   tab.click();await delay(700);valid();
   let target=null,remaining=index;
@@ -539,7 +546,8 @@ async function prepareBundle(command){const generation=++controlEpoch;controlOwn
   target.click();
   const chosen=await waitFor(()=>textOf(d).match(/(\d+)\s*\/\s*(\d+)\s*sản phẩm sẽ được thêm|(\d+)\s*\/\s*(\d+)\s*products? will be added/i),4000,valid);
   if(!chosen)throw Error('Chọn '+name+' nhưng chưa thấy dòng "x/y sản phẩm sẽ được thêm"');
-  const confirm=byText(/^Thêm sản phẩm$|^Add products?$/i,d).filter(b=>!b.disabled&&b.getAttribute('aria-disabled')!=='true'&&!/disabled/i.test(String(b.className)));
+  const picked=c.bundleConfirm&&safeOne(c.bundleConfirm);
+  const confirm=picked?[picked].filter(b=>!b.disabled&&b.getAttribute('aria-disabled')!=='true'):byText(/^Thêm sản phẩm$|^Add products?$/i,d).filter(b=>!b.disabled&&b.getAttribute('aria-disabled')!=='true'&&!/disabled/i.test(String(b.className)));
   if(confirm.length!==1)throw Error('Nút "Thêm sản phẩm" chưa sẵn sàng');
   confirm[0].click();
   const outcome=await waitFor(()=>{const t=textOf(d);const ok=t.match(/(?:Đã thêm|Added)\s*(\d+)\s*\/\s*(\d+)/i);if(ok&&Number(ok[1])>0)return {ok};if(/Không thể thêm sản phẩm nào|Could not add any products/i.test(t))return {fail:true};return null;},Math.max(5000,command.deadline*1000-Date.now()-3000),valid);

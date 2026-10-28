@@ -12,7 +12,7 @@ import time
 import zipfile
 from pathlib import Path
 
-VERSION = '4.3.6'
+VERSION = '4.3.7'
 SECRET_KEYS = {'keys', 'key', 'api_key', 'apiKey', 'secret', 'pin_token', 'token', 'protected_token', 'password', 'image', 'sendImage', 'greetingImage', 'qrDataUrl'}
 FILES = ('ai_reply.json', 'profiles.json', 'profiles.json.bak', 'studio_schedules.json', 'studio_interactions_journal.json', 'native_alarm_check.json')
 
