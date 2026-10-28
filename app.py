@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.1'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.2'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -388,24 +388,31 @@ class Console(QMainWindow):
             return 'trang TikTok Shop chưa đọc được tên tài khoản ('+(names[0] or 'trống')+'). Tải lại trang LIVE; còn vậy thì gửi gói chẩn đoán.'
         if binding and binding.get('account') and binding['account'] not in names:
             return 'nick này đã gắn với tài khoản Shop "'+binding['account']+'", còn Chrome đang mở "'+', '.join(n for n in names if n not in bad)+'". Đúng tài khoản thì vào Giỏ hàng & ghim bấm "🌐 Mở Chrome & tự kết nối" để gắn lại.'
-        if len(states)>1:return 'đang mở '+str(len(states))+' tab trang LIVE; đóng bớt, chỉ giữ 1 tab.'
+        if len(states)>1:return 'đang mở '+str(len(states))+' tab trang LIVE của các tài khoản Shop khác nhau; chỉ giữ tab của đúng tài khoản.'
         return 'bấm "🌐 Mở Chrome & tự kết nối" ở mục Giỏ hàng & ghim.'
     def auto_bind_chrome(self,clients):
+        """4.3.2 (owner, 29/10/2026 "sao nó lại không kết nối chrome"): one nick per PC, so
+        the TikTok Shop LIVE tab is tied to the nick by itself whenever it is not tied yet,
+        not only in the 10 minutes after NBL opened Chrome. Several tabs of the SAME Shop
+        account: the newest tab is used (the old one is left alone)."""
+        if not self.data['sessions'] or not clients:return
         pending=getattr(self,'auto_bind',None)
-        if not pending or time.time()-pending[1]>600:return
-        session=next((s for s in self.data['sessions'] if s['id']==pending[0]),None)
-        if not session:self.auto_bind=None;return
+        if pending and time.time()-pending[1]>600:pending=self.auto_bind=None
+        session=next((s for s in self.data['sessions'] if pending and s['id']==pending[0]),None) or self.current()
         if resolve_binding(session.get('chrome_binding'),clients):self.auto_bind=None;return
-        taken={resolve_binding(s.get('chrome_binding'),clients) for s in self.data['sessions'] if s.get('chrome_binding')}
-        free=[c for c,st in clients.items() if c not in taken and st.get('accountVerified') is not False and st.get('account') not in ('Chưa chọn tài khoản','Chưa hiệu chỉnh','Không đọc được trang','Đang đọc trang','Chưa đăng nhập','Chưa xác định','',None)]
-        if len(free)!=1:return
-        binding=make_binding(free[0],clients[free[0]])
-        manual=len(pending)>2 and pending[2]
-        if not manual and session.get('account') and session.get('chrome_binding') and binding['account']!=session['chrome_binding'].get('account'):return   # another nick's Chrome: never re-bound by itself (the owner's own button may re-bind)
+        taken={resolve_binding(s.get('chrome_binding'),clients) for s in self.data['sessions'] if s is not session and s.get('chrome_binding')}
+        bad=('Chưa chọn tài khoản','Chưa hiệu chỉnh','Không đọc được trang','Đang đọc trang','Chưa đăng nhập','Chưa xác định','',None)
+        free=[c for c,st in clients.items() if c not in taken and st.get('accountVerified') is not False and st.get('account') not in bad]
+        if not free or len({clients[c].get('account') for c in free})!=1:return
+        client=max(free,key=lambda c:clients[c].get('tab') if type(clients[c].get('tab')) is int else -1)
+        try:binding=make_binding(client,clients[client])
+        except ValueError:return
+        old=(session.get('chrome_binding') or {}).get('account')
         session.pop('chrome_login_binding',None);session['chrome_binding']=binding;session['account']=binding['account']
         try:write_json(self.path,self.data)
         except Exception as e:self.log('Chưa lưu gắn Chrome: '+type(e).__name__)
-        self.auto_bind=None;self.refresh_list();self.log('Đã tự gắn Chrome ('+binding['account']+') cho nick '+str(session.get('number','')))
+        self.auto_bind=None;self.chrome_why_logged='';self.refresh_list()
+        self.log('Đã tự gắn Chrome (tài khoản Shop: '+binding['account']+') cho nick '+str(session.get('number',''))+(' · trước đây gắn '+old if old and old!=binding['account'] else '')+(' · đang mở '+str(len(free))+' tab, dùng tab mới nhất' if len(free)>1 else ''))
     def bind_chrome(self):
         try:
             client=self.chrome_clients.currentData();clients=self.bridge.snapshot()
@@ -557,7 +564,7 @@ class Console(QMainWindow):
         text=str(text)
         secret=self.phone_config.get('token','')
         if secret:text=text.replace(secret,'[ẩn mã bot]')
-        self.logbox.append(html.escape(time.strftime('%H:%M:%S')+'  '+text));self.logger.info(text)
+        self.logbox.append('<span>'+html.escape(time.strftime('%H:%M:%S')+'  '+text,quote=False).replace('\n','<br>')+'</span>');self.logger.info(text)   # 4.3.2: rich text, so & and " show as themselves
         if not hasattr(self,'phone_log'):
             import collections;self.phone_log=collections.deque(maxlen=400);self.phone_seq=0
         self.phone_seq+=1;self.phone_log.append((self.phone_seq,time.time(),text))
