@@ -81,6 +81,7 @@ Section "NBL LIVE" SecMain
   ; files of older NBL versions that 4.2.0 no longer uses (also the trimmed Qt/OCR parts)
 !include "cleanup_old.nsh"
   Delete "$INSTDIR\HUONG_DAN_SU_DUNG.pdf"
+  Delete "$INSTDIR\ocr_models\vi\.rec.onnx.aTBUPz"
   Delete "$INSTDIR\THAY_DOI_4.1.txt"
   Delete "$INSTDIR\KET_QUA_KIEM_TRA_4.1.txt"
   Delete "$INSTDIR\requirements-test.txt"

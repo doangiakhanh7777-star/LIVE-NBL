@@ -64,6 +64,10 @@ def main(src, deps, out, version):
     for d in ('runtime', 'ocr_vendor'):
         shutil.copytree(deps / d, app / d, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '*.pyi'))
     removed = []
+    # half-downloaded leftovers like ".Qt6Core.dll.yk4BPQ" (hidden temp files) are junk
+    for p in sorted(app.rglob('.*'), key=lambda x: -len(x.parts)):
+        if p.is_file():
+            removed.append(p); p.unlink()
     trim_qt(app / 'runtime' / 'site-packages' / 'PySide6', removed)
     for rel in VENDOR_DROP:
         p = app / 'ocr_vendor' / rel
