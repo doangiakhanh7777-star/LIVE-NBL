@@ -48,7 +48,7 @@ STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử 
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.7 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.8 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
@@ -442,6 +442,14 @@ class StudioPanel(QWidget):
      continue
     if jid=='autoconnect':
      self.auto_connected(future,widget);continue
+    if jid=='chatdock':
+     try:r=future.result() or {}
+     except Exception:r={}
+     if r.get('floating') and not r.get('docked') and r.get('found') is False:
+      msg=str(widget)+' · Cửa sổ Trò chuyện LIVE đang nổi nhưng NBL chưa tìm thấy nút ghép để tự gộp. Bấm nút ghép trên cửa sổ đó 1 lần (hoặc gửi file đo khung chat để NBL tự làm).'
+      if self.owner.notifier.alarm('chatdock:'+str(widget),msg):self.owner.log(msg)
+     elif r.get('docked') and r.get('how'):self.owner.log(str(widget)+' · Đã tự ghép cửa sổ Trò chuyện LIVE về Studio.')
+     continue
     if jid=='studiocaptcha':
      try:text=(future.result() or {}).get('captcha') or ''
      except Exception:text=''
@@ -550,6 +558,7 @@ class StudioPanel(QWidget):
    self.poll_hand_live(now)
    self.auto_connect(now)
    self.poll_studio_captcha(now)
+   self.poll_chat_dock(now)
    for j,action in decisions(self.jobs,time.time(),self.cart_ready):
     try:
      p=self.profile(j['profile'])
@@ -1059,6 +1068,17 @@ class StudioPanel(QWidget):
    if p.get('cdp') and not any(k[0]=='studiocaptcha' for k in self.futures.values()):
     try:f=self.pool.submit_priority(48,execute,copy.deepcopy(self.effective_profile(p)),'captcha');self.futures[f]=('studiocaptcha',p.get('name',''),'captcha')
     except Exception:pass
+ def poll_chat_dock(self,now):
+  """4.3.8: whenever a nick is LIVE, keep the Studio chat docked (no mouse) so AI reads
+  comments and greeting can type. Every 20 s, only when that nick is LIVE."""
+  if now-getattr(self,'dock_at',0)<20:return
+  self.dock_at=now
+  for p in self.profiles:
+   if not p.get('cdp'):continue
+   live=p['id'] in getattr(self,'hand_live',{}) or any(j['profile']==p['id'] and j['state'] in ('running','recovering') for j in self.jobs)
+   if not live or any(k[0]=='chatdock' for k in self.futures.values()):continue
+   try:f=self.pool.submit_priority(44,execute,copy.deepcopy(self.effective_profile(p)),'dock_chat');self.futures[f]=('chatdock',p.get('name',''),'dock_chat')
+   except Exception:pass
  # ---------------- 4.3.0 LIVE bật tay: tự bật ghim + AI ----------------
  def poll_hand_live(self,now):
   """Owner, 28/10/2026: whenever Studio is LIVE (also started by hand), pinning and the

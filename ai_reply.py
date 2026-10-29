@@ -18,6 +18,7 @@ import io
 import json
 import os
 import re
+import socket
 import struct
 import time
 import wave
@@ -131,27 +132,37 @@ class Settings:
 
 
 # ---------------- Gemini calls ----------------
-def _post(url, body, key, timeout=25):
-    req = Request(url, data=json.dumps(body, ensure_ascii=False).encode('utf-8'),
-                  headers={'Content-Type': 'application/json', 'x-goog-api-key': key}, method='POST')
-    try:
-        with urlopen(req, timeout=timeout) as r:
-            return json.loads(r.read().decode('utf-8'))
-    except HTTPError as e:
-        detail = ''
+def _post(url, body, key, timeout=30):
+    # 4.3.8 (owner 29/10): a slow network gave "The read operation timed out" and killed the
+    # reply. Retry a timeout / transient network error once before giving up.
+    data = json.dumps(body, ensure_ascii=False).encode('utf-8')
+    for attempt in range(2):
+        req = Request(url, data=data, headers={'Content-Type': 'application/json', 'x-goog-api-key': key}, method='POST')
         try:
-            detail = json.loads(e.read().decode('utf-8', 'replace')).get('error', {}).get('message', '')
-        except Exception:
-            pass
-        if e.code == 429:
-            raise AIError('Gemini đang giới hạn lượt dùng (gói miễn phí); đợi một lát. ' + detail[:150])
-        if e.code in (401, 403):
-            raise AIError('API key Gemini không đúng hoặc chưa được bật. ' + detail[:150])
-        if e.code == 404:
-            raise AIError('404 model: ' + detail[:150])
-        raise AIError('Gemini lỗi ' + str(e.code) + ': ' + detail[:200])
-    except URLError as e:
-        raise AIError('Không kết nối được Gemini (mạng?): ' + str(e.reason)[:150])
+            with urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read().decode('utf-8'))
+        except HTTPError as e:
+            detail = ''
+            try:
+                detail = json.loads(e.read().decode('utf-8', 'replace')).get('error', {}).get('message', '')
+            except Exception:
+                pass
+            if e.code == 429:
+                raise AIError('Gemini đang giới hạn lượt dùng (gói miễn phí); đợi một lát. ' + detail[:150])
+            if e.code in (401, 403):
+                raise AIError('API key Gemini không đúng hoặc chưa được bật. ' + detail[:150])
+            if e.code == 404:
+                raise AIError('404 model: ' + detail[:150])
+            raise AIError('Gemini lỗi ' + str(e.code) + ': ' + detail[:200])
+        except (TimeoutError, socket.timeout):
+            if attempt == 0:
+                continue
+            raise AIError('Gemini phản hồi chậm quá (mạng chậm?); đã thử lại nhưng chưa được.')
+        except URLError as e:
+            if isinstance(getattr(e, 'reason', None), (TimeoutError, socket.timeout)) and attempt == 0:
+                continue
+            raise AIError('Không kết nối được Gemini (mạng?): ' + str(getattr(e, 'reason', e))[:150])
+    raise AIError('Gemini không trả lời.')
 
 
 def _texts(obj, out):

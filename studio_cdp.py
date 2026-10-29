@@ -116,6 +116,19 @@ CHAT_JS = r"""(() => {
  return out.slice(-60);
 })()"""
 
+# 4.3.8 (owner 29/10 04:37): the "Trò chuyện LIVE" window can float over the chat/input.
+# NBL docks it back WITHOUT the mouse — a CDP in-page click on the merge button, found only
+# by its own label (never the close/settings icon), so a wrong element is never clicked.
+DOCK_JS = r"""(() => {
+ const vis = el => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.top < 90; };
+ const label = el => (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('data-tooltip') || el.getAttribute('alt') || '').trim();
+ const MERGE = /ghép|gộp|hợp nhất|thu về|gắn lại|đưa về|về studio|dock|merge|combine|attach|re-?dock|embed/i;
+ const AVOID = /đóng|close|thoát|exit|tắt|cài đặt|setting|khóa|lock|phóng|minimi|maximi|full/i;
+ const cands = [...document.querySelectorAll('button,[role=button],[class*=icon i],[class*=btn i],svg,span,div')].filter(vis);
+ for (const el of cands) { const l = label(el); if (l && MERGE.test(l) && !AVOID.test(l)) { const r = el.getBoundingClientRect(); return {x: r.left + r.width/2, y: r.top + r.height/2, how: 'label:' + l.slice(0,40)}; } }
+ return null;
+})()"""
+
 CAPTCHA_JS = r"""(() => {
  const vis = el => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 20 && r.height > 20; };
  const re = /captcha|xác minh|kéo thanh trượt|kéo mảnh ghép|xoay hình|verify to continue|drag the slider|security check/i;
@@ -126,6 +139,9 @@ CAPTCHA_JS = r"""(() => {
  }
  return '';
 })()"""
+
+
+_DOCK_TRIED = {}
 
 
 def plain(text):
@@ -363,6 +379,7 @@ class Studio:
         out = dict(nickname=st.get('nickname', ''), hasButton=bool(st.get('hasButton')), living=bool(st.get('living')), idle=bool(st.get('idle')),
                    buttonText=st.get('buttonText', ''), dialogs=[d.get('text', '')[:120] for d in st.get('dialogs') or []], health=st.get('health'))
         out['chatBox'] = bool(self.chat_page())
+        out['chatFloating'] = bool(self.page('/html/liveChatFloat/'))
         try:
             out['comments'] = len(self.chat_read())
         except Exception:
@@ -373,23 +390,54 @@ class Studio:
             out['captcha'] = ''
         return out
 
+    def dock_chat(self):
+        """If the chat window is floating, click its merge button in-page (no mouse). Returns
+        {floating, docked, found}. Rate-limited per port so it never clicks on every read."""
+        t = self.page('/html/liveChatFloat/')
+        if not t:
+            return dict(floating=False, docked=True)
+        import time as _t
+        last = _DOCK_TRIED.get(self.port, 0)
+        if _t.time() - last < 20:
+            return dict(floating=True, docked=False, found=None, waiting=True)
+        _DOCK_TRIED[self.port] = _t.time()
+        spot = self.js(t, DOCK_JS)
+        if not spot:
+            return dict(floating=True, docked=False, found=False)
+        base = {'x': spot['x'], 'y': spot['y'], 'button': 'left', 'clickCount': 1}
+        self.call(t, [('Input.dispatchMouseEvent', {**base, 'type': 'mouseMoved'}),
+                      ('Input.dispatchMouseEvent', {**base, 'type': 'mousePressed'}),
+                      ('Input.dispatchMouseEvent', {**base, 'type': 'mouseReleased'})])
+        for _ in range(8):
+            _t.sleep(.25)
+            if not self.page('/html/liveChatFloat/'):
+                return dict(floating=True, docked=True, how=spot.get('how'))
+        return dict(floating=True, docked=False, found=True, how=spot.get('how'))
+
     def chat_read(self):
-        """Comments shown in Studio's chat (newest last), from the chat window or the main window."""
+        """Comments shown in Studio's chat (newest last). Docks a floating chat window first so
+        the comments live in one place, then reads the main window, then the float as a fallback."""
+        try:
+            self.dock_chat()
+        except Exception:
+            pass
         seen, out = set(), []
-        for part in ('/html/liveChatFloat/', '/html/main/'):
-            t = self.page(part)
-            if not t:
-                continue
+        for part in ('/html/main/', '/html/liveChatFloat/'):
             try:
-                rows = self.js(t, CHAT_JS) or []
+                t = self.page(part)
+                rows = self.js(t, CHAT_JS) if t else []
             except Exception:
                 continue
-            for r in rows:
+            for r in rows or []:
                 if r.get('id') and r['id'] not in seen:
                     seen.add(r['id']); out.append(r)
         return out
 
     def chat_page(self):
+        try:
+            self.dock_chat()
+        except Exception:
+            pass
         for part in ('/html/main/', '/html/liveChatFloat/'):
             t = self.page(part)
             if t and self.js(t, FIND_JS + '("editor","")'):
@@ -502,7 +550,7 @@ def execute_cdp(profile, action, deadline=0, payload=None):
     port = int(profile.get('cdpPort') or BASE_PORT)
     expected = profile.get('accountName') or profile.get('name') or ''
     others = [int(p) for p in profile.get('_otherPorts') or []]
-    if action in ('status', 'stop', 'close_summary', 'probe', 'chat_check', 'send', 'chat_read', 'captcha', 'screenshot', 'selfcheck'):
+    if action in ('status', 'stop', 'close_summary', 'probe', 'chat_check', 'send', 'chat_read', 'captcha', 'screenshot', 'selfcheck', 'dock_chat'):
         studio = connect(profile.get('exePath'), port, others, open_if_closed=False)
         if studio is None:
             if action == 'probe':
@@ -513,7 +561,7 @@ def execute_cdp(profile, action, deadline=0, payload=None):
                 return dict(live=False, studioClosed=True, closed=True, method='cdp')
             if action in ('screenshot', 'selfcheck'):
                 raise NotTouched('TikTok LIVE Studio chưa mở.')
-            if action in ('chat_read', 'captcha'):
+            if action in ('chat_read', 'captcha', 'dock_chat'):
                 return dict(comments=[], captcha='', studioClosed=True, method='cdp')
             raise NotTouched('TikTok LIVE Studio chưa mở; chưa gửi.')
     else:
@@ -537,6 +585,8 @@ def execute_cdp(profile, action, deadline=0, payload=None):
         return dict(comments=studio.chat_read(), method='cdp')
     if action == 'captcha':
         return dict(captcha=studio.captcha(), method='cdp')
+    if action == 'dock_chat':
+        return dict(studio.dock_chat(), method='cdp')
     if action == 'send':
         return studio.send(str((payload or {}).get('text', '')), expected)
     if action == 'selfcheck':
@@ -548,7 +598,7 @@ def execute_cdp(profile, action, deadline=0, payload=None):
     raise NotTouched('Kết nối tự động chưa làm mục này: ' + action)
 
 
-CDP_ACTIONS = ('probe', 'status', 'start', 'stop', 'close_summary', 'chat_check', 'send', 'connect', 'chat_read', 'captcha', 'screenshot', 'selfcheck')
+CDP_ACTIONS = ('probe', 'status', 'start', 'stop', 'close_summary', 'chat_check', 'send', 'connect', 'chat_read', 'captcha', 'screenshot', 'selfcheck', 'dock_chat')
 
 
 # ---- 4.3.0: Studio icons open Studio with NBL's port (owner agreed 28/10/2026) ----
