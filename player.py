@@ -5,6 +5,7 @@ minute of clean playback, so a 6-hour LIVE is not killed by three unrelated
 hiccups), and playlist edits keep the current clip on Windows paths.
 """
 import json
+import os
 import random
 import sys
 import time
@@ -86,6 +87,9 @@ class Output(QMainWindow):
         self.devices = QMediaDevices(self); self.devices.audioOutputsChanged.connect(self.refresh_audio)
         self.timer = QTimer(self); self.timer.timeout.connect(self.poll); self.timer.start(250)
         self.heartbeat = QTimer(self); self.heartbeat.timeout.connect(self.maintain); self.heartbeat.start(1000)
+        # 4.3.14: ghi mã tiến trình để NBL nhận ra cửa sổ này còn sống (không mở cửa sổ thứ hai)
+        try: write_json(self.folder/'player.json', dict(pid=os.getpid(), started=time.time()))
+        except OSError: pass
         self.poll()
     def maintain(self):
         state = self.player.playbackState()
@@ -215,7 +219,10 @@ class Output(QMainWindow):
         self.end_pending = False
         self.next()
     def closeEvent(self, event):
-        self.wanted = 'stopped'; self.cancel_transition(); self.player.stop(); self.status('Cửa sổ đã đóng.'); super().closeEvent(event)
+        self.wanted = 'stopped'; self.cancel_transition(); self.player.stop(); self.status('Cửa sổ đã đóng.')
+        try: write_json(self.folder/'player.json', dict(pid=os.getpid(), closed=True))
+        except OSError: pass
+        super().closeEvent(event)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv); window = Output(Path(sys.argv[1])); window.show(); sys.exit(app.exec())

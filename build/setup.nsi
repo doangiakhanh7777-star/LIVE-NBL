@@ -6,7 +6,7 @@ Unicode true
 
 !define APP "NBL LIVE"
 !ifndef VER
-!define VER "4.3.13"
+!define VER "4.3.14"
 !endif
 !define UKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NBL_LIVE"
 
@@ -21,7 +21,7 @@ BrandingText "${APP} ${VER}"
 ShowInstDetails show
 ShowUninstDetails show
 
-VIProductVersion "4.3.13.0"
+VIProductVersion "4.3.14.0"
 VIAddVersionKey /LANG=0 "ProductName" "${APP}"
 VIAddVersionKey /LANG=0 "FileDescription" "Cài đặt ${APP} ${VER}"
 VIAddVersionKey /LANG=0 "FileVersion" "${VER}"

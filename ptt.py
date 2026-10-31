@@ -20,9 +20,9 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, Qt, QEvent
-from PySide6.QtMultimedia import QAudioFormat, QAudioSink, QAudioSource, QMediaDevices
+from PySide6.QtMultimedia import QAudio, QAudioFormat, QAudioSink, QAudioSource, QMediaDevices
 
-from ptt_core import POLL_MS, SINK_MS, TEXT_WIDGETS, VK_SPACE, Gate, Settings, convert, peak
+from ptt_core import POLL_MS, SINK_MS, TEXT_WIDGETS, VK_SPACE, Gate, Pipeline, Settings, choose_input, is_cable
 
 
 def space_down_windows():
@@ -44,23 +44,24 @@ def foreground_pid():
         return None
 
 
-def pick_format(inp, out):
-    """Định dạng chung cho mic và cáp: ưu tiên 48 kHz 16-bit, kênh mỗi bên tự chọn."""
-    for rate in (48000, 44100):
-        for kind in (QAudioFormat.SampleFormat.Int16, QAudioFormat.SampleFormat.Float):
-            fi = fo = None
-            for ch in (1, 2):
-                f = QAudioFormat(); f.setSampleRate(rate); f.setChannelCount(ch); f.setSampleFormat(kind)
-                if fi is None and inp.isFormatSupported(f):
-                    fi = f
-            for ch in (2, 1):
-                f = QAudioFormat(); f.setSampleRate(rate); f.setChannelCount(ch); f.setSampleFormat(kind)
-                if fo is None and out.isFormatSupported(f):
-                    fo = f
-            if fi is not None and fo is not None:
-                return fi, fo
-    fo = out.preferredFormat(); fi = QAudioFormat(fo)
-    return fi, fo
+KIND = {QAudioFormat.SampleFormat.UInt8: 'u8', QAudioFormat.SampleFormat.Int16: 'i16',
+        QAudioFormat.SampleFormat.Int32: 'i32', QAudioFormat.SampleFormat.Float: 'f32'}
+
+MIC_PRIVACY = ('Windows có thể đang chặn quyền micro: Cài đặt → Quyền riêng tư & bảo mật → Micro → bật "Truy cập micro" '
+               'và "Cho phép ứng dụng máy tính truy cập micro". Hoặc micro đang bị app khác giữ riêng (tắt chế độ độc quyền '
+               'trong Âm thanh → Ghi âm → Thuộc tính → Nâng cao).')
+
+
+def native_format(dev):
+    """4.3.14: định dạng gốc của thiết bị (Windows chia sẻ: luôn mở được). Hỏng thì 48 kHz 16-bit."""
+    f = dev.preferredFormat()
+    if f.sampleRate() <= 0 or f.channelCount() <= 0 or f.sampleFormat() not in KIND:
+        f = QAudioFormat(); f.setSampleRate(48000); f.setChannelCount(2); f.setSampleFormat(QAudioFormat.SampleFormat.Int16)
+    return f
+
+
+def describe(f):
+    return '%d Hz %d kênh %s' % (f.sampleRate(), f.channelCount(), KIND.get(f.sampleFormat(), '?'))
 
 
 class PushToTalk(QObject):
@@ -74,7 +75,7 @@ class PushToTalk(QObject):
         self.key_reader = key_reader or (space_down_windows if sys.platform == 'win32' else None)
         self.app_space = False            # phím cách khi NBL đang được chọn (đường dự phòng ngoài Windows)
         self.source = self.sink = self.inp = self.out = None
-        self.fi = self.fo = None
+        self.fi = self.fo = None; self.pipe = None; self.got = 0; self.warn = ''
         self.level = 0.0; self.talking = False; self.armed = False; self.error = ''; self.anywhere = True
         self.target_name = ''; self.mic_name = ''
         self.talk_started = 0.0; self.total_talk = 0.0
@@ -84,30 +85,55 @@ class PushToTalk(QObject):
     def arm(self, cfg=None):
         cfg = cfg or self.settings.load()
         self.disarm(quiet=True)
-        mic = self.find_input(cfg.get('mic'))
+        self.error = ''; self.warn = ''
+        mic, why = self.find_input(cfg.get('mic'))
         out = self.owner.ptt_target(cfg.get('out'))
+        inputs = [d.description() for d in QMediaDevices.audioInputs()]
         if mic is None or mic.isNull():
-            self.error = 'Máy chưa có micro.'; self.owner.log('Giọng nói: ' + self.error); return False
+            self.error = why or ('Máy chưa có micro nào (Windows không thấy thiết bị ghi âm). Cắm tai nghe có mic / mic USB rồi bật lại.')
+            self.owner.log('Giọng nói: ' + self.error + ' Thiết bị ghi âm Windows thấy: ' + (', '.join(inputs) or 'không có')); return False
         if out is None or out.isNull():
-            self.error = 'Không thấy đầu ra âm thanh.'; self.owner.log('Giọng nói: ' + self.error); return False
-        self.fi, self.fo = pick_format(mic, out)
+            self.error = 'Không thấy đầu ra âm thanh (cáp ảo).'; self.owner.log('Giọng nói: ' + self.error); return False
+        self.fi, self.fo = native_format(mic), native_format(out)
+        self.pipe = Pipeline(self.fi.sampleRate(), self.fi.channelCount(), KIND[self.fi.sampleFormat()],
+                             self.fo.sampleRate(), self.fo.channelCount(), KIND[self.fo.sampleFormat()])
         self.source = QAudioSource(mic, self.fi, self)
         self.sink = QAudioSink(out, self.fo, self)
-        bpf_in = max(1, self.fi.bytesPerFrame()); bpf_out = max(1, self.fo.bytesPerFrame())
-        self.source.setBufferSize(int(self.fi.sampleRate() * 0.02) * bpf_in)
-        self.sink.setBufferSize(int(self.fo.sampleRate() * SINK_MS / 1000) * bpf_out)
+        self.source.setBufferSize(int(self.fi.sampleRate() * 0.02) * max(1, self.fi.bytesPerFrame()))
+        self.sink.setBufferSize(int(self.fo.sampleRate() * SINK_MS / 1000) * max(1, self.fo.bytesPerFrame()))
         self.out = self.sink.start()
         self.inp = self.source.start()
-        if self.inp is None or self.out is None:
-            self.error = 'Không mở được micro hoặc cáp ảo (thiết bị đang bị chiếm?).'
+        self.mic_name = mic.description(); self.target_name = out.description()
+        self.owner.log('Giọng nói: mic "' + self.mic_name + '" (' + describe(self.fi) + ') → "' + self.target_name + '" (' + describe(self.fo) + '). Thiết bị ghi âm: ' + ', '.join(inputs))
+        err_in = self.source.error() != QAudio.Error.NoError if self.source is not None else True
+        err_out = self.sink.error() != QAudio.Error.NoError if self.sink is not None else True
+        if self.inp is None or err_in:
+            self.error = 'Không mở được micro "' + self.mic_name + '". ' + MIC_PRIVACY
+            self.owner.log('Giọng nói: ' + self.error); self.disarm(quiet=True); return False
+        if self.out is None or err_out:
+            self.error = 'Không mở được đầu ra "' + self.target_name + '" (cáp ảo đang bị chiếm hoặc đã gỡ?).'
             self.owner.log('Giọng nói: ' + self.error); self.disarm(quiet=True); return False
         self.inp.readyRead.connect(self.pump)
-        self.mic_name = mic.description(); self.target_name = out.description()
+        self.source.stateChanged.connect(self.source_state)
+        self.got = 0
+        self.warn = why
         self.anywhere = bool(cfg.get('anywhere', True))
-        self.armed = True; self.error = ''; self.gate.reset()
+        self.armed = True; self.gate.reset()
         self.timer.start(POLL_MS)
-        self.owner.log('Giọng nói: SẴN SÀNG — giữ phím cách để nói (mic "' + self.mic_name + '" → "' + self.target_name + '").')
+        QTimer.singleShot(2500, self.check_data)
+        self.owner.log('Giọng nói: SẴN SÀNG — giữ phím cách để nói.' + (' ' + why if why else ''))
         return True
+
+    def source_state(self, state):
+        if self.source is not None and self.armed and self.source.error() not in (QAudio.Error.NoError, QAudio.Error.UnderrunError):
+            self.error = 'Micro "' + self.mic_name + '" ngừng gửi tiếng (' + str(self.source.error()).split('.')[-1] + '). ' + MIC_PRIVACY
+            self.owner.log('Giọng nói: ' + self.error)
+
+    def check_data(self):
+        """Bật xong 2,5 giây mà micro không gửi byte nào: gần như chắc Windows chặn quyền micro."""
+        if self.armed and self.got == 0 and not self.error:
+            self.error = 'Micro "' + self.mic_name + '" không gửi tiếng nào. ' + MIC_PRIVACY
+            self.owner.log('Giọng nói: ' + self.error)
 
     def disarm(self, quiet=False):
         self.timer.stop()
@@ -126,10 +152,12 @@ class PushToTalk(QObject):
 
     @staticmethod
     def find_input(want):
-        for d in QMediaDevices.audioInputs():
-            if want and bytes(d.id()).hex() == want:
-                return d
-        return QMediaDevices.defaultAudioInput()
+        """Micro sẽ dùng + lời nhắc (ptt_core.choose_input)."""
+        inputs = QMediaDevices.audioInputs()
+        d = QMediaDevices.defaultAudioInput()
+        hexid = lambda x: bytes(x.id()).hex()
+        got, why = choose_input([(x.description(), hexid(x)) for x in inputs], None if d.isNull() else (d.description(), hexid(d)), want)
+        return next((x for x in inputs if hexid(x) == got), None), why
 
     # ---------- phím ----------
     def pressed(self):
@@ -183,20 +211,31 @@ class PushToTalk(QObject):
         data = bytes(self.inp.readAll())
         if not data:
             return
-        f_in = self.fi.sampleFormat() == QAudioFormat.SampleFormat.Float
-        self.level = max(self.level * 0.7, peak(data, f_in))
+        self.got += len(data)
         if not self.talking or self.out is None:
+            self.level = max(self.level * 0.7, self.quick_level(data))
             return
-        f_out = self.fo.sampleFormat() == QAudioFormat.SampleFormat.Float
-        data = convert(data, self.fi.channelCount(), self.fo.channelCount(), f_in, f_out)
+        out = self.pipe.process(data)
+        self.level = max(self.level * 0.7, self.pipe.level)
         free = self.sink.bytesFree()
         if free <= 0:
             return
-        if len(data) > free:
+        if len(out) > free:
             frame = max(1, self.fo.bytesPerFrame())
-            cut = len(data) - free; cut += (-cut) % frame
-            data = data[cut:]
-        self.out.write(data)
+            cut = len(out) - free; cut += (-cut) % frame
+            out = out[cut:]
+        self.out.write(out)
+
+    def quick_level(self, data):
+        """Mức tiếng mic cho thanh thử mic (cả lúc chưa giữ phím)."""
+        from ptt_core import decode
+        try:
+            x = decode(data[-8192:], KIND[self.fi.sampleFormat()])
+            if len(x) == 0:
+                return 0.0
+            return min(1.0, float(abs(x).max()) if hasattr(x, 'max') else max(abs(v) for v in x))
+        except Exception:
+            return 0.0
 
     def status(self):
         if self.error:
@@ -205,7 +244,7 @@ class PushToTalk(QObject):
             return 'Đang tắt. Bật lên rồi giữ phím cách để nói vào LIVE.'
         if self.talking:
             return '🔴 ĐANG NÓI VÀO LIVE — thả phím cách để ngắt'
-        return '🟢 Sẵn sàng — giữ phím cách để nói (mic: ' + self.mic_name + ' → ' + self.target_name + ')'
+        return '🟢 Sẵn sàng — giữ phím cách để nói (mic: ' + self.mic_name + ' → ' + self.target_name + ')' + ('\nℹ ' + self.warn if self.warn else '')
 
 
 class SpaceFilter(QObject):

@@ -48,7 +48,7 @@ STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử 
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.13 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.14 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
@@ -451,8 +451,9 @@ class StudioPanel(QWidget):
      try:r=future.result() or {}
      except Exception:r={}
      if r.get('floating') and not r.get('docked') and r.get('found') is False:
-      msg=str(widget)+' · Cửa sổ Trò chuyện LIVE đang nổi nhưng NBL chưa tìm thấy nút ghép để tự gộp. Bấm nút ghép trên cửa sổ đó 1 lần (hoặc gửi file đo khung chat để NBL tự làm).'
-      if self.owner.notifier.alarm('chatdock:'+str(widget),msg):self.owner.log(msg)
+      # 4.3.14: báo 1 lần (6 giờ mới nhắc lại), không dồn 5 lần như captcha; NBL tự lưu các nút của cửa sổ nổi
+      msg=str(widget)+' · Cửa sổ Trò chuyện LIVE đang nổi, NBL chưa tự gộp được. AI vẫn đọc bình luận ở cửa sổ nổi. NBL đã lưu dữ liệu nút vào logs/khung_chat_noi.json để sửa; muốn gộp ngay thì bấm nút ghép trên cửa sổ đó 1 lần.'
+      if self.owner.notifier.publish('chatdock:'+str(widget),msg,cooldown=6*3600):self.owner.log(msg)
      elif r.get('docked') and r.get('how'):self.owner.log(str(widget)+' · Đã tự ghép cửa sổ Trò chuyện LIVE về Studio.')
      continue
     if jid=='studiocaptcha':
@@ -646,6 +647,14 @@ class StudioPanel(QWidget):
   video_problem(session);session['loop']=True
   self.warn_shared_audio(j,session)
   j['video_sent']=time.time();self.owner.command('play',False,session);j['prepare_phase']='video';j['video_until']=time.time()+20
+  # 4.3.14: phát lại trong cửa sổ đang mở; phải mở cửa sổ mới (Studio chưa nhận hình) thì báo chủ máy
+  from video_commands import LAST
+  if LAST.get('redirected'):self.owner.log(str(p.get('name',''))+' · NBL VIDEO: dùng cửa sổ đang mở, phát lại từ đầu.')
+  if LAST.get('opened'):
+   msg=str(p.get('name',''))+' · ⚠ Không thấy cửa sổ NBL VIDEO nào đang mở nên NBL phải mở cửa sổ mới. Studio có thể chưa nhận hình cửa sổ mới: vào Studio chọn lại nguồn cửa sổ "NBL VIDEO".'
+   self.owner.log(msg)
+   try:self.owner.notifier.publish('video_new:'+str(p.get('id','')),msg)
+   except Exception:pass
  def warn_shared_audio(self,j,session):
   """Two LIVEs on one PC: both NBL VIDEO windows playing to the same speaker are
   heard by both Studios (owner, 19/10/2026)."""

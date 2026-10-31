@@ -47,8 +47,7 @@ w = nbl.Console(); w.show(); spin(2)
 
 def t_title():
     from diagnostics import VERSION
-    assert VERSION == '4.3.13', VERSION
-    assert w.windowTitle() == 'TOOL NBL LIVE • 4.3.13', w.windowTitle()
+    assert w.windowTitle() == 'TOOL NBL LIVE • ' + VERSION, w.windowTitle()
     assert 'vá' not in w.windowTitle().lower()
 
 
@@ -112,6 +111,8 @@ def t_pump_only_while_talking_and_never_lags():
     fi = QAudioFormat(); fi.setSampleRate(48000); fi.setChannelCount(1); fi.setSampleFormat(QAudioFormat.SampleFormat.Int16)
     fo = QAudioFormat(); fo.setSampleRate(48000); fo.setChannelCount(2); fo.setSampleFormat(QAudioFormat.SampleFormat.Int16)
     p.fi, p.fo = fi, fo; p.inp = FakeIn(); p.sink = FakeSink(100000); p.out = FakeOut()
+    from ptt_core import Pipeline
+    p.pipe = Pipeline(48000, 1, 'i16', 48000, 2, 'i16')
     p.inp.buf = array.array('h', [1000] * 960).tobytes(); p.pump()
     assert p.out.data == [], 'không giữ phím mà vẫn ghi vào cáp'
     assert p.level > 0.02
@@ -120,7 +121,13 @@ def t_pump_only_while_talking_and_never_lags():
     assert len(p.out.data) == 1 and len(p.out.data[0]) == 960 * 2 * 2, len(p.out.data[0])
     p.sink.free = 1000; p.inp.buf = array.array('h', range(960)).tobytes(); p.pump()
     last = p.out.data[-1]; assert len(last) == 1000, len(last)            # bỏ phần cũ, giữ phần mới nhất
-    assert array.array('h', last)[-1] == 959
+    assert abs(array.array('h', last)[-1] - 959) <= 1
+    # 4.3.14: mic 44,1 kHz float stereo -> cáp 48 kHz 16-bit stereo (4.3.13 không mở được ca này)
+    p.pipe = Pipeline(44100, 2, 'f32', 48000, 2, 'i16'); p.sink.free = 100000
+    fi2 = QAudioFormat(); fi2.setSampleRate(44100); fi2.setChannelCount(2); fi2.setSampleFormat(QAudioFormat.SampleFormat.Float); p.fi = fi2
+    p.inp.buf = array.array('f', [0.25] * 882).tobytes(); n0 = len(p.out.data); p.pump()
+    got = array.array('h', p.out.data[-1]); assert len(p.out.data) == n0 + 1 and abs(len(got) / 2 - 441 * 48000 / 44100) <= 2, len(got)
+    assert abs(got[-1] - 8192) <= 2, got[-1]
 
 
 def t_gate_with_fake_key():
@@ -188,7 +195,7 @@ def t_phone_server_has_store():
     assert w.phone_server.store is w.video_store
 
 
-for name, fn in [('tiêu đề 4.3.13', t_title), ('có trang Giọng nói + AI', t_pages), ('chọn Gemini/ChatGPT', t_ai_engine_ui),
+for name, fn in [('tiêu đề 4.3.14', t_title), ('có trang Giọng nói + AI', t_pages), ('chọn Gemini/ChatGPT', t_ai_engine_ui),
                  ('make_ai đúng lớp', t_make_ai), ('trang Giọng nói đủ ô', t_voice_page_widgets),
                  ('bật giọng nói khi máy không có micro', t_voice_arm_without_devices_is_clean),
                  ('mic chỉ vào cáp khi đang giữ phím, không trễ dần', t_pump_only_while_talking_and_never_lags),

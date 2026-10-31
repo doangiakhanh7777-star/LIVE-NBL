@@ -33,6 +33,33 @@ jobs:
           Get-Content out\ci_summary.txt
           Get-Content out\smoke_windows.txt -Tail 30
           Get-Content out\test_windows.txt -Tail 15
+      - name: Thu am thanh that (VB-CABLE) - khong chan ban build
+        continue-on-error: true
+        timeout-minutes: 12
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONIOENCODING: utf-8
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $log = 'out\audio_windows.txt'
+          "== dich vu am thanh ==" | Out-File -Encoding utf8 $log
+          Set-Service Audiosrv -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service Audiosrv -ErrorAction SilentlyContinue
+          Set-Service AudioEndpointBuilder -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service AudioEndpointBuilder -ErrorAction SilentlyContinue
+          Get-Service Audiosrv, AudioEndpointBuilder | Format-Table -AutoSize | Out-String | Add-Content $log
+          try {
+            Invoke-WebRequest https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip -OutFile vbc.zip -TimeoutSec 120
+            Expand-Archive vbc.zip vbc -Force
+            Get-ChildItem vbc -Filter *.cat | ForEach-Object { $c = (Get-AuthenticodeSignature $_.FullName).SignerCertificate; if ($c) { $f = "$env:TEMP\vb.cer"; Export-Certificate -Cert $c -FilePath $f | Out-Null; Import-Certificate -FilePath $f -CertStoreLocation Cert:\LocalMachine\TrustedPublisher | Out-Null } }
+            $p = Start-Process vbc\VBCABLE_Setup_x64.exe -ArgumentList '-i','-h' -PassThru
+            if (-not $p.WaitForExit(180000)) { $p.Kill(); "cai VB-CABLE: treo qua 3 phut" | Add-Content $log }
+            Start-Sleep 10
+            Restart-Service Audiosrv -Force -ErrorAction SilentlyContinue; Start-Sleep 5
+          } catch { "cai VB-CABLE loi: $_" | Add-Content $log }
+          Get-PnpDevice -Class AudioEndpoint -ErrorAction SilentlyContinue | Format-Table -AutoSize | Out-String | Add-Content $log
+          $q = Start-Process -FilePath .\runtime\python.exe -ArgumentList '-X','utf8','tests\audio_e2e4314.py' -NoNewWindow -PassThru -RedirectStandardOutput out\audio_e2e.txt -RedirectStandardError out\audio_e2e_err.txt
+          if (-not $q.WaitForExit(120000)) { $q.Kill(); "TREO" | Add-Content out\audio_e2e.txt }
+          Get-Content out\audio_e2e.txt
       - name: Day ket qua vao nhanh ci-out-tests
         if: always()
         shell: bash

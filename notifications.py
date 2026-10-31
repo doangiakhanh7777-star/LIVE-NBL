@@ -115,7 +115,11 @@ class Notifier:
                 try:self.work.get_nowait()
                 except queue.Empty:break
     def alarm(self, key, text, times=CAPTCHA_BURST):
-        """Send `text` `times` times in a row (numbered), once per key every 5 minutes."""
+        """Send `text` `times` times in a row (numbered), once per key every 5 minutes.
+        4.3.14 (chủ máy, 31/10/2026): CHỈ captcha mới được báo dồn 5 lần; báo khác gọi nhầm vào đây
+        thì gửi 1 lần như thường."""
+        if not (str(key).startswith('captcha') or is_captcha(text)):
+            return self.publish(key, text)
         with self.lock:
             if self.closed or not self.config.get('enabled'):
                 return False
@@ -126,7 +130,7 @@ class Notifier:
             except queue.Full:return False
             self.last[burst] = now
             return True
-    def publish(self, key, text, test=False):
+    def publish(self, key, text, test=False, cooldown=600):
         if not test and is_captcha(text):
             return self.alarm(key, text)
         with self.lock:
@@ -134,7 +138,7 @@ class Notifier:
                 return False
             now = self.clock()
             # 4.3.0 (owner): each kind of message at most once every 10 minutes (captcha: 5 times, see alarm)
-            if not test and now - self.last.get(key, -1000) < 600:
+            if not test and now - self.last.get(key, -1e9) < cooldown:
                 return False
             try:self.work.put_nowait((self.generation, dict(self.config), text))
             except queue.Full:return False

@@ -141,7 +141,24 @@ CAPTCHA_JS = r"""(() => {
 })()"""
 
 
+FLOAT_DUMP_JS = r"""(() => {
+ // 4.3.14: mọi thứ bấm được / có biểu tượng trong cửa sổ, để đo nút ghép khung chat thật
+ const out = [];
+ const label = el => ['aria-label','title','data-tooltip','alt','data-e2e','data-testid','name'].map(a => el.getAttribute && el.getAttribute(a)).filter(Boolean).join(' | ');
+ for (const el of document.querySelectorAll('button,[role=button],[tabindex],a,svg,[class*=icon i],[class*=btn i],[class*=button i],[class*=header i] *')) {
+   const r = el.getBoundingClientRect(); if (r.width <= 0 || r.height <= 0 || r.width > 900) continue;
+   const use = el.querySelector && el.querySelector('use');
+   out.push({tag: el.tagName.toLowerCase(), cls: String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className).slice(0, 120),
+     label: label(el).slice(0, 120), text: (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 60),
+     icon: use ? (use.getAttribute('href') || use.getAttribute('xlink:href') || '') : '', x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height)});
+   if (out.length >= 400) break;
+ }
+ return {title: document.title, url: location.href.slice(-80), w: innerWidth, h: innerHeight, items: out};
+})()"""
+
+
 _DOCK_TRIED = {}
+_DOCK_DUMPED = {}
 
 
 def plain(text):
@@ -445,6 +462,31 @@ class Studio:
             out['captcha'] = ''
         return out
 
+    def dump_float_chat(self):
+        """4.3.14: chưa biết nút ghép thật của khung chat nổi -> lưu các nút của cửa sổ nổi + cửa sổ chính
+        (mỗi lần mở NBL tối đa 1 file mỗi 30 phút, giữ 5 file mới nhất) vào logs/khung_chat_noi_*.json."""
+        import time as _t
+        if _t.time() - _DOCK_DUMPED.get(self.port, 0) < 1800:
+            return
+        _DOCK_DUMPED[self.port] = _t.time()
+        try:
+            LOG_DIR.mkdir(parents=True, exist_ok=True)
+            data = []
+            for t in self.pages():
+                url = t.get('url', '')
+                if '/html/liveChatFloat/' not in url and '/html/main/' not in url:
+                    continue
+                try:
+                    data.append(dict(url=url[-80:], title=t.get('title', ''), dump=self.js(t, FLOAT_DUMP_JS)))
+                except Exception as e:
+                    data.append(dict(url=url[-80:], error=str(e)[:200]))
+            (LOG_DIR / ('khung_chat_noi_' + _t.strftime('%Y%m%d_%H%M%S') + '.json')).write_text(
+                json.dumps(dict(version=__import__('diagnostics').VERSION, pages=data), ensure_ascii=False, indent=1), encoding='utf-8')
+            for old in sorted(LOG_DIR.glob('khung_chat_noi_*.json'))[:-5]:
+                old.unlink(missing_ok=True)
+        except Exception:
+            pass
+
     def dock_chat(self):
         """If the chat window is floating, click its merge button in-page (no mouse). Returns
         {floating, docked, found}. Rate-limited per port so it never clicks on every read."""
@@ -458,6 +500,7 @@ class Studio:
         _DOCK_TRIED[self.port] = _t.time()
         spot = self.js(t, DOCK_JS)
         if not spot:
+            self.dump_float_chat()
             return dict(floating=True, docked=False, found=False)
         base = {'x': spot['x'], 'y': spot['y'], 'button': 'left', 'clickCount': 1}
         self.call(t, [('Input.dispatchMouseEvent', {**base, 'type': 'mouseMoved'}),

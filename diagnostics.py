@@ -12,7 +12,7 @@ import time
 import zipfile
 from pathlib import Path
 
-VERSION = '4.3.13'
+VERSION = '4.3.14'
 SECRET_KEYS = {'keys', 'key', 'api_key', 'apiKey', 'secret', 'pin_token', 'token', 'protected_token', 'password', 'image', 'sendImage', 'greetingImage', 'qrDataUrl'}
 FILES = ('ai_reply.json', 'profiles.json', 'profiles.json.bak', 'studio_schedules.json', 'studio_interactions_journal.json', 'native_alarm_check.json')
 
@@ -46,7 +46,8 @@ def build(data_dir, destination, extra=None):
             except (OSError, ValueError):
                 text = '(không đọc được tệp này)'
             bundle.writestr(name, text)
-        for path in sorted((data_dir/'logs').glob('app.log*')) + [data_dir/'startup_error.txt']:
+        # 4.3.14: kèm dữ liệu đo khung chat nổi / trang kết thúc Studio (để sửa tự gộp chat)
+        for path in sorted((data_dir/'logs').glob('app.log*')) + sorted((data_dir/'logs').glob('khung_chat_noi*.json'))[-5:] + sorted((data_dir/'logs').glob('studio_trang_ket_thuc_*.json'))[-3:] + [data_dir/'startup_error.txt']:
             if path.is_file():
                 bundle.write(path, 'logs/'+path.name)
         # 4.3.0: newest error / activity reports (with their Studio screenshots), small files only
