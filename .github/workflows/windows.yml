@@ -34,6 +34,7 @@ jobs:
           Get-Content out\smoke_windows.txt -Tail 30
           Get-Content out\test_windows.txt -Tail 15
       - name: Thu am thanh that (VB-CABLE) - khong chan ban build
+        if: always()
         continue-on-error: true
         timeout-minutes: 12
         shell: pwsh
