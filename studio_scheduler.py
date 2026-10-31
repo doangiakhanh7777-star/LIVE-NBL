@@ -64,6 +64,20 @@ def decisions(jobs,now,can_start=lambda j:True):
 
 def execute(profile,action,deadline=0,payload=None):
  if os.name!='nt':raise RuntimeError('Điều khiển LIVE Studio chỉ chạy trên Windows; chưa xác minh trên máy này.')
+ # 4.3.9: tắt hẳn Studio phải làm được với MỌI nick, kể cả nick chưa bật kết nối tự động
+ # (lúc đó không có cổng điều khiển nên tắt thẳng tiến trình theo tên file Studio).
+ if action in ('quit_studio','emergency_stop') and not profile.get('cdp'):
+  from studio_cdp import kill_studio
+  why=''
+  if action=='emergency_stop':
+   try:
+    r=execute(profile,'stop',deadline,payload)
+    if not r.get('live'):return dict(r,quit=False)
+    why='Studio vẫn báo đang LIVE sau lệnh kết thúc'
+   except Exception as e:why=str(e)
+  k=kill_studio(profile.get('exePath'),int(profile.get('cdpPort') or 0))
+  if action=='emergency_stop' and not k.get('closed'):raise ValueError('Chưa kết thúc được LIVE và cũng chưa tắt được Studio. Lý do: '+why[:200])
+  return dict(k,studioClosed=True,live=False,quit=action=='emergency_stop',why=why[:200])
  required=['pid','windowTitle','exePath']
  # 4.2.1 (owner, 28/10/2026): "kết nối tự động" — Studio is read and driven from the
  # inside (DevTools port opened by NBL); no regions, no window, no mouse.

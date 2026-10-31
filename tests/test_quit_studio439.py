@@ -73,3 +73,52 @@ class TatStudio(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class NickChuaBatKetNoiTuDong(unittest.TestCase):
+    """Nick chạy đường cũ (ảnh + chuột) vẫn phải tắt được Studio."""
+    def setUp(self):
+        import studio_scheduler
+        self.sch = studio_scheduler
+        self.old_name = studio_scheduler.os.name; studio_scheduler.os.name = 'nt'
+        self.old_kill = studio_cdp.kill_studio
+        self.killed = []
+        studio_cdp.kill_studio = lambda exe='', port=0: (self.killed.append((exe, port)), dict(closed=True, method='taskkill-ten'))[1]
+
+    def tearDown(self):
+        self.sch.os.name = self.old_name; studio_cdp.kill_studio = self.old_kill
+
+    def test_tat_studio_theo_ten_file(self):
+        r = self.sch.execute(dict(exePath=r'C:\x\TikTokLiveStudio.exe', cdpPort=9339), 'quit_studio')
+        self.assertTrue(r['closed']) and self.assertTrue(r['studioClosed'])
+        self.assertEqual(self.killed, [(r'C:\x\TikTokLiveStudio.exe', 9339)])
+
+    def _emergency(self, stop_result):
+        """Gọi thẳng hàm thật, còn lệnh 'stop' bên trong thì thay bằng kết quả giả."""
+        orig = self.sch.execute
+        def stub(p, a, d=0, pay=None):
+            if a == 'stop':
+                if isinstance(stop_result, Exception):
+                    raise stop_result
+                return stop_result
+            return orig(p, a, d, pay)
+        self.sch.execute = stub
+        try:
+            return orig(dict(exePath=r'C:\\x\\TikTokLiveStudio.exe', cdpPort=0), 'emergency_stop')
+        finally:
+            self.sch.execute = orig
+
+    def test_khan_cap_ket_thuc_duoc_thi_khong_dung_den_tien_trinh(self):
+        r = self._emergency(dict(live=False, confirmed=True))
+        self.assertFalse(r['live']); self.assertFalse(r.get('quit'))
+        self.assertEqual(self.killed, [])
+
+    def test_khan_cap_captcha_chan_thi_tat_han_studio(self):
+        r = self._emergency(RuntimeError('captcha che man hinh, chua thay nut Ket thuc'))
+        self.assertFalse(r['live']); self.assertTrue(r['quit']); self.assertTrue(r['studioClosed'])
+        self.assertIn('captcha', r['why'])
+        self.assertEqual(len(self.killed), 1)
+
+    def test_khan_cap_van_bao_dang_live_thi_cung_tat_han(self):
+        r = self._emergency(dict(live=True))
+        self.assertTrue(r['quit']); self.assertEqual(len(self.killed), 1)
