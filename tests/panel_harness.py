@@ -13,7 +13,7 @@ CLIP = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False).name
 
 METHODS = ('tick', 'notify', 'action_failed', 'start_video', 'warn_shared_audio', 'on_started', 'resume_automation',
            'on_stopped', 'watch_dark', 'poll_chrome_modules', 'start_chrome_modules', 'cart_ready', 'cart_ok', 'poll_cart',
-           'cart_failed', 'close_chrome_summary', 'stop_owned_video', 'stop_chrome', 'drop_job', 'end_hand_live', 'postpone', 'watch_summary', 'poll_summary', 'poll_clip', 'reset_done', 'reset_failed', 'poll_captcha', 'emergency', 'poll_emergency', 'publish', 'cancel_pending_starts')
+           'cart_failed', 'close_chrome_summary', 'stop_owned_video', 'stop_chrome', 'drop_job', 'end_hand_live', 'postpone', 'watch_summary', 'poll_summary', 'poll_clip', 'reset_done', 'reset_failed', 'poll_captcha', 'emergency', 'poll_emergency', 'publish', 'cancel_pending_starts', 'auto_connect', 'auto_connected')
 
 
 def panel_class():
@@ -21,7 +21,7 @@ def panel_class():
     cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'StudioPanel')
     body = [copy.deepcopy(n) for n in cls.body if isinstance(n, ast.FunctionDef) and n.name in METHODS]
     reports = []
-    ns = dict(uuid=__import__('uuid'), copy=copy, json=json, re=__import__('re'), time=time, Path=Path, NotTouched=L.NotTouched, same_file=same_file,
+    ns = dict(uuid=__import__('uuid'), copy=copy, json=json, re=__import__('re'), time=time, Path=Path, NotTouched=L.NotTouched, same_file=same_file, os=__import__('os'),
               decisions=S.decisions, execute=lambda *a, **k: None, ACTIVE=S.ACTIVE, START_MARGIN=S.START_MARGIN,
               RETRY_GAP=S.RETRY_GAP, STOP_TRIES=S.STOP_TRIES, report=lambda *a: reports.append(a))
     helpers = [copy.deepcopy(n) for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in ('vision_missing', 'video_problem', 'now_due')]
@@ -63,7 +63,8 @@ def make(jobs, profiles=None, sessions=None):
     p.effective_profile = lambda prof: prof
     p.submit = lambda j, action, payload=None: p.submitted.append((j['id'], action))
     p.reports = reports
-    p.poll_hand_live = p.auto_connect = p.poll_studio_captcha = p.poll_chat_dock = lambda now: None   # watchers: tested on their own
+    p.poll_hand_live = p.poll_studio_captcha = p.poll_chat_dock = lambda now: None   # watchers: tested on their own
+    p.auto_connect_real = p.auto_connect; p.auto_connect = lambda now: None          # bật lại trong test riêng của nó
     return p
 
 

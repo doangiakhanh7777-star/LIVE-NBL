@@ -9,16 +9,68 @@ import random
 import sys
 import time
 from pathlib import Path
-from PySide6.QtGui import QIcon
-from PySide6.QtCore import QTimer, QUrl, Qt
-from PySide6.QtWidgets import QApplication, QMainWindow, QLabel
-from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer, QMediaDevices
-from PySide6.QtMultimediaWidgets import QVideoWidget
+from PySide6.QtGui import QIcon, QColor, QImage, QPainter
+from PySide6.QtCore import QTimer, QUrl, Qt, QRect
+from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QWidget
+from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer, QMediaDevices, QVideoSink
 from model import write_json
 from video_commands import same_file
 
 
 HEALTHY_SECONDS = 60
+
+
+def letterbox(frame_w, frame_h, area_w, area_h):
+    """Ô vẽ (x, y, rộng, cao) để hình nằm GIỮA và GIỮ ĐÚNG TỈ LỆ, viền đen hai bên.
+
+    Kéo méo hình LIVE là hỏng cả phiên, nên phần tính này tách riêng ra để kiểm được."""
+    if frame_w <= 0 or frame_h <= 0 or area_w <= 0 or area_h <= 0:
+        return 0, 0, max(area_w, 0), max(area_h, 0)
+    if frame_w * area_h > area_w * frame_h:      # hình bè hơn ô vẽ: chạm hai mép trái phải
+        w = area_w; h = max(1, round(frame_h * area_w / frame_w))
+    else:                                         # hình cao hơn: chạm hai mép trên dưới
+        h = area_h; w = max(1, round(frame_w * area_h / frame_h))
+    return (area_w - w) // 2, (area_h - h) // 2, w, h
+
+
+class VideoCanvas(QWidget):
+    """4.3.11 (chủ máy, 31/10/2026): NBL tự vẽ hình bằng CPU thay vì nhờ card màn hình.
+
+    Máy thứ hai của chủ máy (card Intel) vẽ được 0,5 lần/giây — hình đứng — và nhiều
+    khi giết luôn cả chương trình ("mở lên nó tự tắt"). Đo trên đúng máy đó: giải mã
+    vẫn chạy đủ 29,9 hình/giây, chỉ khâu vẽ là chết. Tự vẽ bằng CPU: 29,6 lần/giây.
+
+    Cửa sổ này là thứ TikTok LIVE Studio chụp lại để phát LIVE, nên nó phải vẽ được
+    trên mọi máy; chạy chắc quan trọng hơn chạy nhẹ.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+        self.setAutoFillBackground(False)
+        self.frame = QImage()
+        self.sink = QVideoSink(self)
+        self.sink.videoFrameChanged.connect(self.on_frame)
+
+    def on_frame(self, frame):
+        if not frame.isValid():
+            return
+        image = frame.toImage()
+        if image.isNull():
+            return
+        self.frame = image
+        self.update()
+
+    def clear(self):
+        self.frame = QImage(); self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), QColor(0, 0, 0))
+        if self.frame.isNull():
+            return
+        area = self.rect()
+        painter.drawImage(QRect(*letterbox(self.frame.width(), self.frame.height(), area.width(), area.height())), self.frame)
+
 
 class Output(QMainWindow):
     def __init__(self, folder):
@@ -26,9 +78,9 @@ class Output(QMainWindow):
         self.wanted = 'stopped'; self.generation = 0; self.end_pending = False
         self.stopped_since = None; self.recovery_count = 0; self.playing_since = None
         self.setWindowIcon(QIcon(str(Path(__file__).parent/'assets/logo_38.ico')));self.setWindowTitle('NBL VIDEO'); self.resize(405, 720)
-        self.video = QVideoWidget(); self.setCentralWidget(self.video)
+        self.video = VideoCanvas(); self.setCentralWidget(self.video)
         self.audio = QAudioOutput(self); self.audio.setMuted(True)
-        self.player = QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.player.setVideoOutput(self.video)
+        self.player = QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.player.setVideoOutput(self.video.sink)
         self.player.mediaStatusChanged.connect(self.media_status)
         self.player.errorOccurred.connect(self.media_error)
         self.devices = QMediaDevices(self); self.devices.audioOutputsChanged.connect(self.refresh_audio)

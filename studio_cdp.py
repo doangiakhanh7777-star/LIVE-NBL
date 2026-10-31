@@ -643,19 +643,82 @@ def connect(exe, port, other_ports=(), open_if_closed=True):
         return studio
     if not open_if_closed:
         return None
+    if not exe:
+        exe = find_exe()                 # hỏi Windows: chỉ khi NBL thật sự phải tự mở Studio
     if running_studio(exe) and not any(Studio(p).alive() for p in other_ports):
         raise NotTouched('TikTok LIVE Studio đang mở nhưng KHÔNG phải do NBL mở, nên NBL chưa đọc được. Đóng hẳn Studio (khi không LIVE); NBL sẽ tự mở lại.')
     return launch(exe, port)
 
 
-def find_exe(hint=''):
-    cands = [hint] if hint else []
-    for base in (os.environ.get('ProgramFiles', ''), os.environ.get('ProgramFiles(x86)', ''), os.environ.get('LOCALAPPDATA', '') + r'\Programs'):
-        cands.append(str(Path(base) / 'TikTok LIVE Studio' / 'TikTok LIVE Studio.exe'))
-    for c in cands:
-        if c and Path(c).is_file():
-            return c
+STUDIO_EXE = 'TikTok LIVE Studio.exe'
+
+
+_EXE_CACHE = {'at': 0.0, 'path': ''}
+
+
+def running_exe_path(max_age=300):
+    r"""Đường dẫn thật của Studio ĐANG CHẠY, hỏi thẳng Windows.
+
+    4.3.10 (chủ máy, 31/10/2026): máy khách cài Studio thành
+    "...\TikTok LIVE Studio\1.38.0\TikTok LIVE Studio.exe" — có thêm tầng thư mục
+    phiên bản — nên cách dò theo khuôn cố định không ra. Hỏi Windows thì đúng mọi kiểu cài."""
+    if os.name != 'nt':
+        return ''
+    now = time.time()
+    if now - _EXE_CACHE['at'] < (max_age if _EXE_CACHE['path'] else 60):
+        return _EXE_CACHE['path']
+    _EXE_CACHE['at'] = now
+    ps = ("Get-CimInstance Win32_Process -Filter \"Name='" + STUDIO_EXE + "'\" "
+          "| Where-Object { $_.ExecutablePath } | Select-Object -First 1 -ExpandProperty ExecutablePath")
+    try:
+        out = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', ps], capture_output=True,
+                             text=True, errors='replace', timeout=25,
+                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout.strip().splitlines()
+    except Exception:
+        return ''
+    for line in out:
+        line = line.strip().strip('"')
+        if line and Path(line).is_file():
+            _EXE_CACHE['path'] = line
+            return line
     return ''
+
+
+def find_exe(hint='', ask_windows=True):
+    """Thứ tự: đường dẫn đã lưu → Studio đang chạy (chuẩn nhất) → các thư mục cài
+    thường gặp → thư mục con theo phiên bản (1.38.0, 1.39.0…), bản mới nhất trước."""
+    if hint and Path(hint).is_file():
+        return hint
+    if ask_windows:
+        found = running_exe_path()
+        if found:
+            return found
+    bases, cands = [], []
+    for key in ('ProgramFiles', 'ProgramW6432', 'ProgramFiles(x86)'):
+        if os.environ.get(key):
+            bases.append(Path(os.environ[key]))
+    if os.environ.get('LOCALAPPDATA'):
+        bases += [Path(os.environ['LOCALAPPDATA']) / 'Programs', Path(os.environ['LOCALAPPDATA'])]
+    for base in bases:
+        root = base / 'TikTok LIVE Studio'
+        cands.append(root / STUDIO_EXE)
+        try:
+            if root.is_dir():
+                subs = [d for d in root.iterdir() if d.is_dir() and (d / STUDIO_EXE).is_file()]
+                cands += [d / STUDIO_EXE for d in sorted(subs, key=lambda d: _ver(d.name), reverse=True)]
+        except OSError:
+            pass
+    for c in cands:
+        try:
+            if c.is_file():
+                return str(c)
+        except OSError:
+            pass
+    return ''
+
+
+def _ver(name):
+    return [int(x) if x.isdigit() else 0 for x in re.split(r'[._-]', str(name))[:4]] or [0]
 
 
 def execute_cdp(profile, action, deadline=0, payload=None):
@@ -684,6 +747,9 @@ def execute_cdp(profile, action, deadline=0, payload=None):
     else:
         studio = connect(profile.get('exePath'), port, others, open_if_closed=not profile.get('noLaunch'))
         if studio is None:
+            if not profile.get('exePath'):
+                raise NotTouched('TikTok LIVE Studio chưa mở, và NBL cũng chưa tìm thấy file Studio trên máy nên không tự mở được. '
+                                 'Mở Studio lên là NBL tự kết nối.')
             raise NotTouched('TikTok LIVE Studio chưa mở. Mở Studio bằng icon TikTok LIVE Studio; NBL tự kết nối.')
     if action == 'probe':
         return dict(windowFound=True)
@@ -715,7 +781,8 @@ def execute_cdp(profile, action, deadline=0, payload=None):
     if action == 'screenshot':
         return dict(jpeg=studio.screenshot(), method='cdp')
     if action == 'connect':
-        return studio.connect_screen(port)
+        out = studio.connect_screen(port)
+        return dict(out, exePath=profile.get('exePath') or find_exe())
     raise NotTouched('Kết nối tự động chưa làm mục này: ' + action)
 
 

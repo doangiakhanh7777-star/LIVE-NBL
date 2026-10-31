@@ -48,7 +48,7 @@ STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử 
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.9 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.11 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
@@ -1052,14 +1052,17 @@ class StudioPanel(QWidget):
   if current.get('cdp') and ok.get('ok') and time.monotonic()-ok.get('at',0)<30:self.auto_at=now+30;return
   self.auto_at=now+20
   from studio_cdp import find_exe,BASE_PORT
-  exe=find_exe(current.get('exePath') or '')
-  if not exe:
-   if self.auto_note!='exe':self.auto_note='exe';self.owner.log('Chưa tìm thấy TikTok LIVE Studio trên máy (cài Studio vào thư mục mặc định).')
-   return
+  # ask_windows=False: hàm này chạy trên luồng giao diện, không được gọi PowerShell kẻo NBL khựng.
+  # Luồng thợ sẽ tự hỏi Windows khi cần mở Studio, rồi trả đường dẫn về cho NBL lưu lại.
+  exe=find_exe(current.get('exePath') or '',ask_windows=False)
   port=int(current.get('cdpPort') or BASE_PORT)
+  # 4.3.10 (chủ máy, 31/10/2026): TRƯỚC ĐÂY không tìm thấy file Studio là NBL bỏ về luôn,
+  # không thèm thử kết nối. Máy khách cài Studio có tầng thư mục phiên bản nên dò không ra,
+  # dù Studio đang mở sẵn và đã mở cổng điều khiển — NBL thừa sức đọc. File .exe chỉ cần khi
+  # NBL phải TỰ MỞ Studio, nên không có thì vẫn nối, chỉ là không tự mở được thôi.
   try:
    # Studio is opened by NBL only once (when NBL starts); later NBL only looks for it.
-   f=self.pool.submit_priority(30,execute,dict(cdp=True,cdpPort=port,exePath=exe,noLaunch=getattr(self,'auto_launched',False)),'connect');self.futures[f]=('autoconnect',(session['id'],exe,port),'connect')
+   f=self.pool.submit_priority(30,execute,dict(cdp=True,cdpPort=port,exePath=exe,noLaunch=bool(getattr(self,'auto_launched',False)) or not exe),'connect');self.futures[f]=('autoconnect',(session['id'],exe,port),'connect')
    self.auto_launched=True
   except Exception:pass
  def auto_connected(self,future,info):
@@ -1067,7 +1070,10 @@ class StudioPanel(QWidget):
   try:r=future.result()
   except Exception as e:
    text=str(e)
-   if text!=self.auto_note:self.auto_note=text;self.owner.log('Studio: '+text)
+   # 4.3.10: trước đây lỗi y hệt chỉ ghi MỘT LẦN rồi im luôn, nên chủ máy nhìn nhật ký
+   # chỉ thấy "Đang tìm và kết nối lại Studio…" mà không bao giờ biết vì sao hỏng.
+   if text!=self.auto_note or time.time()-getattr(self,'auto_note_at',0)>300:
+    self.auto_note=text;self.auto_note_at=time.time();self.owner.log('Studio: '+text)
    if 'KHÔNG phải do NBL mở' in text:
     try:self.owner.notifier.publish('studio:noport','⚠ TikTok LIVE Studio đang mở nhưng không mở qua NBL nên NBL chưa đọc được. Đóng Studio (khi không LIVE) rồi mở lại bằng icon TikTok LIVE Studio.')
     except Exception:pass
@@ -1076,7 +1082,7 @@ class StudioPanel(QWidget):
   session=next((s for s in self.owner.data['sessions'] if s['id']==sid),None)
   if not nick or not session:return
   current=next((p for p in self.profiles if p.get('session')==sid),None) or {}
-  value={**current,'id':current.get('id',uuid.uuid4().hex),'name':nick,'accountName':nick,'session':sid,'exePath':exe,'cdp':True,'cdpPort':port,
+  value={**current,'id':current.get('id',uuid.uuid4().hex),'name':nick,'accountName':nick,'session':sid,'exePath':r.get('exePath') or exe or current.get('exePath',''),'cdp':True,'cdpPort':port,
          'interaction':current.get('interaction',session.get('studio_interaction',{})),'allowMouse':current.get('allowMouse',True),'mousePermissionFile':str(self.mouse_path)}
   if current:self.profiles[self.profiles.index(current)]=value
   else:self.profiles.append(value)
