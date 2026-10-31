@@ -3,6 +3,8 @@ on:
   workflow_dispatch:
   push:
     paths: ['mobile/**', '.github/workflows/android.yml']
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -50,3 +52,13 @@ jobs:
         with:
           name: NBL_LIVE_Android
           path: NBL_LIVE_Android_4.3.13.apk
+      - name: Day APK vao nhanh apk-out (artifact khong tai duoc tu may dung ban)
+        run: |
+          set -e
+          mkdir apkout; cp NBL_LIVE_Android_4.3.13.apk apkout/; cd apkout
+          sha256sum NBL_LIVE_Android_4.3.13.apk > NBL_LIVE_Android_4.3.13.apk.sha256
+          if [ -n "$NBL_KEYSTORE" ]; then echo signed > ky.txt; else echo debug > ky.txt; fi
+          git init -q -b apk-out
+          git config user.name nbl-ci; git config user.email nbl-ci@users.noreply.github.com
+          git add -A; git commit -q -m "APK 4.3.13 ($GITHUB_SHA)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/apk-out

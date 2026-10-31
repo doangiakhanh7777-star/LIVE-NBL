@@ -14,7 +14,7 @@ class QtSmokeTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d,patch.object(app,'DATA',Path(d)):
    window=app.Console()
    try:
-    window.show();self.qt.processEvents();self.assertIn('4.0.2',window.windowTitle());self.assertFalse(window.studio_panel.stopped)
+    window.show();self.qt.processEvents();self.assertIn(__import__('diagnostics').VERSION,window.windowTitle());self.assertFalse(window.studio_panel.stopped)
    finally:window.close();self.qt.processEvents()
  def test_actual_console_recovers_bad_studio_file_and_notifies(self):
   import app
