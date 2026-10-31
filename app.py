@@ -403,6 +403,26 @@ class Console(QMainWindow):
         if hit:self.ptt_warn='';return find(hit[0])
         self.ptt_warn='Máy chưa có cáp âm thanh ảo — tiếng đang ra loa mặc định, Studio có thể không thu được.'
         return QMediaDevices.defaultAudioOutput()
+    def ptt_mic_blocked(self,priv):
+        """4.3.14: Windows chặn micro cho ứng dụng máy tính -> hỏi chủ máy, đồng ý thì NBL bật quyền (tài khoản này) rồi mở lại."""
+        if getattr(self,'_mic_asking',False) or getattr(self,'_mic_declined',False):return
+        self._mic_asking=True
+        try:
+            from ptt import allow_mic_for_user
+            if priv.get('machine')=='Deny':
+                QMessageBox.information(self,'Micro bị khóa','Windows đang khóa micro cho CẢ MÁY (cần quyền quản trị). NBL mở trang Cài đặt → Micro: bật "Truy cập micro" và "Cho phép ứng dụng máy tính truy cập micro", rồi bật lại giữ phím cách.')
+                QDesktopServices.openUrl(QUrl('ms-settings:privacy-microphone'));return
+            ans=QMessageBox.question(self,'Windows đang chặn micro','Windows đang chặn micro cho ứng dụng máy tính nên NBL không nghe được mic.\n\nCho NBL bật quyền micro cho tài khoản Windows này? (Tắt lại được trong Cài đặt → Quyền riêng tư → Micro.)')
+            if ans!=QMessageBox.StandardButton.Yes:
+                self._mic_declined=True;QDesktopServices.openUrl(QUrl('ms-settings:privacy-microphone'));return
+            try:ok=allow_mic_for_user()
+            except Exception as e:ok=False;self.log('Giọng nói: chưa bật được quyền micro: '+str(e)[:150])
+            if not ok:
+                QDesktopServices.openUrl(QUrl('ms-settings:privacy-microphone'));return
+            self.log('Giọng nói: đã bật quyền micro Windows cho ứng dụng máy tính; mở lại mic…')
+            QTimer.singleShot(800,self.voice_apply)
+        finally:
+            self._mic_asking=False
     def ptt_changed(self,on):
         ai=getattr(self,'ai',None)
         if ai is not None:ai.set_hold(on)

@@ -40,6 +40,8 @@ class Owner(QObject):
         self.changes.append(on)
     def ptt_target(self, out_id=''):
         return cin
+    def ptt_mic_blocked(self, priv):
+        self.blocked = priv; print('NBL HỎI BẬT QUYỀN MICRO (quyền hiện tại: %s)' % priv, flush=True)
 
 
 def spin(sec):
@@ -67,8 +69,14 @@ def feed():
 feeder = QTimer(); feeder.timeout.connect(feed); feeder.start(15)
 owner = Owner()
 p = ptt.PushToTalk(owner, Path(os.environ.get('TEMP', '/tmp')), key_reader=lambda: False)
-ok = p.arm(dict(enabled=True, mic=bytes(cout.id()).hex(), out='', anywhere=True, duck=True))
+cfg = dict(enabled=True, mic=bytes(cout.id()).hex(), out='', anywhere=True, duck=True)
+ok = p.arm(cfg)
 results = []
+if not ok and p.blocked:
+    # giống chủ máy bấm "Có" ở câu hỏi bật quyền micro
+    print('Windows chặn micro -> NBL bật quyền cho tài khoản này:', ptt.allow_mic_for_user(), ptt.mic_privacy(), flush=True)
+    ok = p.arm(cfg)
+    results.append(('nhận ra Windows chặn micro và bật quyền xong mở được', ok, p.error))
 results.append(('arm() mở được micro + cáp thật bằng định dạng gốc', ok and not p.error, p.error))
 spin(3)
 results.append(('micro gửi tiếng (byte nhận > 0)', p.got > 0, p.got))

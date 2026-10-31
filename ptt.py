@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, Qt, QEvent
-from PySide6.QtMultimedia import QAudio, QAudioFormat, QAudioSink, QAudioSource, QMediaDevices
+from PySide6.QtMultimedia import QAudioFormat, QAudioSink, QAudioSource, QMediaDevices
 
 from ptt_core import POLL_MS, SINK_MS, TEXT_WIDGETS, VK_SPACE, Gate, Pipeline, Settings, choose_input, is_cable
 
@@ -52,6 +52,45 @@ MIC_PRIVACY = ('Windows có thể đang chặn quyền micro: Cài đặt → Qu
                'trong Âm thanh → Ghi âm → Thuộc tính → Nâng cao).')
 
 
+MIC_KEY = r'SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone'
+
+
+def mic_privacy():
+    """4.3.14 (đo trên Windows thật): quyền micro của Windows. Tắt "Cho phép ứng dụng máy tính truy cập micro"
+    thì QAudioSource luôn OpenError (Qt vẫn báo Granted). Trả {'machine','user','desktop'}: 'Allow'/'Deny'/''."""
+    out = dict(machine='', user='', desktop='')
+    try:
+        import winreg
+    except ImportError:
+        return out
+    for name, root, sub in (('machine', winreg.HKEY_LOCAL_MACHINE, MIC_KEY), ('user', winreg.HKEY_CURRENT_USER, MIC_KEY),
+                            ('desktop', winreg.HKEY_CURRENT_USER, MIC_KEY + '\\NonPackaged')):
+        try:
+            with winreg.OpenKey(root, sub) as k:
+                out[name] = str(winreg.QueryValueEx(k, 'Value')[0])
+        except OSError:
+            pass
+    return out
+
+
+def allow_mic_for_user():
+    """Bật quyền micro cho tài khoản Windows đang dùng (HKCU, không cần quyền quản trị). Chỉ gọi khi chủ máy bấm Có.
+    Trả True nếu ghi được; máy khóa ở mức cả máy (HKLM = Deny) thì trả False."""
+    import winreg
+    if mic_privacy().get('machine') == 'Deny':
+        return False
+    for sub in (MIC_KEY, MIC_KEY + '\\NonPackaged'):
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, sub, 0, winreg.KEY_SET_VALUE) as k:
+            winreg.SetValueEx(k, 'Value', 0, winreg.REG_SZ, 'Allow')
+    return True
+
+
+def err_name(e):
+    """Tên lỗi âm thanh ('NoError', 'OpenError'…). PySide6 6.12 trả QtAudio.Error, không bằng QAudio.Error
+    -> phải so theo tên (4.3.14: so kiểu làm NBL tưởng micro hỏng dù Qt báo NoError)."""
+    return str(getattr(e, 'name', '') or str(e).split('.')[-1])
+
+
 def native_format(dev):
     """4.3.14: định dạng gốc của thiết bị (Windows chia sẻ: luôn mở được). Hỏng thì 48 kHz 16-bit."""
     f = dev.preferredFormat()
@@ -75,7 +114,7 @@ class PushToTalk(QObject):
         self.key_reader = key_reader or (space_down_windows if sys.platform == 'win32' else None)
         self.app_space = False            # phím cách khi NBL đang được chọn (đường dự phòng ngoài Windows)
         self.source = self.sink = self.inp = self.out = None
-        self.fi = self.fo = None; self.pipe = None; self.got = 0; self.warn = ''
+        self.fi = self.fo = None; self.pipe = None; self.got = 0; self.warn = ''; self.blocked = False
         self.level = 0.0; self.talking = False; self.armed = False; self.error = ''; self.anywhere = True
         self.target_name = ''; self.mic_name = ''
         self.talk_started = 0.0; self.total_talk = 0.0
@@ -105,12 +144,21 @@ class PushToTalk(QObject):
         self.inp = self.source.start()
         self.mic_name = mic.description(); self.target_name = out.description()
         self.owner.log('Giọng nói: mic "' + self.mic_name + '" (' + describe(self.fi) + ') → "' + self.target_name + '" (' + describe(self.fo) + '). Thiết bị ghi âm: ' + ', '.join(inputs))
-        err_in = self.source.error() != QAudio.Error.NoError if self.source is not None else True
-        err_out = self.sink.error() != QAudio.Error.NoError if self.sink is not None else True
+        err_in = err_name(self.source.error()) != 'NoError' if self.source is not None else True
+        err_out = err_name(self.sink.error()) != 'NoError' if self.sink is not None else True
         if self.inp is None or err_in:
-            self.owner.log('Giọng nói: micro báo ' + str(self.source.error()).split('.')[-1] + ' / ' + str(self.source.state()).split('.')[-1] + ('' if self.inp is not None else ' (không có luồng)'))
+            code = err_name(self.source.error())
+            priv = mic_privacy()
+            self.owner.log('Giọng nói: micro báo ' + code + ' / ' + err_name(self.source.state()) + ('' if self.inp is not None else ' (không có luồng)') + ' · quyền micro Windows: ' + str(priv))
+            self.blocked = 'Deny' in priv.values() or (code == 'OpenError' and sys.platform == 'win32' and (priv.get('user') != 'Allow' or priv.get('desktop') != 'Allow'))
             self.error = 'Không mở được micro "' + self.mic_name + '". ' + MIC_PRIVACY
-            self.owner.log('Giọng nói: ' + self.error); self.disarm(quiet=True); return False
+            self.owner.log('Giọng nói: ' + self.error); self.disarm(quiet=True)
+            if self.blocked:
+                try:
+                    self.owner.ptt_mic_blocked(priv)
+                except Exception as e:
+                    self.owner.log('Giọng nói: ' + str(e)[:150])
+            return False
         if self.out is None or err_out:
             self.error = 'Không mở được đầu ra "' + self.target_name + '" (cáp ảo đang bị chiếm hoặc đã gỡ?).'
             self.owner.log('Giọng nói: ' + self.error); self.disarm(quiet=True); return False
@@ -126,8 +174,8 @@ class PushToTalk(QObject):
         return True
 
     def source_state(self, state):
-        if self.source is not None and self.armed and self.source.error() not in (QAudio.Error.NoError, QAudio.Error.UnderrunError):
-            self.error = 'Micro "' + self.mic_name + '" ngừng gửi tiếng (' + str(self.source.error()).split('.')[-1] + '). ' + MIC_PRIVACY
+        if self.source is not None and self.armed and err_name(self.source.error()) not in ('NoError', 'UnderrunError'):
+            self.error = 'Micro "' + self.mic_name + '" ngừng gửi tiếng (' + err_name(self.source.error()) + '). ' + MIC_PRIVACY
             self.owner.log('Giọng nói: ' + self.error)
 
     def check_data(self):
