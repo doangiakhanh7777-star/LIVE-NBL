@@ -102,31 +102,66 @@ def phone(seconds, close_abruptly=False):
     c.close()
 
 
+def analyse(cap, t_first):
+    """Nối mẫu thu được; vùng từ mẫu to đầu tiên tới mẫu to cuối cùng; tần số theo số lần qua 0; hụt tiếng = đoạn im > 3 ms."""
+    xs = []; t_start = None
+    for t, m in cap:
+        if t_start is None and m:
+            t_start = t - len(m) / float(rate_in)
+        xs += m
+    idx = [i for i, v in enumerate(xs) if abs(v) > 0.1]
+    if not idx:
+        return 0, 0, None, 0
+    a, b = idx[0], idx[-1]; seg = xs[a:b + 1]
+    dur = len(seg) / float(rate_in)
+    zc = sum(1 for u, v in zip(seg, seg[1:]) if u < 0 <= v)
+    gaps = 0; run = 0
+    for v in seg:
+        if abs(v) < 0.02:
+            run += 1
+        else:
+            if run > rate_in * 0.003:
+                gaps += run
+            run = 0
+    lat = (t_start + a / float(rate_in)) - t_first if t_first else None
+    return dur, zc / dur if dur else 0, lat, gaps / float(rate_in)
+
+
 results = []
+# ĐỐI CHỨNG: phát thẳng 2 giây 440 Hz vào CABLE Input (không qua điện thoại) để biết cách đo có đúng không
+from PySide6.QtMultimedia import QAudioSink
+from ptt_core import encode
+fo = ptt.native_format(cin); ko = ptt.KIND[fo.sampleFormat()]
+ref = QAudioSink(cin, fo); ref.setBufferSize(int(fo.sampleRate() * 0.2) * fo.bytesPerFrame()); rio = ref.start()
+pcm = encode([0.5 * math.sin(2 * math.pi * 440 * i / fo.sampleRate()) for i in range(fo.sampleRate() * 2) for _ in range(fo.channelCount())], ko)
+spin(0.5); cap.clear(); pos = [0]; t_ref = time.monotonic()
+end = time.time() + 3.0
+while time.time() < end:
+    free = ref.bytesFree()
+    if free > 0 and pos[0] < len(pcm):
+        n = rio.write(pcm[pos[0]:pos[0] + free]); pos[0] += max(0, int(n or 0))
+    app.processEvents(); grab(); time.sleep(0.003)
+rd, rf, rl, rg = analyse(cap, t_ref)
+print('  ĐỐI CHỨNG phát thẳng: %.2f s, ~%.0f Hz, hụt %.0f ms' % (rd, rf, rg * 1000), flush=True)
+ref.stop()
 spin(0.5); cap.clear()
 th = threading.Thread(target=phone, args=(2.0,)); th.start()
 end = time.time() + 3.5
 while time.time() < end:
     app.processEvents(); grab(); time.sleep(0.003)
 th.join()
-# phân tích: khối 10 ms
-loud = [(t, m) for t, m in cap if m and max(abs(v) for v in m) > 0.1]
-first = loud[0][0] if loud else None
-latency = (first - sent['first']) if first else None
-samples = [v for _, m in loud for v in m]
-zc = sum(1 for a, b in zip(samples, samples[1:]) if a < 0 <= b)
-dur = len(samples) / float(rate_in) if samples else 0
-freq = zc / dur if dur else 0
-print('  tiếng thu được: %.2f s, tần số ~%.0f Hz, trễ ~%s ms, RemoteTalk nhận %d byte ghi %d byte' %
-      (dur, freq, int(latency * 1000) if latency else '-', rt.received, rt.written), flush=True)
+dur, freq, latency, gap = analyse(cap, sent['first'])
+print('  tiếng thu được: %.2f s, tần số ~%.0f Hz, trễ ~%s ms, hụt tiếng %.0f ms, RemoteTalk nhận %d byte ghi %d byte' %
+      (dur, freq, None if latency is None else int(latency * 1000), gap * 1000, rt.received, rt.written), flush=True)
 results.append(('tiếng điện thoại vào tới CABLE Output (Studio thu được)', dur > 1.0, round(dur, 2)))
 results.append(('đúng tiếng 440 Hz (±40)', 400 < freq < 480, round(freq)))
-results.append(('độ trễ điện thoại -> cáp dưới 400 ms (mạng nội bộ)', latency is not None and latency < 0.4, latency))
+results.append(('độ trễ điện thoại -> cáp 0–400 ms (mạng nội bộ)', latency is not None and 0 <= latency < 0.4, latency))
+results.append(('không hụt tiếng quá 60 ms trong 2 giây (không rè)', gap < 0.06, round(gap, 3)))
 results.append(('bật/tắt "đang nói" đúng một lần', owner.changes[:2] == [(True, 'dien_thoai'), (False, 'dien_thoai')], owner.changes))
 # mất mạng giữa chừng
 owner.changes.clear()
-th = threading.Thread(target=phone, args=(0.6, True)); th.start()
-spin(1.0); mid = rt.talking; th.join(); spin(2.5)
+th = threading.Thread(target=phone, args=(0.8, True)); th.start()
+spin(0.4); mid = rt.talking; th.join(); spin(2.5)
 results.append(('điện thoại mất mạng giữa lúc nói -> NBL tự ngắt', mid and not rt.talking and owner.changes[-1:] == [(False, 'dien_thoai')], (mid, rt.talking, owner.changes)))
 server.stop()
 for name, good, info in results:

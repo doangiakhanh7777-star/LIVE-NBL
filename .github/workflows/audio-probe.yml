@@ -33,6 +33,9 @@ jobs:
             if (-not $q.WaitForExit(150000)) { $q.Kill(); "TREO" | Add-Content "out\$name.txt" }
             Get-Content "out\$name.txt"
           }
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { choco install ffmpeg -y --no-progress | Out-Null; $env:Path += ';C:\ProgramData\chocolatey\bin' }
+          ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc2=size=360x640:rate=30 -t 20 -pix_fmt yuv420p -c:v libx264 probe.mp4
+          $env:PROBE_VIDEO = (Resolve-Path probe.mp4 -ErrorAction SilentlyContinue).Path
           run 'cua_so_khuat' 'tests\window_probe4315.py'
           run 'probe_1_mac_dinh' 'tests\audio_probe4314.py'
           run 'e2e_1_mac_dinh' 'tests\audio_e2e4314.py'

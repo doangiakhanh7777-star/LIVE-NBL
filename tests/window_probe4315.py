@@ -35,14 +35,27 @@ gdi32.GetPixel.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]; gdi32.G
 user32.PrintWindow.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint]
 
 
-def capture_r(hwnd):
-    """Màu đỏ (R) ở giữa vùng hình, chụp bằng PrintWindow(PW_RENDERFULLCONTENT)."""
-    r = wintypes.RECT(); user32.GetWindowRect(ctypes.c_void_p(hwnd), ctypes.byref(r)); w, h = r.right - r.left, r.bottom - r.top
-    hdc = user32.GetWindowDC(hwnd); mdc = gdi32.CreateCompatibleDC(hdc); bmp = gdi32.CreateCompatibleBitmap(hdc, w, h); old = gdi32.SelectObject(mdc, bmp)
-    ok = user32.PrintWindow(hwnd, mdc, 2)
-    px = gdi32.GetPixel(mdc, w // 2, h // 2)
+gdi32.BitBlt.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_uint32]
+
+
+def capture(hwnd, how):
+    """9 điểm ảnh quanh giữa vùng hình. how = 'printwindow' (PW_RENDERFULLCONTENT) hoặc 'bitblt' (GetDC + BitBlt, kiểu OBS)."""
+    r = wintypes.RECT()
+    if how == 'printwindow':
+        user32.GetWindowRect(ctypes.c_void_p(hwnd), ctypes.byref(r)); hdc = user32.GetWindowDC(hwnd)
+    else:
+        user32.GetClientRect(ctypes.c_void_p(hwnd), ctypes.byref(r)); hdc = user32.GetDC(hwnd)
+    w, h = r.right - r.left, r.bottom - r.top
+    mdc = gdi32.CreateCompatibleDC(hdc); bmp = gdi32.CreateCompatibleBitmap(hdc, w, h); old = gdi32.SelectObject(mdc, bmp)
+    ok = user32.PrintWindow(hwnd, mdc, 2) if how == 'printwindow' else gdi32.BitBlt(mdc, 0, 0, w, h, hdc, 0, 0, 0x00CC0020)
+    pts = tuple(gdi32.GetPixel(mdc, w // 2 + dx, h // 2 + dy) & 0xFFFFFF for dx in (-40, 0, 40) for dy in (-60, 0, 60))
     gdi32.SelectObject(mdc, old); gdi32.DeleteObject(bmp); gdi32.DeleteDC(mdc); user32.ReleaseDC(hwnd, hdc)
-    return bool(ok), px & 0xFF
+    return bool(ok), pts
+
+
+def capture_r(hwnd):
+    ok, pts = capture(hwnd, 'printwindow')
+    return ok, pts[4] & 0xFF
 
 
 scr = QGuiApplication.primaryScreen().geometry()
@@ -82,23 +95,62 @@ def run(mode):
         t0 = time.time()
         while time.time() - t0 < 0.5:
             app.processEvents(); time.sleep(0.003)
-        p0 = w.paints; caps = []; t0 = time.time()
+        p0 = w.paints; caps = []; bb = []; t0 = time.time()
         while time.time() - t0 < 1.5:
             app.processEvents(); time.sleep(0.003)
             if len(caps) < 6 and time.time() - t0 > len(caps) * 0.25:
-                ok, r = capture_r(hwnd); caps.append((r, (w.k * 7) % 256, ok))
+                ok, r = capture_r(hwnd); caps.append((r, (w.k * 7) % 256, ok)); bb.append(capture(hwnd, 'bitblt')[1][4] & 0xFF)
         paints = (w.paints - p0) / 1.5
         fresh = sum(1 for r, want, ok in caps if ok and min((r - want) % 256, (want - r) % 256) <= 7 * 4)
         changing = len(set(r for r, _, _ in caps)) > 2
         exposed = w.windowHandle().isExposed()
         out.append((name, paints, exposed, fresh, len(caps), changing, [c[0] for c in caps]))
-        print('  [%s] %-20s vẽ %5.1f lần/s | exposed=%s | chụp khớp khung mới %d/%d | hình đổi=%s | R=%s' %
-              (mode, name, paints, exposed, fresh, len(caps), changing, [c[0] for c in caps]), flush=True)
+        print('  [%s] %-20s vẽ %5.1f lần/s | exposed=%s | PrintWindow khớp %d/%d đổi=%s R=%s | BitBlt đổi=%s R=%s' %
+              (mode, name, paints, exposed, fresh, len(caps), changing, [c[0] for c in caps], len(set(bb)) > 2, bb), flush=True)
     w.timer.stop(); w.close(); app.processEvents()
     return out
 
 
 res = {m: run(m) for m in ('cu', 'repaint', 'ban_sua_4315')}
+
+
+def run_video(mode, path):
+    """Video thật qua QMediaPlayer -> VideoCanvas (đúng đường của NBL VIDEO)."""
+    from PySide6.QtCore import QUrl
+    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+    player._hidden = ORIG_HIDDEN if mode == 'ban_sua_4315' else (lambda widget: False)
+    win = QMainWindow(); win.resize(360, 640); win.setWindowTitle('NBL VIDEO that ' + mode)
+    canvas = player.VideoCanvas(); win.setCentralWidget(canvas)
+    frames = [0]; canvas.sink.videoFrameChanged.connect(lambda f: frames.__setitem__(0, frames[0] + 1))
+    audio = QAudioOutput(win); audio.setMuted(True); mp = QMediaPlayer(win); mp.setAudioOutput(audio); mp.setVideoOutput(canvas.sink)
+    mp.setLoops(QMediaPlayer.Loops.Infinite); mp.setSource(QUrl.fromLocalFile(path)); win.move(100, 100); win.show(); mp.play()
+    t0 = time.time()
+    while time.time() - t0 < 2.0:
+        app.processEvents(); time.sleep(0.003)
+    hwnd = int(win.winId()); rows = []
+    for name, x in (('trong màn hình', 100), ('khuất hẳn bên phải', scr.right() + 300), ('khuất hẳn bên trái', -2500), ('quay lại màn hình', 100)):
+        win.move(x, 100); t0 = time.time()
+        while time.time() - t0 < 0.5:
+            app.processEvents(); time.sleep(0.003)
+        f0 = frames[0]; pw = []; bb = []; t0 = time.time()
+        while time.time() - t0 < 2.0:
+            app.processEvents(); time.sleep(0.003)
+            if len(pw) < 8 and time.time() - t0 > len(pw) * 0.25:
+                pw.append(capture(hwnd, 'printwindow')[1]); bb.append(capture(hwnd, 'bitblt')[1])
+        fps = (frames[0] - f0) / 2.0
+        rows.append((name, len(set(pw)) > 3, len(set(bb)) > 3))
+        print('  [video %s] %-20s khung giải mã %5.1f/s | PrintWindow hình đổi=%s (%d kiểu) | BitBlt hình đổi=%s (%d kiểu) | trạng thái %s' %
+              (mode, name, fps, len(set(pw)) > 3, len(set(pw)), len(set(bb)) > 3, len(set(bb)), mp.playbackState().name), flush=True)
+    mp.stop(); win.close(); app.processEvents()
+    return rows
+
+
+vid = os.environ.get('PROBE_VIDEO', '')
+if vid and Path(vid).is_file():
+    for m in ('cu', 'ban_sua_4315'):
+        run_video(m, vid)
+else:
+    print('Không có video thử (PROBE_VIDEO) — bỏ qua phần video thật.', flush=True)
 print('\nTÓM TẮT (hình còn chạy khi khuất hẳn?):', flush=True)
 for m, rows in res.items():
     hidden = [r for r in rows if 'hẳn' in r[0]]
