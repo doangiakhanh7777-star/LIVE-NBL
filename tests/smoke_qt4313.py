@@ -195,6 +195,32 @@ def t_phone_server_has_store():
     assert w.phone_server.store is w.video_store
 
 
+def t_two_talkers_toggle_once():
+    seen = []
+    orig = w.ai.set_hold
+    w.ai.set_hold = lambda on: (seen.append(on), orig(on))
+    try:
+        w.ptt_changed(True, 'phim'); w.ptt_changed(True, 'dien_thoai')     # cả hai cùng nói
+        w.ptt_changed(False, 'phim'); spin(0.05)
+        assert w.ai.hold and w.talk_badge.w.isVisible(), 'phím thả mà điện thoại còn nói thì vẫn phải im AI'
+        w.ptt_changed(False, 'dien_thoai'); spin(0.05)
+        assert not w.ai.hold and not w.talk_badge.w.isVisible()
+        assert seen == [True, False], seen
+    finally:
+        w.ai.set_hold = orig
+
+
+def t_phone_talk_wired():
+    assert w.phone_server.talk is w.remote_talk
+    assert w.remote_talk.status() == '' and not w.remote_talk.talking
+    assert 'điện thoại' in w.voice_phone.text().lower()
+
+
+def t_player_hidden_fallback():
+    import player
+    assert callable(player.paint_hidden) and callable(player._hidden)
+
+
 for name, fn in [('tiêu đề 4.3.14', t_title), ('có trang Giọng nói + AI', t_pages), ('chọn Gemini/ChatGPT', t_ai_engine_ui),
                  ('make_ai đúng lớp', t_make_ai), ('trang Giọng nói đủ ô', t_voice_page_widgets),
                  ('bật giọng nói khi máy không có micro', t_voice_arm_without_devices_is_clean),
@@ -203,7 +229,10 @@ for name, fn in [('tiêu đề 4.3.14', t_title), ('có trang Giọng nói + AI'
                  ('đang nói: AI im + nhãn đỏ', t_ptt_changed_holds_ai_and_shows_badge),
                  ('kho video: nhận -> playlist -> xóa', t_store_upload_and_delete),
                  ('kho video không xóa file ngoài kho', t_store_never_deletes_user_files),
-                 ('phone API nhận kho video', t_phone_server_has_store)]:
+                 ('phone API nhận kho video', t_phone_server_has_store),
+                 ('phím + điện thoại cùng nói: AI im/nhãn đỏ bật tắt 1 lần', t_two_talkers_toggle_once),
+                 ('phone API có đường nói qua điện thoại', t_phone_talk_wired),
+                 ('NBL VIDEO có đường vẽ khi bị khuất', t_player_hidden_fallback)]:
     check(name, fn)
 
 ok = all(r[1] for r in results)
