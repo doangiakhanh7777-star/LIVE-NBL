@@ -66,9 +66,14 @@ class AIEngine(QObject):
 
     # ---------- helpers ----------
     def keyring(self, cfg):
-        keys = tuple(self.settings.api_keys(cfg))
-        if keys != self.ring_keys:
-            self.ring, self.ring_keys = A.KeyRing(keys), keys
+        # 4.3.12: chọn key theo engine (gemini / openai)
+        engine = cfg.get('engine') or 'gemini'
+        if engine == 'openai':
+            keys = tuple(self.settings.openai_api_keys(cfg))
+        else:
+            keys = tuple(self.settings.api_keys(cfg))
+        if keys != self.ring_keys or engine != getattr(self, '_ring_engine', ''):
+            self.ring, self.ring_keys, self._ring_engine = A.KeyRing(keys), keys, engine
         self.limiter.n = max(1, int(cfg.get('max_per_minute') or 10))
         return self.ring
 
@@ -171,15 +176,16 @@ class AIEngine(QObject):
         if hit:
             self.deliver(st, c, hit, cfg); return
         ring = self.keyring(cfg)
+        engine = cfg.get('engine') or 'gemini'
         if not ring.keys:
-            self.fail('Chưa nhập API key Gemini (trang Trả lời bình luận AI).'); return
+            label = 'ChatGPT' if engine == 'openai' else 'Gemini'
+            self.fail('Chưa nhập API key ' + label + ' (trang Trả lời bình luận AI).'); return
         if not self.limiter.allow():
             self.stats['dropped'] += 1; return
         system = A.build_system(cfg.get('prompt'), self.products(st['profile']))
-        text_model = cfg.get('text_model') or A.TEXT_MODEL
 
         def work():
-            return c, ring.call(lambda key: A.Gemini(key, text_model).ask(system, c['text'], c['user']))
+            return c, ring.call(lambda key: A.make_ai(cfg, key).ask(system, c['text'], c['user']))
         st['asking'] = self.pool.submit(work)
 
     def deliver(self, st, c, answer, cfg):
@@ -198,11 +204,19 @@ class AIEngine(QObject):
         if mode in ('giong', 'ca_hai'):
             if len(self.voice) >= VOICE_QUEUE:
                 self.stats['dropped'] += 1; self.owner.log('AI: hàng chờ giọng đọc đầy — bỏ câu này'); return
-            ring = self.keyring(cfg); voice, speed, tts = cfg.get('voice') or 'Kore', cfg.get('speed') or '1.0', cfg.get('tts_model') or A.TTS_MODEL
+            ring = self.keyring(cfg)
+            engine = cfg.get('engine') or 'gemini'
+            # 4.3.12: giọng và speed tuỳ engine
+            if engine == 'openai':
+                voice = cfg.get('oai_voice') or 'nova'
+                speed = cfg.get('speed') or '1.0'
+            else:
+                voice = cfg.get('voice') or 'Kore'
+                speed = cfg.get('speed') or '1.0'
             session = self.session_of(st['profile'])
 
-            def speak():
-                return ring.call(lambda key: A.Gemini(key, tts_model=tts).speak(answer, voice, speed))
+            def speak(cfg=cfg, voice=voice, speed=speed):
+                return ring.call(lambda key: A.make_ai(cfg, key).speak(answer, voice, speed))
             self.voice.append(dict(future=self.pool.submit(speak), session=session, at=time.time()))
 
     # ---------- voice ----------
@@ -273,8 +287,11 @@ class AIEngine(QObject):
     # ---------- buttons of the AI page ----------
     def preview_voice(self, cfg, done):
         ring = self.keyring(cfg)
-        f = self.pool.submit(lambda: ring.call(lambda key: A.Gemini(key, tts_model=cfg.get('tts_model') or A.TTS_MODEL).speak(
-            'Xin chào cả nhà, em là trợ lý của shop. Anh chị xem sản phẩm trong giỏ hàng màu cam nha.', cfg.get('voice') or 'Kore', cfg.get('speed') or '1.0')))
+        engine = cfg.get('engine') or 'gemini'
+        voice = cfg.get('oai_voice') if engine == 'openai' else cfg.get('voice') or 'Kore'
+        speed = cfg.get('speed') or '1.0'
+        f = self.pool.submit(lambda: ring.call(lambda key: A.make_ai(cfg, key).speak(
+            'Xin chào cả nhà, em là trợ lý của shop. Anh chị xem sản phẩm trong giỏ hàng màu cam nha.', voice or 'nova', speed)))
         return f
 
     def stop_preview(self):
@@ -288,7 +305,7 @@ class AIEngine(QObject):
         hit = A.rule_answer(rules, question)
         if hit:
             return self.pool.submit(lambda: 'Từ khóa: ' + hit)
-        return self.pool.submit(lambda: 'AI: ' + (ring.call(lambda key: A.Gemini(key, cfg.get('text_model') or A.TEXT_MODEL).ask(system, question, 'Khách')) or '(AI bỏ qua câu này)'))
+        return self.pool.submit(lambda: 'AI: ' + (ring.call(lambda key: A.make_ai(cfg, key).ask(system, question, 'Khách')) or '(AI bỏ qua câu này)'))
 
     def summary(self):
         s = self.stats

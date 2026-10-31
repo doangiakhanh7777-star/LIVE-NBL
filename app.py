@@ -260,22 +260,38 @@ class Console(QMainWindow):
         from ai_engine import AIEngine
         self.ai=AIEngine(self,DATA);cfg=self.ai.settings.load()
         if not cfg.get('rules') and self.data.get('sessions'):
-            cfg['rules']=next((s.get('rules') or (s.get('chrome') or {}).get('rules','') for s in self.data['sessions'] if s.get('rules') or (s.get('chrome') or {}).get('rules')),'')   # từ khóa cũ của Chrome
+            cfg['rules']=next((s.get('rules') or (s.get('chrome') or {}).get('rules','') for s in self.data['sessions'] if s.get('rules') or (s.get('chrome') or {}).get('rules')),'')
         v=self.page('Trả lời bình luận AI')
         self.ai_on=QCheckBox('Bật AI trả lời bình luận khi LIVE (tự bật/tắt theo LIVE)');self.ai_on.setChecked(bool(cfg.get('enabled')));v.addWidget(self.ai_on)
         self.ai_stats=QLabel(self.ai.summary());self.ai_stats.setWordWrap(True);self.ai_stats.setObjectName('accountStatus');v.addWidget(self.ai_stats)
+        # 4.3.12: chọn engine AI
+        eb=QGroupBox('Nguồn AI');ef=QFormLayout(eb);ef.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        self.ai_engine=QComboBox();self.ai_engine.addItem('Gemini (Google) — miễn phí có hạn mức','gemini');self.ai_engine.addItem('ChatGPT (OpenAI) — tốn phí, ổn định hơn','openai')
+        self.ai_engine.setCurrentIndex(max(0,self.ai_engine.findData(cfg.get('engine','gemini'))));ef.addRow('Dùng AI',self.ai_engine);v.addWidget(eb)
+        # Gemini key box
         kb=QGroupBox('Gemini API key');kf=QVBoxLayout(kb)
-        self.ai_keys=QLineEdit();self.ai_keys.setEchoMode(QLineEdit.EchoMode.Password);self.ai_keys.setPlaceholderText('Dán API key; nhiều key cách nhau dấu phẩy, rồi bấm Lưu key');kf.addWidget(self.ai_keys)
+        self.ai_keys=QLineEdit();self.ai_keys.setEchoMode(QLineEdit.EchoMode.Password);self.ai_keys.setPlaceholderText('Dán key Gemini; nhiều key cách dấu phẩy, rồi bấm Lưu key');kf.addWidget(self.ai_keys)
         self.ai_key_count=QLabel('Đã lưu '+str(len(self.ai.settings.api_keys(cfg)))+' key (mã hóa, chỉ trên máy này)');kf.addWidget(self.ai_key_count)
-        row=QHBoxLayout();row.addWidget(button('Lưu key',self.ai_save_keys,'primary'));row.addWidget(button('Mở trang lấy key',lambda:QDesktopServices.openUrl(QUrl('https://aistudio.google.com/apikey'))));row.addWidget(button('Xóa key',self.ai_clear_keys,'danger'));kf.addLayout(row)
-        note=QLabel('Key tạo trong CÙNG một tài khoản Google dùng chung lượt miễn phí; muốn thêm lượt thì lấy key từ tài khoản Google khác.');note.setWordWrap(True);note.setObjectName('subtitle');kf.addWidget(note);v.addWidget(kb)
+        row=QHBoxLayout();row.addWidget(button('Lưu key Gemini',self.ai_save_keys,'primary'));row.addWidget(button('Lấy key',lambda:QDesktopServices.openUrl(QUrl('https://aistudio.google.com/apikey'))));row.addWidget(button('Xóa',self.ai_clear_keys,'danger'));kf.addLayout(row)
+        note=QLabel('Key tạo trong CÙNG tài khoản Google dùng chung hạn mức; muốn thêm lượt thì tạo key từ tài khoản khác.');note.setWordWrap(True);note.setObjectName('subtitle');kf.addWidget(note);v.addWidget(kb)
+        # OpenAI key box
+        okb=QGroupBox('ChatGPT (OpenAI) API key');okf=QVBoxLayout(okb)
+        self.oai_keys=QLineEdit();self.oai_keys.setEchoMode(QLineEdit.EchoMode.Password);self.oai_keys.setPlaceholderText('Dán key OpenAI (sk-…), rồi bấm Lưu key');okf.addWidget(self.oai_keys)
+        self.oai_key_count=QLabel('Đã lưu '+str(len(self.ai.settings.openai_api_keys(cfg)))+' key (mã hóa, chỉ trên máy này)');okf.addWidget(self.oai_key_count)
+        row2=QHBoxLayout();row2.addWidget(button('Lưu key ChatGPT',self.ai_save_oai_keys,'primary'));row2.addWidget(button('Lấy key',lambda:QDesktopServices.openUrl(QUrl('https://platform.openai.com/api-keys'))));row2.addWidget(button('Xóa',self.ai_clear_oai_keys,'danger'));okf.addLayout(row2)
+        onote=QLabel('Tạo tài khoản OpenAI → vào platform.openai.com → API keys → Create. Tốn phí theo lượt dùng (gpt-4o-mini rất rẻ).');onote.setWordWrap(True);onote.setObjectName('subtitle');okf.addWidget(onote);v.addWidget(okb)
         mb=QGroupBox('Cách trả lời');mf=QFormLayout(mb);mf.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
         self.ai_mode=QComboBox()
         for k,t in [('chu','Chữ — gửi vào bình luận Studio'),('giong','Giọng đọc — đọc vào LIVE, không gửi chữ'),('ca_hai','Chữ + giọng đọc')]:self.ai_mode.addItem(t,k)
         self.ai_mode.setCurrentIndex(max(0,self.ai_mode.findData(cfg.get('mode','chu'))));mf.addRow('Kiểu trả lời',self.ai_mode)
+        # Gemini voice
         self.ai_voice=QComboBox()
         for k,t in A.VOICES:self.ai_voice.addItem(k+' · '+t,k)
-        self.ai_voice.setCurrentIndex(max(0,self.ai_voice.findData(cfg.get('voice','Kore'))));mf.addRow('Giọng đọc (Gemini, có tiếng Việt)',self.ai_voice)
+        self.ai_voice.setCurrentIndex(max(0,self.ai_voice.findData(cfg.get('voice','Kore'))));mf.addRow('Giọng Gemini',self.ai_voice)
+        # OpenAI voice
+        self.oai_voice=QComboBox()
+        for k,t in A.OAI_VOICES:self.oai_voice.addItem(k+' · '+t,k)
+        self.oai_voice.setCurrentIndex(max(0,self.oai_voice.findData(cfg.get('oai_voice','nova'))));mf.addRow('Giọng ChatGPT',self.oai_voice)
         self.ai_speed=QComboBox()
         for k in A.SPEEDS:self.ai_speed.addItem(k+'x',k)
         self.ai_speed.setCurrentIndex(max(0,self.ai_speed.findData(str(cfg.get('speed','1.0')))));mf.addRow('Tốc độ đọc',self.ai_speed)
@@ -293,14 +309,16 @@ class Console(QMainWindow):
         tb=QGroupBox('Thử hỏi AI');tf=QVBoxLayout(tb);self.ai_question=QLineEdit();self.ai_question.setPlaceholderText('Gõ một câu bình luận, ví dụ: ship về Cần Thơ mấy ngày em?');tf.addWidget(self.ai_question)
         self.ai_answer=QLabel('');self.ai_answer.setWordWrap(True);tf.addWidget(button('Hỏi thử',self.ai_try));tf.addWidget(self.ai_answer);v.addWidget(tb)
         for w in (self.ai_on,):w.toggled.connect(self.ai_save)
-        for w in (self.ai_mode,self.ai_voice,self.ai_speed):w.currentIndexChanged.connect(self.ai_save)
+        for w in (self.ai_engine,self.ai_mode,self.ai_voice,self.oai_voice,self.ai_speed):w.currentIndexChanged.connect(self.ai_save)
         for w in (self.ai_cooldown,self.ai_rate):w.valueChanged.connect(self.ai_save)
         self.ai_save(quiet=True);v.addStretch()
         self.ai_timer=QTimer(self);self.ai_timer.timeout.connect(lambda:self.ai_stats.setText(self.ai.summary()));self.ai_timer.start(2000)
     def ai_cfg(self):
         cfg=self.ai.settings.load()
-        cfg.update(enabled=self.ai_on.isChecked(),mode=self.ai_mode.currentData(),voice=self.ai_voice.currentData(),speed=self.ai_speed.currentData(),cooldown=self.ai_cooldown.value(),
-                   max_per_minute=self.ai_rate.value(),prompt=self.ai_prompt.toPlainText().strip(),rules=self.ai_rules.toPlainText().strip())
+        cfg.update(enabled=self.ai_on.isChecked(),engine=self.ai_engine.currentData(),mode=self.ai_mode.currentData(),
+                   voice=self.ai_voice.currentData(),oai_voice=self.oai_voice.currentData(),speed=self.ai_speed.currentData(),
+                   cooldown=self.ai_cooldown.value(),max_per_minute=self.ai_rate.value(),
+                   prompt=self.ai_prompt.toPlainText().strip(),rules=self.ai_rules.toPlainText().strip())
         return cfg
     def ai_save(self,*args,quiet=False):
         if not hasattr(self,'ai_rate'):return
@@ -319,6 +337,12 @@ class Console(QMainWindow):
         self.ai.settings.save(cfg);self.ai_keys.clear();self.ai_key_count.setText('Đã lưu '+str(len(keys))+' key (mã hóa, chỉ trên máy này)');self.log('Đã lưu '+str(len(keys))+' Gemini API key.')
     def ai_clear_keys(self):
         cfg=self.ai_cfg();cfg['keys']='';self.ai.settings.save(cfg);self.ai_key_count.setText('Chưa có key');self.log('Đã xóa Gemini API key.')
+    def ai_save_oai_keys(self):
+        cfg=self.ai_cfg();keys=self.ai.settings.set_openai_keys(cfg,self.oai_keys.text())
+        if not keys:QMessageBox.information(self,'API key','Chưa thấy key hợp lệ (key OpenAI dạng sk-…).');return
+        self.ai.settings.save(cfg);self.oai_keys.clear();self.oai_key_count.setText('Đã lưu '+str(len(keys))+' key (mã hóa, chỉ trên máy này)');self.log('Đã lưu '+str(len(keys))+' OpenAI API key.')
+    def ai_clear_oai_keys(self):
+        cfg=self.ai_cfg();cfg['openai_keys']='';self.ai.settings.save(cfg);self.oai_key_count.setText('Chưa có key');self.log('Đã xóa OpenAI API key.')
     def ai_wait(self,future,done):
         timer=QTimer(self)
         def check():

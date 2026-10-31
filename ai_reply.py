@@ -1,4 +1,7 @@
-"""4.2.2 (owner, 28/10/2026): AI trả lời bình luận (Gemini) — chữ, giọng hoặc cả hai.
+"""4.3.12 (owner, 31/10/2026): AI trả lời bình luận — Gemini hoặc ChatGPT, chữ/giọng/cả hai.
+
+4.3.12: thêm class OpenAI (ChatGPT gpt-4o-mini + TTS tts-1); Settings lưu thêm engine/openai_keys;
+        KeyRing và ai_engine.py dùng engine setting để chọn class đúng. Gemini vẫn giữ nguyên.
 
 Comments come from the NBL extension on the TikTok Shop LIVE page (keyword rules are
 tried first there). NBL asks Gemini with the shop description and the products in the
@@ -31,6 +34,14 @@ TEXT_MODEL = 'gemini-3.8-flash'
 TTS_MODEL = 'gemini-3.8-flash-tts'
 OLD_TEXT_MODEL = 'gemini-2.5-flash'
 OLD_TTS_MODEL = 'gemini-2.5-flash-preview-tts'
+
+# ChatGPT (OpenAI)
+OAI_API = 'https://api.openai.com/v1/'
+OAI_TEXT_MODEL = 'gpt-4o-mini'
+OAI_TTS_MODEL = 'tts-1'
+# 6 giọng OpenAI TTS
+OAI_VOICES = [('alloy', 'trung tính, rõ ràng'), ('echo', 'trầm, chắc'), ('fable', 'kể chuyện, nhẹ nhàng'),
+              ('onyx', 'sâu, uy tín'), ('nova', 'tươi sáng, trẻ trung'), ('shimmer', 'mềm mại, ấm áp')]
 MAX_CHARS = 100          # TikTok Shop comment box (NBL extension refuses more)
 # The 30 voices of Gemini TTS (ai.google.dev, 28/10/2026) with the style Google gives each.
 VOICES = [('Kore', 'chắc, rõ'), ('Puck', 'vui, sôi nổi'), ('Zephyr', 'tươi sáng'), ('Leda', 'trẻ trung'), ('Aoede', 'nhẹ nhàng'), ('Charon', 'trầm, rõ ý'),
@@ -97,7 +108,8 @@ def unseal(value):
 class Settings:
     """ai_reply.json in the NBL data folder."""
     DEFAULTS = dict(enabled=False, mode='chu', voice='Kore', speed='1.0', prompt=DEFAULT_PROMPT, keys='', cooldown=60,
-                    text_model=TEXT_MODEL, tts_model=TTS_MODEL, max_per_minute=10, rules='')
+                    text_model=TEXT_MODEL, tts_model=TTS_MODEL, max_per_minute=10, rules='',
+                    engine='gemini', openai_keys='', oai_voice='nova', oai_text_model=OAI_TEXT_MODEL, oai_tts_model=OAI_TTS_MODEL)
 
     def __init__(self, path):
         self.path = Path(path)
@@ -128,6 +140,19 @@ class Settings:
     def set_keys(self, data, text):
         keys = [k for k in dict.fromkeys(x.strip() for x in re.split(r'[,;\s]+', str(text or ''))) if len(k) > 20]
         data['keys'] = seal(','.join(keys)) if keys else ''
+        return keys
+
+    def openai_api_keys(self, data=None):
+        """OpenAI keys (several, comma separated when pasted)."""
+        try:
+            raw = unseal((data or self.load()).get('openai_keys'))
+        except Exception:
+            return []
+        return [k for k in dict.fromkeys(x.strip() for x in re.split(r'[,;\s]+', raw)) if len(k) > 20]
+
+    def set_openai_keys(self, data, text):
+        keys = [k for k in dict.fromkeys(x.strip() for x in re.split(r'[,;\s]+', str(text or ''))) if len(k) > 20]
+        data['openai_keys'] = seal(','.join(keys)) if keys else ''
         return keys
 
 
@@ -350,6 +375,81 @@ class Gemini:
             return raw
         rate = int((re.search(r'rate=(\d+)', mime or '') or [0, 24000])[1])
         return pcm_to_wav(raw, rate)
+
+
+# ---------------- OpenAI (ChatGPT) calls ----------------
+def _post_openai(path, body, key, timeout=30, binary=False):
+    """POST tới OpenAI API. binary=True → trả bytes (TTS). Ném AIError khi lỗi."""
+    data = json.dumps(body, ensure_ascii=False).encode('utf-8')
+    req = Request(OAI_API + path, data=data,
+                  headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key}, method='POST')
+    for attempt in range(2):
+        try:
+            with urlopen(req, timeout=timeout) as r:
+                return r.read() if binary else json.loads(r.read().decode('utf-8'))
+        except HTTPError as e:
+            detail = ''
+            try:
+                detail = json.loads(e.read().decode('utf-8')).get('error', {}).get('message', '')
+            except Exception:
+                pass
+            code = str(e.code)
+            if e.code == 429:
+                raise AIError('ChatGPT hết lượt hoặc hết tiền tài khoản: ' + detail[:200])
+            if e.code in (401, 403):
+                raise AIError('ChatGPT key không hợp lệ hoặc không có quyền: ' + detail[:200])
+            if e.code == 503 or e.code >= 500:
+                if attempt == 0:
+                    time.sleep(2); continue
+                raise AIError('ChatGPT lỗi ' + code + ' (server quá tải, thử lại sau): ' + detail[:200])
+            raise AIError(code + ' ChatGPT: ' + detail[:300])
+        except (URLError, OSError, socket.timeout) as e:
+            if attempt == 0:
+                time.sleep(1.5); continue
+            raise AIError('ChatGPT lỗi mạng: ' + str(e)[:200])
+    raise AIError('ChatGPT không phản hồi sau 2 lần thử.')
+
+
+class OpenAI:
+    """4.3.12: ChatGPT gpt-4o-mini (text) + tts-1 (giọng đọc MP3)."""
+    def __init__(self, key, text_model=OAI_TEXT_MODEL, tts_model=OAI_TTS_MODEL, post=_post_openai):
+        if not key:
+            raise AIError('Chưa nhập API key ChatGPT (trang Trả lời bình luận AI).')
+        self.key = key
+        self.text_model = text_model or OAI_TEXT_MODEL
+        self.tts_model = tts_model or OAI_TTS_MODEL
+        self.post = post
+
+    def ask(self, system, question, user=''):
+        text = 'Khách "' + str(user)[:60] + '" bình luận: ' + str(question)[:300]
+        body = {
+            'model': self.text_model,
+            'messages': [{'role': 'system', 'content': system}, {'role': 'user', 'content': text}],
+            'max_tokens': 120,
+            'temperature': 0.6,
+        }
+        resp = self.post('chat/completions', body, self.key)
+        try:
+            answer = (resp.get('choices') or [{}])[0].get('message', {}).get('content', '') or ''
+        except Exception:
+            answer = ''
+        return clean_answer(answer)
+
+    def speak(self, text, voice='nova', speed='1.0'):
+        """MP3 bytes. OpenAI TTS speed: 0.25–4.0 (thực sự hỗ trợ, không chỉ là gợi ý style)."""
+        try:
+            spd = max(0.5, min(4.0, float(speed)))
+        except Exception:
+            spd = 1.0
+        body = {'model': self.tts_model, 'input': text[:4096], 'voice': voice, 'speed': spd, 'response_format': 'mp3'}
+        return self.post('audio/speech', body, self.key, timeout=40, binary=True)
+
+
+def make_ai(cfg, key):
+    """4.3.12: tạo Gemini hoặc OpenAI tuỳ engine setting."""
+    if (cfg.get('engine') or 'gemini') == 'openai':
+        return OpenAI(key, cfg.get('oai_text_model') or OAI_TEXT_MODEL, cfg.get('oai_tts_model') or OAI_TTS_MODEL)
+    return Gemini(key, cfg.get('text_model') or TEXT_MODEL, cfg.get('tts_model') or TTS_MODEL)
 
 
 class Limiter:
