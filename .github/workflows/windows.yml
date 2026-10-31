@@ -106,3 +106,39 @@ jobs:
           for f in setup.part.*; do git add "$f"; git commit -q -m "bo cai $VER $f"; done
           git add -A; git commit -q -m "bo cai $VER xong ($GITHUB_SHA)"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/setup-out
+  install:
+    # 4.3.16: cai that bo cai vua build (im lang /S) tren Windows: camera ao da dang ky? kiem tra sau cai dat dat?
+    needs: setup
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Lay bo cai tu nhanh setup-out
+        shell: bash
+        run: |
+          git clone -q --depth 1 -b setup-out "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" so
+          cat so/setup.part.* > setup.exe
+          cd so && (cd .. && sha256sum setup.exe) && cat *.sha256
+      - name: Cai im lang + kiem
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          New-Item -ItemType Directory -Force out | Out-Null
+          $p = Start-Process .\setup.exe -ArgumentList '/S' -PassThru
+          if (-not $p.WaitForExit(600000)) { $p.Kill(); "TREO" | Tee-Object -Append out\install.txt }
+          "ma thoat bo cai: $($p.ExitCode)" | Tee-Object -Append out\install.txt
+          $d = "$env:ProgramFiles\NBL_LIVE"
+          "co nbl_camera.dll: $(Test-Path "$d\camera\nbl_camera.dll")" | Tee-Object -Append out\install.txt
+          $k = 'Registry::HKEY_CLASSES_ROOT\CLSID\{49B46215-F6C1-4B8E-949D-ED6959D7B702}\InprocServer32'
+          "dang ky camera: $((Get-ItemProperty -Path $k -ErrorAction SilentlyContinue).'(default)')" | Tee-Object -Append out\install.txt
+          if (Test-Path "$d\SETUP_CHECK.log") { Get-Content "$d\SETUP_CHECK.log" -Tail 25 | Tee-Object -Append out\install.txt }
+          & "$d\runtime\python.exe" -X utf8 -c "import sys;sys.path.insert(0,r'$d');import vcam;print('vcam.registered()', vcam.registered());c=vcam.VirtualCam();print('tao camera', c.ok, c.error);c.close()" *>> out\install.txt
+          Get-Content out\install.txt
+      - name: Day ket qua vao nhanh ci-out-install
+        if: always()
+        shell: bash
+        run: |
+          cd out
+          git init -q -b ci-out-install
+          git config user.name nbl-ci; git config user.email nbl-ci@users.noreply.github.com
+          git add -A; git commit -q -m "cai thu $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/ci-out-install
