@@ -1299,7 +1299,43 @@ class VisionSession:
                 return True
         return False
 
-    def start_live(self):
+    def cleanup_summary(self, wait=20.0):
+        """4.1.9 (owner, 26/10/2026): after EVERY LIVE end — next schedule or not —
+        look for Studio's end page ("tab cuối cùng") and close it. It can open long
+        after the LIVE ended, so the app calls this again and again for ~2 minutes."""
+        end = self.clock() + wait
+        while True:
+            frame = self.frame()
+            if self.is_summary(self.summary_lines(frame)):
+                self.close_summary(frame)
+                return dict(closed=True, seen=True)
+            if self.clock() >= end:
+                return dict(closed=False, seen=False)
+            self.sleep(2.0)
+
+    def reset_live(self, hold=5.0):
+        """4.1.10 (owner, 26/10/2026): the cart would not add 3 times → "phát LIVE rồi
+        kết thúc ngay trong 5–10 giây" resets the cart on Chrome. One call: Phát LIVE,
+        keep it `hold` seconds after the clock runs, Kết thúc LIVE. Never an official LIVE."""
+        state = self.screen_state()
+        if state == 'summary':
+            state = self._close_after_end()
+        if state == 'live':
+            raise NotTouched('Nick đang LIVE; không phát thử để reset giỏ.')
+        self.start_live(dock=False)
+        report('hoat_dong', self.account_name(), 'Phát thử để reset giỏ (sẽ tắt sau vài giây)', '', self.last_frame)
+        self.sleep(hold)
+        error = None
+        for attempt in range(3):
+            try:
+                result = self.stop_live()
+                return dict(live=False, reset=True, summaryOpen=bool(result.get('summaryOpen')))
+            except Exception as e:
+                error = e
+                self.sleep(2.0)
+        raise StudioAttention('PHIÊN PHÁT THỬ CÒN ĐANG CHẠY: chưa kết thúc được (' + str(error) + ').')
+
+    def start_live(self, dock=True):
         state = self.screen_state()
         if state == 'summary':
             self.close_summary(); state = self.screen_state()
@@ -1325,8 +1361,8 @@ class VisionSession:
         if not live:
             raise ValueError('Đã bấm Phát LIVE nhưng chưa thấy đồng hồ LIVE chạy sau 30 giây.')
         docked = None
-        docker = getattr(self.native, 'dock_chat_window', None)
-        for _ in range(8):
+        docker = getattr(self.native, 'dock_chat_window', None) if dock else None
+        for _ in range(8 if docker else 0):
             docked = docker() if docker else None
             if docked:
                 report('hoat_dong', self.account_name(), docked[0], 'Studio tách khung trò chuyện khi bắt đầu LIVE; NBL bấm Ghép.', docked[1])
@@ -1334,11 +1370,23 @@ class VisionSession:
             self.sleep(1.0)
         return dict(live=True, confirmed=True, docked=bool(docked))
 
+    def _close_after_end(self, late=False):
+        """4.1.9: the LIVE is over once the end page shows; failing to close that page
+        must not turn into "kết thúc thất bại" (the app keeps trying to close it)."""
+        try:
+            if late:
+                self.close_late_summary()
+            else:
+                self.close_summary()
+        except Exception:
+            pass
+        return self.screen_state()
+
     def stop_live(self):
         state = self.screen_state()
         if state == 'summary':
-            self.close_summary()
-            return dict(live=False, confirmed=True)
+            state = self._close_after_end()
+            return dict(live=False, confirmed=True, summaryOpen=state == 'summary')
         if state == 'idle':
             return dict(live=False, already=True, confirmed=True)
         if state != 'live':
@@ -1369,14 +1417,13 @@ class VisionSession:
             if state in ('summary', 'idle'):
                 break
         if state == 'summary':
-            self.close_summary()
-            state = self.screen_state()
+            state = self._close_after_end()
         elif state == 'idle':
-            self.close_late_summary()
-            state = self.screen_state()
+            state = self._close_after_end(late=True)
         if state == 'summary':
-            self.close_summary()
-            state = self.screen_state()
+            state = self._close_after_end()
+        if state == 'summary':
+            return dict(live=False, confirmed=True, summaryOpen=True)
         if state != 'idle':
             raise ValueError('Đã bấm Kết thúc ngay nhưng chưa thấy Studio trở về nút "Phát LIVE".')
         return dict(live=False, confirmed=True)
@@ -1736,7 +1783,7 @@ class VisionSession:
         return dict(greeted=False, attempted=True, uncertain=True)
 
 
-DISMISS_ACTIONS = ('send', 'greet', 'greet_scan', 'chat_check', 'start', 'stop', 'status')
+DISMISS_ACTIONS = ('send', 'greet', 'greet_scan', 'chat_check', 'start', 'stop', 'status', 'reset_live')
 
 
 def _run(session, profile, action, payload):
@@ -1776,6 +1823,10 @@ def _run_action(session, profile, action, payload):
         return {**session.start_live(), 'pid': profile['pid']}
     if action == 'stop':
         return {**session.stop_live(), 'pid': profile['pid']}
+    if action == 'reset_live':
+        return {**session.reset_live(float((payload or {}).get('hold', 5))), 'pid': profile['pid']}
+    if action == 'close_summary':
+        return {**session.cleanup_summary(float((payload or {}).get('wait', 20))), 'pid': profile['pid']}
     if action == 'chat_check':
         return session.check()
     if action == 'send':

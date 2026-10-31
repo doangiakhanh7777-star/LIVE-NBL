@@ -86,9 +86,10 @@ class Cart(unittest.TestCase):
         now = time.time(); j = job(start=now + 400, cart=dict(state='preparing', attempts=0, next=0, command='cmd1', kind='add', until=now + 100))
         p = make([j]); p.owner.bridge.control = dict(id='cmd1', state='failed', error='Dừng tương tác và đợi thao tác chuẩn bị trước', busy='1')
         p.poll_cart(now)
-        self.assertEqual((j['cart']['attempts'], j['cart']['state']), (0, 'failed')); self.assertAlmostEqual(j['cart']['next'], now + 20, delta=1)
+        # 4.1.7: shown as "Chrome bận, chờ", not as a failed cart
+        self.assertEqual((j['cart']['attempts'], j['cart']['state'], j['cart']['wait']), (0, 'none', 'Chrome đang bận')); self.assertAlmostEqual(j['cart']['next'], now + 20, delta=1)
         self.assertEqual(p.alerts, [])
-        p.poll_cart(now + 21); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
+        j['cart']['probe'] = dict(at=now + 21, live=False); j['cart']['reloaded_at'] = now; p.poll_cart(now + 21); self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
 
     def test_real_failure_near_the_live_is_retried_after_one_minute(self):
         now = time.time(); j = job(start=now + 400, cart=dict(state='preparing', attempts=0, next=0, command='cmd1', kind='add', until=now + 100))
@@ -147,7 +148,7 @@ class StuckJob(unittest.TestCase):
         p = make([a, b]); p.futures = {done(dict(live=False)): ('a', None, 'status')}
         p.tick()
         self.assertEqual(a['state'], 'finished')
-        self.assertEqual(p.owner.bridge.commands[0]['action'], 'finish_live')
+        self.assertEqual([c['action'] for c in p.owner.bridge.commands[:2]], ['stop', 'finish_live'])   # 4.1.8: pin/reply off too
         p.poll_cart(time.time())
         self.assertEqual(p.owner.bridge.commands[-1]['action'], 'prepare_bundle')
 
