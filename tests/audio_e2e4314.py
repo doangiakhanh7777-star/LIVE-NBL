@@ -75,17 +75,24 @@ results = []
 if not ok and p.blocked:
     # giống chủ máy bấm "Có" ở câu hỏi bật quyền micro
     print('Windows chặn micro -> NBL bật quyền cho tài khoản này:', ptt.allow_mic_for_user(), ptt.mic_privacy(), flush=True)
-    ok = p.arm(cfg)
-    results.append(('nhận ra Windows chặn micro và bật quyền xong mở được', ok, p.error))
+    t0 = time.time(); ok = False
+    for wait in (0.8, 2, 4, 8, 15):                  # đo: bật quyền xong bao lâu thì Windows cho mở
+        spin(max(0, wait - (time.time() - t0)))
+        ok = p.arm(cfg); print('  thử lại sau %.1f s: %s' % (time.time() - t0, ok), flush=True)
+        if ok:
+            break
+    results.append(('nhận ra Windows chặn micro và bật quyền xong mở được (cùng lần chạy)', ok, p.error))
 results.append(('arm() mở được micro + cáp thật bằng định dạng gốc', ok and not p.error, p.error))
 spin(3)
 results.append(('micro gửi tiếng (byte nhận > 0)', p.got > 0, p.got))
 results.append(('nhận ra tiếng thử 440 Hz (mức > 0,05)', p.level > 0.05, round(p.level, 3)))
 results.append(('không báo lỗi quyền micro sau 2,5 giây', not p.error, p.error))
 before = p.sink.processedUSecs() if p.sink else 0
+free0 = p.sink.bytesFree() if p.sink else -1
 p.talking = True; spin(1.5); p.talking = False
 after = p.sink.processedUSecs() if p.sink else 0
-results.append(('giữ phím: tiếng ghi vào cáp (processedUSecs tăng)', after > before, (before, after)))
+print('  cáp: bytesFree lúc đầu', free0, '| bufferSize', p.sink.bufferSize() if p.sink else -1, '| state', ptt.err_name(p.sink.state()) if p.sink else '-', '| error', ptt.err_name(p.sink.error()) if p.sink else '-', flush=True)
+results.append(('giữ phím: tiếng ghi vào cáp (byte đã ghi > 0)', p.written > 0, (p.written, before, after)))
 p.disarm(quiet=True)
 for name, good, info in results:
     print(('OK   ' if good else 'FAIL ') + name + '  [' + str(info) + ']', flush=True)

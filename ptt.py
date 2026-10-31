@@ -114,7 +114,7 @@ class PushToTalk(QObject):
         self.key_reader = key_reader or (space_down_windows if sys.platform == 'win32' else None)
         self.app_space = False            # phím cách khi NBL đang được chọn (đường dự phòng ngoài Windows)
         self.source = self.sink = self.inp = self.out = None
-        self.fi = self.fo = None; self.pipe = None; self.got = 0; self.warn = ''; self.blocked = False
+        self.fi = self.fo = None; self.pipe = None; self.got = 0; self.written = 0; self.warn = ''; self.blocked = False; self.err_check = 0.0
         self.level = 0.0; self.talking = False; self.armed = False; self.error = ''; self.anywhere = True
         self.target_name = ''; self.mic_name = ''
         self.talk_started = 0.0; self.total_talk = 0.0
@@ -163,8 +163,7 @@ class PushToTalk(QObject):
             self.error = 'Không mở được đầu ra "' + self.target_name + '" (cáp ảo đang bị chiếm hoặc đã gỡ?).'
             self.owner.log('Giọng nói: ' + self.error); self.disarm(quiet=True); return False
         self.inp.readyRead.connect(self.pump)
-        self.source.stateChanged.connect(self.source_state)
-        self.got = 0
+        self.got = 0; self.written = 0
         self.warn = why
         self.anywhere = bool(cfg.get('anywhere', True))
         self.armed = True; self.gate.reset()
@@ -174,7 +173,7 @@ class PushToTalk(QObject):
         return True
 
     def source_state(self, state):
-        if self.source is not None and self.armed and err_name(self.source.error()) not in ('NoError', 'UnderrunError'):
+        if self.source is not None and self.armed and not self.error and err_name(self.source.error()) not in ('NoError', 'UnderrunError'):
             self.error = 'Micro "' + self.mic_name + '" ngừng gửi tiếng (' + err_name(self.source.error()) + '). ' + MIC_PRIVACY
             self.owner.log('Giọng nói: ' + self.error)
 
@@ -236,7 +235,10 @@ class PushToTalk(QObject):
     def tick(self):
         if not self.armed:
             return
-        on = self.gate.update(self.pressed(), time.monotonic())
+        now = time.monotonic()
+        if now - self.err_check > 1.0:          # 4.3.14: hỏi lỗi micro mỗi giây (stateChanged của PySide 6.12 không gọi được)
+            self.err_check = now; self.source_state(None)
+        on = self.gate.update(self.pressed(), now)
         if on != self.talking:
             self.set_talking(on)
         if not self.talking:
@@ -267,13 +269,12 @@ class PushToTalk(QObject):
         out = self.pipe.process(data)
         self.level = max(self.level * 0.7, self.pipe.level)
         free = self.sink.bytesFree()
-        if free <= 0:
-            return
-        if len(out) > free:
+        if 0 < free < len(out):                  # bộ đệm cáp sắp đầy: bỏ phần cũ, giữ phần mới nhất (không trễ dần)
             frame = max(1, self.fo.bytesPerFrame())
             cut = len(out) - free; cut += (-cut) % frame
             out = out[cut:]
-        self.out.write(out)
+        n = self.out.write(out)
+        self.written += max(0, int(n or 0))
 
     def quick_level(self, data):
         """Mức tiếng mic cho thanh thử mic (cả lúc chưa giữ phím)."""
