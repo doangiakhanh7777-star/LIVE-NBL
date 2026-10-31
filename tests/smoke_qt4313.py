@@ -254,9 +254,16 @@ def t_player_camera_and_window_command():
         assert state['state'] in ('ready', 'connected') and state.get('sent', 0) >= 1, state
     (folder / 'commands' / 'a.json').write_text(json.dumps(dict(token='t1', action='window', config={'show': False}, deadline=time.time() + 15)), encoding='utf-8')
     out.poll(); spin(0.1); assert not out.isVisible(), 'lệnh ẩn cửa sổ video không chạy'
-    out.video.on_frame(QVideoFrame(img)); spin(0.05)
     if out.cam is not None:
-        assert out.cam.sent >= 2, 'cửa sổ ẩn thì camera vẫn phải nhận hình'
+        before = out.cam.sent
+        out.video.on_frame(QVideoFrame(img)); spin(0.05)
+        if not out.cam.connected():           # 4.3.16: ẩn + chưa app nào mở camera -> 1 khung/giây (đỡ CPU)
+            assert out.cam.sent == before, 'chưa ai dùng camera mà vẫn đẩy dồn khung'
+            spin(1.05)
+        out.video.on_frame(QVideoFrame(img)); spin(0.05)
+        assert out.cam.sent >= before + 1, 'cửa sổ ẩn thì camera vẫn phải nhận hình'
+    else:
+        out.video.on_frame(QVideoFrame(img)); spin(0.05)
     (folder / 'commands' / 'b.json').write_text(json.dumps(dict(token='t2', action='window', config={'show': True}, deadline=time.time() + 15)), encoding='utf-8')
     out.poll(); spin(0.1); assert out.isVisible()
     st = json.loads((folder / 'status.json').read_text(encoding='utf-8')); assert 'camera' in st and 'shown' in st, st
