@@ -108,6 +108,7 @@ class PushToTalk(QObject):
         err_in = self.source.error() != QAudio.Error.NoError if self.source is not None else True
         err_out = self.sink.error() != QAudio.Error.NoError if self.sink is not None else True
         if self.inp is None or err_in:
+            self.owner.log('Giọng nói: micro báo ' + str(self.source.error()).split('.')[-1] + ' / ' + str(self.source.state()).split('.')[-1] + ('' if self.inp is not None else ' (không có luồng)'))
             self.error = 'Không mở được micro "' + self.mic_name + '". ' + MIC_PRIVACY
             self.owner.log('Giọng nói: ' + self.error); self.disarm(quiet=True); return False
         if self.out is None or err_out:

@@ -96,5 +96,41 @@ except Exception as e:
     print('requestPermission lỗi:', repr(e), flush=True)
 print('\n--- lần 2 (sau requestPermission) ---', flush=True)
 second = [attempt(*c) for c in cases[:3]]
+print('\n--- lần 3: mic + cáp cùng lúc (như NBL) ---', flush=True)
+from PySide6.QtMultimedia import QAudioSink
+from PySide6.QtCore import QObject
+cin = next((d for d in QMediaDevices.audioOutputs() if 'cable input' in d.description().lower()), QMediaDevices.defaultAudioOutput())
+of = cin.preferredFormat()
+
+
+def combo(name, sink_first, parent=None, bufs=True, keep_tone=False):
+    tone = None
+    if keep_tone:
+        tone = QAudioSink(cin, of); tone.start()
+    src = QAudioSource(mic, pf, parent) if parent else QAudioSource(mic, pf)
+    snk = QAudioSink(cin, of, parent) if parent else QAudioSink(cin, of)
+    if bufs:
+        src.setBufferSize(int(pf.sampleRate() * 0.02) * pf.bytesPerFrame()); snk.setBufferSize(int(of.sampleRate() * 0.06) * of.bytesPerFrame())
+    if sink_first:
+        o = snk.start(); i = src.start()
+    else:
+        i = src.start(); o = snk.start()
+    got = [0]
+    if i is not None:
+        i.readyRead.connect(lambda: got.__setitem__(0, got[0] + len(bytes(i.readAll()))))
+    spin(1.2)
+    print('%-44s src: io=%s err=%s state=%s bytes=%d | sink: io=%s err=%s state=%s' % (name, i is not None, str(src.error()).split('.')[-1], str(src.state()).split('.')[-1], got[0],
+          o is not None, str(snk.error()).split('.')[-1], str(snk.state()).split('.')[-1]), flush=True)
+    src.stop(); snk.stop()
+    if tone: tone.stop()
+
+
+owner = QObject()
+combo('nguồn trước, cáp sau', False)
+combo('cáp trước, nguồn sau', True)
+combo('cáp trước + bộ đệm nhỏ + có parent', True, owner)
+combo('cáp trước, không đặt bộ đệm', True, None, False)
+combo('đang phát tiếng thử + cáp trước', True, None, True, True)
+combo('đang phát tiếng thử + nguồn trước', False, None, True, True)
 print('\nKET QUA DO: lan1', first, 'lan2', second, flush=True)
 os._exit(0)
