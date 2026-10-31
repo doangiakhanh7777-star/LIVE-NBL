@@ -108,7 +108,9 @@ class Console(QMainWindow):
         QTimer.singleShot(4000,self.one_nick_cleanup)
         for notice in self.startup_notices:
             self.log(notice);QMessageBox.warning(self,'Đã khôi phục cấu hình',notice)
-        if sys.platform=='win32' and (BASE/'ocr_vendor').is_dir():
+        # 4.3.16: chỉ nạp sẵn OCR (onnxruntime/numpy/PIL, ~200 MB) khi có nick dùng đường đọc ảnh Studio; kết nối tự động (CDP) không cần
+        needs_ocr=any((p.get('vision') or {}).get('enabled') and not p.get('cdp') for p in getattr(self.studio_panel,'profiles',[]))
+        if sys.platform=='win32' and (BASE/'ocr_vendor').is_dir() and needs_ocr:
             # 4.0: load the OCR models now so the first Studio send is not 5-10 s late.
             import threading
             def warm():

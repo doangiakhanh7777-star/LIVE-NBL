@@ -101,12 +101,16 @@ class VideoCanvas(QWidget):
         self.setAutoFillBackground(False)
         self.frame = QImage()
         self.frame_hook = None          # 4.3.16: NBL Camera nhận từng khung
+        self.wants = None               # 4.3.16: hỏi có cần khung này không (cửa sổ đang ẩn)
         self.sink = QVideoSink(self)
         self.sink.videoFrameChanged.connect(self.on_frame)
 
     def on_frame(self, frame):
         if not frame.isValid():
             return
+        win = self.window()
+        if (not win.isVisible() or win.isMinimized()) and self.wants is not None and not self.wants():
+            return                     # 4.3.16: ẩn + chưa app nào dùng NBL Camera: khỏi đổi khung (đỡ CPU)
         image = frame.toImage()
         if image.isNull():
             return
@@ -143,7 +147,7 @@ class Output(QMainWindow):
         self.setWindowIcon(QIcon(str(Path(__file__).parent/'assets/logo_38.ico')));self.setWindowTitle('NBL VIDEO'); self.resize(405, 720)
         self.video = VideoCanvas(); self.setCentralWidget(self.video)
         self.cam = None; self.cam_want = True; self.cam_tried = 0.0
-        self.video.frame_hook = self.cam_send
+        self.video.frame_hook = self.cam_send; self.video.wants = self.cam_wants; self.cam_last = 0.0
         self.audio = QAudioOutput(self); self.audio.setMuted(True)
         self.player = QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.player.setVideoOutput(self.video.sink)
         self.player.mediaStatusChanged.connect(self.media_status)
@@ -196,9 +200,22 @@ class Output(QMainWindow):
         self.audio.setVolume(self.config['volume']/100)
         self.audio.setMuted(self.config['mute'])
     # ---------- 4.3.16: camera ảo NBL Camera ----------
+    def cam_wants(self):
+        """Chưa app nào mở NBL Camera thì 1 khung/giây là đủ (Studio mở camera là có hình ngay, rồi lên đủ 30 hình/giây)."""
+        if not self.cam_want:
+            return False
+        if self.cam is None:
+            return True
+        try:
+            return self.cam.connected() or time.monotonic() - self.cam_last >= 1.0
+        except Exception:
+            return True
     def cam_send(self, image):
         if not self.cam_want:
             return
+        if self.cam is not None and not self.cam_wants():
+            return
+        self.cam_last = time.monotonic()
         if self.cam is None:
             if time.monotonic() - self.cam_tried < 10:
                 return

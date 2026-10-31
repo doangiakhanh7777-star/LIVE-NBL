@@ -185,6 +185,7 @@ class StudioPanel(QWidget):
    if any(q is not current and q.get('cdpPort')==port for q in self.profiles):QMessageBox.warning(self,'Trùng','Cổng này đã gắn nick khác.');return
    value={**current,'id':current.get('id',uuid.uuid4().hex),'name':nick,'accountName':nick,'session':session['id'],'exePath':exe,'cdp':True,'cdpPort':port,
           'interaction':current.get('interaction',session.get('studio_interaction',{})),'allowMouse':current.get('allowMouse',True),'mousePermissionFile':str(self.mouse_path)}
+   if current.get('name') and not same_author(current.get('name'),nick):value.pop('handle',None);value.pop('handle_for',None)   # 4.3.16: Studio đổi nick -> quên @ Chrome của nick cũ
    if current:self.profiles[self.profiles.index(current)]=value
    else:self.profiles.append(value)
    self.connection_checks.pop(value['id'],None);self.save();self.refresh_profiles();self.render()
@@ -381,8 +382,16 @@ class StudioPanel(QWidget):
    # 4.3.0 (owner, 28/10/2026): "giakhanhdoxe" (TikTok @, read on TikTok Shop) and "Khánh Car
    # Auto" (display name, read in Studio) are the same nick: the pair is remembered the first
    # time both are seen; afterwards only another @ is refused.
+   # 4.3.16 (chủ máy, 31/10/2026): cặp nhớ từ nick Studio cũ (Khánh Car Auto ↔ @giakhanhdoxe) làm nick mới
+   # SĂN DEAL GIÁ RẺ (@bechaudethuong12) bị chặn mãi. Cặp giờ nhớ kèm tên nick Studio (handle_for): Studio đổi nick
+   # hoặc cặp do bản cũ ghi (không có handle_for) thì ghép lại; cùng nick Studio mà Chrome là @ khác thì vẫn chặn.
+   if account and p.get('handle') and p.get('handle_for')!=p.get('name'):
+    old=p['handle'];p['handle']=account;p['handle_for']=p.get('name')
+    if not same_author(old,account):self.owner.log(str(p.get('name',''))+': ghép lại Chrome @'+account+' (cặp cũ @'+old+' là của nick Studio trước).')
+    try:self.save()
+    except Exception:pass
    if account and not p.get('handle'):
-    p['handle']=account
+    p['handle']=account;p['handle_for']=p.get('name')
     try:self.save()
     except Exception:pass
    if account and p.get('handle') and not same_author(account,p['handle']):raise ValueError('Chrome đang là @'+account+', không phải @'+p['handle']+' của nick này. Đăng nhập đúng nick trên TikTok Shop.')
@@ -1093,6 +1102,7 @@ class StudioPanel(QWidget):
   current=next((p for p in self.profiles if p.get('session')==sid),None) or {}
   value={**current,'id':current.get('id',uuid.uuid4().hex),'name':nick,'accountName':nick,'session':sid,'exePath':r.get('exePath') or exe or current.get('exePath',''),'cdp':True,'cdpPort':port,
          'interaction':current.get('interaction',session.get('studio_interaction',{})),'allowMouse':current.get('allowMouse',True),'mousePermissionFile':str(self.mouse_path)}
+  if current.get('name') and not same_author(current.get('name'),nick):value.pop('handle',None);value.pop('handle_for',None)   # 4.3.16: Studio đổi nick -> quên @ Chrome của nick cũ
   if current:self.profiles[self.profiles.index(current)]=value
   else:self.profiles.append(value)
   self.connection_checks[value['id']]=dict(ok=True,signature=(value.get('pid'),value.get('windowHandle'),value.get('exePath')),at=time.monotonic())
