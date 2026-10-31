@@ -20,7 +20,7 @@ SKIP_TOP = {'tests', '__pycache__', '_sao_luu', 'SETUP_CHECK.log', 'TEST_RESULT.
             'BIEN_BAN_KHAC_PHUC_4.0.2.md', 'CAP_NHAT_4.0.2.bat', 'CAP_NHAT_4.1.bat', 'HUONG_DAN.md', 'HUONG_DAN_4.0.2.txt',
             'HUONG_DAN_SU_DUNG.pdf', 'KET_QUA_KIEM_TRA.txt', 'KET_QUA_KIEM_TRA_4.1.txt', 'THAY_DOI_4.1.txt', 'cap_nhat.ps1',
             'requirements-test.txt', 'run_tests.py', 'Uninstall.exe', 'NBL_LIVE.exe', 'runtime', 'ocr_vendor', '.git', '.github',
-            'build', 'mobile', 'NBL_LIVE_HANDOFF.md', 'README.md', '.gitignore', '.gitattributes'}
+            'build', 'mobile', 'native', 'NBL_LIVE_HANDOFF.md', 'README.md', '.gitignore', '.gitattributes'}
 QT_PYD = {'QtCore.pyd', 'QtGui.pyd', 'QtWidgets.pyd', 'QtMultimedia.pyd', 'QtMultimediaWidgets.pyd', 'QtNetwork.pyd', 'QtSvg.pyd'}
 QT_PLUGINS = {'platforms', 'styles', 'imageformats', 'iconengines', 'multimedia', 'tls', 'networkinformation', 'generic'}
 QT_DYNAMIC = {'opengl32sw.dll', 'd3dcompiler_47.dll'}           # loaded by name at run time, not imported

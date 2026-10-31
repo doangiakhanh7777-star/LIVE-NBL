@@ -1,0 +1,51 @@
+name: Camera ao NBL Camera
+# 4.3.16: build native/nbl_camera (softcam doi ten) bang Visual Studio, dang ky, thu doc bang ffmpeg dshow.
+# DLL + ket qua -> nhanh camera-out (artifact khong tai duoc tu may dung ban).
+on:
+  workflow_dispatch:
+  push:
+    branches: [nbl-4.3]
+    paths: ['native/**', 'vcam.py', 'tests/camera_e2e4316.py', '.github/workflows/camera.yml']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Build DLL
+        shell: pwsh
+        run: |
+          cd native\nbl_camera
+          New-Item -ItemType Directory -Force dist\bin\x64, dist\lib\x64 | Out-Null
+          msbuild src\softcam\softcam.vcxproj /m /p:Configuration=Release /p:Platform=x64 "/p:SolutionDir=$PWD\" /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          New-Item -ItemType Directory -Force ..\..\out | Out-Null
+          Copy-Item dist\bin\x64\softcam.dll ..\..\out\nbl_camera.dll
+          New-Item -ItemType Directory -Force ..\..\camera | Out-Null
+          Copy-Item dist\bin\x64\softcam.dll ..\..\camera\nbl_camera.dll
+          Get-FileHash ..\..\out\nbl_camera.dll -Algorithm SHA256 | Format-List
+      - name: Dang ky + thu bang ffmpeg
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONIOENCODING: utf-8
+        run: |
+          $ErrorActionPreference = 'Continue'
+          regsvr32 /s "$PWD\camera\nbl_camera.dll"; "regsvr32 ma $LASTEXITCODE" | Tee-Object out\camera_e2e.txt
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { choco install ffmpeg -y --no-progress | Out-Null; $env:Path += ';C:\ProgramData\chocolatey\bin' }
+          $q = Start-Process -FilePath .\runtime\python.exe -ArgumentList '-X','utf8','tests\camera_e2e4316.py' -NoNewWindow -PassThru -RedirectStandardOutput out\camera_e2e_run.txt -RedirectStandardError out\camera_e2e_err.txt
+          if (-not $q.WaitForExit(240000)) { $q.Kill(); "TREO" | Add-Content out\camera_e2e_run.txt }
+          Get-Content out\camera_e2e_run.txt
+          regsvr32 /s /u "$PWD\camera\nbl_camera.dll"; "go dang ky ma $LASTEXITCODE" | Add-Content out\camera_e2e.txt
+      - name: Day DLL + ket qua vao nhanh camera-out
+        if: always()
+        shell: bash
+        run: |
+          cd out
+          git init -q -b camera-out
+          git config user.name nbl-ci; git config user.email nbl-ci@users.noreply.github.com
+          git add -A; git commit -q -m "NBL Camera $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/camera-out
