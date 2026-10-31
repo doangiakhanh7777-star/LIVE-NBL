@@ -15,6 +15,7 @@ Phím đọc bằng GetAsyncKeyState (chỉ hỏi phím có đang giữ không):
 nuốt phím của app khác, không cần quyền quản trị.
 """
 import os
+import queue
 import sys
 import time
 from pathlib import Path
@@ -22,7 +23,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QTimer, Qt, QEvent
 from PySide6.QtMultimedia import QAudioFormat, QAudioSink, QAudioSource, QMediaDevices
 
-from ptt_core import POLL_MS, SINK_MS, TEXT_WIDGETS, VK_SPACE, Gate, Pipeline, Settings, choose_input, is_cable
+from ptt_core import POLL_MS, SINK_MS, TEXT_WIDGETS, VK_SPACE, Gate, Jitter, Pipeline, Settings, choose_input, is_cable
 
 
 def space_down_windows():
@@ -334,3 +335,103 @@ class TalkBadge:
 
     def hide(self):
         self.w.hide()
+
+
+class RemoteTalk(QObject):
+    """4.3.15: tiếng nói từ app điện thoại (WebSocket /api/talk, ws_mini.talk_session) -> cáp ảo Studio đang thu.
+
+    begin/feed/end được gọi từ luồng HTTP: chỉ bỏ vào hàng đợi. Mọi việc với Qt làm trong tick (luồng Qt).
+    owner cần: log, ptt_target(out_id), ptt_changed(on, who), ptt.settings.
+    """
+    SILENCE = 1.5          # quá chừng này giây không có tiếng từ điện thoại -> tự ngắt (mạng đứt giữa chừng)
+
+    def __init__(self, owner):
+        super().__init__(owner)
+        self.owner = owner; self.q = queue.Queue(maxsize=2000)
+        self.sink = self.out = self.pipe = self.jit = None; self.fo = None
+        self.talking = False; self.peer = ''; self.last = 0.0; self.level = 0.0; self.error = ''
+        self.received = 0; self.written = 0; self.closing = 0.0
+        self.timer = QTimer(self); self.timer.timeout.connect(self.tick); self.timer.start(10)
+
+    # ---- luồng HTTP ----
+    def begin(self, rate, peer):
+        self.q.put(('begin', int(rate), peer)); return ''
+
+    def feed(self, data):
+        try:
+            self.q.put_nowait(('data', bytes(data)))
+        except queue.Full:
+            pass
+
+    def end(self):
+        self.q.put(('end',))
+
+    # ---- luồng Qt ----
+    def open(self, rate, peer):
+        self.close(quiet=True)
+        cfg = self.owner.ptt.settings.load()
+        out = self.owner.ptt_target(cfg.get('out'))
+        if out is None or out.isNull():
+            self.error = 'Không thấy đầu ra âm thanh (cáp ảo) cho tiếng điện thoại.'; self.owner.log('Điện thoại nói: ' + self.error); return False
+        self.fo = native_format(out)
+        self.pipe = Pipeline(rate, 1, 'i16', self.fo.sampleRate(), self.fo.channelCount(), KIND[self.fo.sampleFormat()])
+        frame = max(1, self.fo.bytesPerFrame())
+        self.jit = Jitter(self.fo.sampleRate() * frame, frame)
+        self.sink = QAudioSink(out, self.fo, self)
+        self.sink.setBufferSize(int(self.fo.sampleRate() * 0.12) * frame)
+        self.out = self.sink.start()
+        if self.out is None or err_name(self.sink.error()) != 'NoError':
+            self.error = 'Không mở được "' + out.description() + '" để phát tiếng điện thoại (' + err_name(self.sink.error()) + ').'
+            self.owner.log('Điện thoại nói: ' + self.error); self.close(quiet=True); return False
+        self.error = ''; self.peer = peer; self.talking = True; self.last = time.monotonic(); self.received = self.written = 0
+        self.owner.log('Điện thoại nói: đang nói vào LIVE (mic điện thoại ' + str(rate) + ' Hz → "' + out.description() + '").')
+        self.owner.ptt_changed(True, 'dien_thoai')
+        return True
+
+    def close(self, quiet=False):
+        was = self.talking
+        self.talking = False; self.closing = 0.0
+        if self.sink is not None:
+            try:
+                self.sink.stop(); self.sink.deleteLater()
+            except Exception:
+                pass
+        self.sink = self.out = self.pipe = self.jit = None; self.level = 0.0
+        if was:
+            self.owner.ptt_changed(False, 'dien_thoai')
+            if not quiet:
+                self.owner.log('Điện thoại nói: đã ngắt (nhận %d KB).' % (self.received // 1024))
+
+    def tick(self):
+        for _ in range(200):
+            try:
+                item = self.q.get_nowait()
+            except queue.Empty:
+                break
+            kind = item[0]
+            if kind == 'begin':
+                self.open(item[1], item[2])
+            elif kind == 'data' and self.talking and self.pipe is not None:
+                self.received += len(item[1]); self.last = time.monotonic()
+                self.jit.push(self.pipe.process(item[1])); self.level = max(self.level * 0.7, self.pipe.level)
+            elif kind == 'end' and self.talking:
+                self.closing = time.monotonic() + 0.25          # phát nốt phần còn trong bộ đệm
+        if not self.talking:
+            return
+        now = time.monotonic()
+        if self.out is not None and self.jit is not None:
+            free = self.sink.bytesFree()
+            data = self.jit.take(free if free > 0 else 0)
+            if data:
+                n = self.out.write(data); self.written += max(0, int(n or 0))
+        if (self.closing and now >= self.closing) or now - self.last > self.SILENCE:
+            if not self.closing:
+                self.owner.log('Điện thoại nói: mất tiếng từ điện thoại hơn %.1f giây (mạng?) → tự ngắt.' % self.SILENCE)
+            self.close()
+        else:
+            self.level *= 0.9
+
+    def status(self):
+        if self.error:
+            return '⚠ ' + self.error
+        return '🔴 Điện thoại đang nói vào LIVE' if self.talking else ''

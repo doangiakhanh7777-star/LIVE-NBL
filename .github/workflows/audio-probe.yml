@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [nbl-4.3]
-    paths: ['tests/audio_probe4314.py', 'tests/audio_e2e4314.py', 'ptt.py', 'ptt_core.py', '.github/workflows/audio-probe.yml']
+    paths: ['tests/audio_probe4314.py', 'tests/audio_e2e4314.py', 'tests/talk_e2e4315.py', 'ws_mini.py', 'phone_api.py', 'ptt.py', 'ptt_core.py', 'player.py', 'tests/window_probe4315.py', '.github/workflows/audio-probe.yml']
 permissions:
   contents: write
 jobs:
@@ -33,6 +33,7 @@ jobs:
             if (-not $q.WaitForExit(150000)) { $q.Kill(); "TREO" | Add-Content "out\$name.txt" }
             Get-Content "out\$name.txt"
           }
+          run 'cua_so_khuat' 'tests\window_probe4315.py'
           run 'probe_1_mac_dinh' 'tests\audio_probe4314.py'
           run 'e2e_1_mac_dinh' 'tests\audio_e2e4314.py'
           foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone','HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone','HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone\NonPackaged') {
@@ -40,6 +41,7 @@ jobs:
           }
           run 'probe_2_cho_phep_micro' 'tests\audio_probe4314.py'
           run 'e2e_2_cho_phep_micro' 'tests\audio_e2e4314.py'
+          run 'talk_dien_thoai' 'tests\talk_e2e4315.py'
       - name: Day ket qua vao nhanh ci-out-audio
         if: always()
         shell: bash

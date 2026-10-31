@@ -1,12 +1,15 @@
 package vn.nbl.live;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -17,6 +20,8 @@ import org.json.JSONObject;
 /** NBL LIVE trên điện thoại: giao diện trong assets/index.html, nói chuyện với NBL trên PC qua Tailscale. */
 public class MainActivity extends Activity {
     private static final int PICK_VIDEO = 4313;
+    private static final int MIC = 4315;
+    private PermissionRequest pendingMic;
     private WebView web;
     private boolean ready;
     private String pending;
@@ -35,6 +40,23 @@ public class MainActivity extends Activity {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         // 4.3.13: <input type="file" accept="video/*"> mở trình chọn video của Android
         web.setWebChromeClient(new WebChromeClient() {
+            // 4.3.15: nút "Giữ để nói" cần micro (getUserMedia trong trang)
+            @Override
+            public void onPermissionRequest(final PermissionRequest req) {
+                runOnUiThread(() -> {
+                    boolean audio = false;
+                    for (String r : req.getResources()) if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r)) audio = true;
+                    if (!audio) { req.deny(); return; }
+                    if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        req.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                    } else {
+                        if (pendingMic != null) pendingMic.deny();
+                        pendingMic = req;
+                        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC);
+                    }
+                });
+            }
+
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (picker != null) picker.onReceiveValue(null);
@@ -82,6 +104,16 @@ public class MainActivity extends Activity {
         }
         picker.onReceiveValue(uris);
         picker = null;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int request, String[] perms, int[] results) {
+        super.onRequestPermissionsResult(request, perms, results);
+        if (request != MIC || pendingMic == null) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED)
+            pendingMic.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+        else pendingMic.deny();
+        pendingMic = null;
     }
 
     /** window.NBL trong trang: giữ màn hình sáng khi đang gửi video. */

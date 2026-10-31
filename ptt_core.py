@@ -222,3 +222,35 @@ class Settings:
         tmp = self.path.with_suffix('.tmp')
         tmp.write_text(json.dumps({k: d.get(k, v) for k, v in self.DEFAULTS.items()}, ensure_ascii=False), encoding='utf-8')
         os.replace(tmp, self.path)
+
+
+class Jitter:
+    """4.3.15: bộ đệm chống giật cho tiếng từ điện thoại (bytes PCM của đầu ra cáp).
+
+    Gom đủ PREROLL rồi mới bắt đầu phát (đệm sẵn trong cáp để mạng chập chờn không hụt tiếng); dồn quá MAXBUF thì bỏ phần cũ, giữ lại KEEP (không trễ dần).
+    """
+
+    def __init__(self, bytes_per_sec, frame=1, preroll_ms=80, max_ms=320, keep_ms=120):
+        self.bps = max(1, int(bytes_per_sec)); self.frame = max(1, int(frame))
+        al = lambda ms: (int(self.bps * ms / 1000) // self.frame) * self.frame
+        self.preroll, self.maxbuf, self.keep = al(preroll_ms), al(max_ms), al(keep_ms)
+        self.buf = bytearray(); self.started = False; self.dropped = 0
+
+    def push(self, data):
+        self.buf += data
+        if len(self.buf) > self.maxbuf:
+            cut = len(self.buf) - self.keep; cut -= cut % self.frame
+            del self.buf[:cut]; self.dropped += cut
+
+    def take(self, free):
+        """Lấy tối đa free byte để ghi vào cáp (bội số khung)."""
+        if not self.started:
+            if len(self.buf) < self.preroll:
+                return b''
+            self.started = True
+        n = min(len(self.buf), max(0, int(free))); n -= n % self.frame
+        out = bytes(self.buf[:n]); del self.buf[:n]
+        return out
+
+    def clear(self):
+        self.buf = bytearray(); self.started = False

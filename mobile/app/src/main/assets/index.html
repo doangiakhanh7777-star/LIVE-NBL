@@ -49,6 +49,8 @@ video{width:100%;border-radius:8px;background:#000;max-height:46vh}
 .flag .t{font-weight:700;min-width:58px;color:var(--orange)}
 .flag .nm{flex:1;overflow:hidden;text-overflow:ellipsis}
 .hide{display:none!important}
+.talk{width:100%;padding:22px 12px;font-size:18px;background:var(--navy);color:#fff;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none}
+.talk.on{background:var(--bad);box-shadow:0 0 0 6px #d6454533}.talk.wait{opacity:.7}
 </style>
 </head>
 <body>
@@ -69,6 +71,10 @@ video{width:100%;border-radius:8px;background:#000;max-height:46vh}
    <div class="mut" style="margin-top:6px">BẮT ĐẦU: tự bật ghim + AI khi LIVE. DỪNG: tắt ngay, không tự bật lại.</div>
    <div class="sw"><span>📌 Ghim sản phẩm<br><span class="mut" id="pinText"></span></span><label class="tg"><input type="checkbox" id="pinOn"><span></span></label></div>
    <div class="sw"><span>🤖 AI trả lời bình luận<br><span class="mut" id="aiText"></span></span><label class="tg"><input type="checkbox" id="aiOn"><span></span></label></div>
+  </div>
+  <div class="card">
+   <button class="b talk" id="talkBtn">🎤 GIỮ ĐỂ NÓI VÀO LIVE</button>
+   <div class="mut" id="talkText" style="margin-top:6px">Giữ nút để nói thẳng vào LIVE bằng mic điện thoại, thả ra là ngắt. Đang nói thì AI tạm im, video nhỏ tiếng.</div>
   </div>
   <div class="card">
    <button class="b d hold" id="emBtn"><span class="fill"></span><span style="position:relative">🛑 GIỮ 2 GIÂY: TẮT KHẨN CẤP</span></button>
@@ -354,6 +360,60 @@ async function upOne(it){
 $('upGo').onclick=async()=>{if(upRunning)return;upRunning=true;try{window.NBL&&NBL.keepScreen(true)}catch(e){}upRender();
  for(const it of upItems){if(!it.done){it.err=false;await upOne(it)}}
  upRunning=false;try{window.NBL&&NBL.keepScreen(false)}catch(e){}upRender();loadPin()};
+
+// ---- 4.3.15: nói qua điện thoại (mic -> WebSocket -> NBL -> cáp ảo Studio) ----
+const talk={ws:null,ctx:null,stream:null,proc:null,on:false,want:false,idle:null,ping:null};
+function talkUi(state,text){const b=$('talkBtn');b.classList.toggle('on',state==='on');b.classList.toggle('wait',state==='wait');
+ b.textContent=state==='on'?'🔴 ĐANG NÓI — THẢ RA ĐỂ NGẮT':state==='wait'?'⏳ Đang kết nối…':'🎤 GIỮ ĐỂ NÓI VÀO LIVE';if(text)$('talkText').textContent=text}
+async function talkMic(){
+ if(talk.stream&&talk.stream.active)return;
+ talk.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1}});
+ talk.ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
+ const src=talk.ctx.createMediaStreamSource(talk.stream);talk.proc=talk.ctx.createScriptProcessor(1024,1,1);
+ const mute=talk.ctx.createGain();mute.gain.value=0;
+ talk.proc.onaudioprocess=e=>{if(!talk.on||!talk.ws||talk.ws.readyState!==1)return;
+  if(talk.ws.bufferedAmount>64000)return;               // mạng nghẽn: bỏ bớt, không để trễ dồn
+  const f=e.inputBuffer.getChannelData(0),o=new Int16Array(f.length);
+  for(let i=0;i<f.length;i++){const v=Math.max(-1,Math.min(1,f[i]));o[i]=v<0?v*32768:v*32767}
+  talk.ws.send(o.buffer)};
+ src.connect(talk.proc);talk.proc.connect(mute);mute.connect(talk.ctx.destination);
+}
+function talkSocket(){
+ return new Promise((ok,bad)=>{
+  if(talk.ws&&talk.ws.readyState===1)return ok(talk.ws);
+  const p=pc();if(!p)return bad(new Error('Chưa ghép PC nào.'));
+  const h=p.good||p.hosts[0];const url='ws://'+(h.includes(':')&&!h.startsWith('[')?'['+h+']':h)+':'+p.port+'/api/talk?t='+encodeURIComponent(p.token);
+  const ws=new WebSocket(url);ws.binaryType='arraybuffer';let done=false;
+  const tm=setTimeout(()=>{if(!done){done=true;try{ws.close()}catch(e){}bad(new Error('Không kết nối được PC để nói (Tailscale? NBL đã lên bản 4.3.15?).'))}},6000);
+  ws.onmessage=e=>{let m={};try{m=JSON.parse(e.data)}catch(_){}
+   if(m.type==='ready'&&!done){done=true;clearTimeout(tm);talk.ws=ws;ok(ws)}
+   else if(m.type==='talking'){talkUi('on','Đang nói vào LIVE qua PC '+(p.name||'')+'…')}
+   else if(m.type==='error'){talk.on=false;talkUi('','⚠ '+m.text);toast(m.text,true)}};
+  ws.onclose=()=>{if(talk.ws===ws)talk.ws=null;clearInterval(talk.ping);if(talk.on){talk.on=false;talkUi('','⚠ Mất kết nối PC giữa chừng.')}
+   if(!done){done=true;clearTimeout(tm);bad(new Error('PC từ chối kết nối nói (sai mã ghép / NBL cũ).'))}};
+  clearInterval(talk.ping);talk.ping=setInterval(()=>{if(ws.readyState===1)ws.send(JSON.stringify({type:'ping'}))},10000);
+ });
+}
+async function talkStart(){
+ talk.want=true;clearTimeout(talk.idle);talkUi('wait');
+ try{await talkMic();if(talk.ctx.state==='suspended')await talk.ctx.resume();const ws=await talkSocket();
+  if(!talk.want){talkUi('');return}
+  ws.send(JSON.stringify({type:'start',rate:talk.ctx.sampleRate}));talk.on=true;try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}
+ }catch(e){talk.on=false;talkUi('','⚠ '+(e.name==='NotAllowedError'?'Chưa cho app dùng micro. Vào Cài đặt điện thoại → Ứng dụng → NBL LIVE → Quyền → Micro.':e.message));}
+}
+function talkStop(){
+ talk.want=false;if(talk.on&&talk.ws&&talk.ws.readyState===1)talk.ws.send(JSON.stringify({type:'stop'}));
+ talk.on=false;talkUi('','Đã ngắt. Giữ nút để nói tiếp.');
+ clearTimeout(talk.idle);talk.idle=setTimeout(talkRelease,60000);   // 1 phút không nói: nhả mic, đóng kết nối
+}
+function talkRelease(){try{talk.ws&&talk.ws.close()}catch(e){}talk.ws=null;clearInterval(talk.ping);
+ try{talk.stream&&talk.stream.getTracks().forEach(t=>t.stop())}catch(e){}talk.stream=null;try{talk.ctx&&talk.ctx.close()}catch(e){}talk.ctx=null}
+(()=>{const b=$('talkBtn');
+ b.addEventListener('pointerdown',e=>{e.preventDefault();try{b.setPointerCapture(e.pointerId)}catch(_){}talkStart()});
+ for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>{if(talk.want||talk.on)talkStop()});
+ b.addEventListener('contextmenu',e=>e.preventDefault());
+ document.addEventListener('visibilitychange',()=>{if(document.hidden){if(talk.want||talk.on)talkStop();talkRelease()}});
+})();
 
 // ---- AI ----
 let aiDefault='';

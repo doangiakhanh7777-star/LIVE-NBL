@@ -34,6 +34,57 @@ def letterbox(frame_w, frame_h, area_w, area_h):
     return (area_w - w) // 2, (area_h - h) // 2, w, h
 
 
+def _hidden(widget):
+    """4.3.15: cửa sổ bị kéo ra ngoài màn hình (Qt thôi vẽ vì coi là không hiển thị)."""
+    win = widget.window(); wh = win.windowHandle()
+    if wh is not None and not wh.isExposed() and win.isVisible() and not win.isMinimized():
+        return True
+    try:
+        from PySide6.QtGui import QGuiApplication
+        g = win.frameGeometry()
+        return win.isVisible() and not win.isMinimized() and not any(sc.geometry().intersects(g) for sc in QGuiApplication.screens())
+    except Exception:
+        return False
+
+
+def paint_hidden(widget, image):
+    """4.3.15 (chủ máy, 31/10/2026): kéo NBL VIDEO khuất khỏi màn hình thì hình đứng, vì Windows/Qt không vẽ cửa sổ
+    nằm ngoài màn hình nữa trong khi Studio vẫn chụp cửa sổ đó. Lúc đó NBL tự vẽ khung hình thẳng lên cửa sổ bằng GDI
+    (SetDIBitsToDevice) để Studio vẫn chụp được hình chạy. Trả True nếu đã vẽ."""
+    if sys.platform != 'win32' or image.isNull():
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+        from PySide6.QtCore import QPoint
+        win = widget.window(); hwnd = int(win.winId()); dpr = win.devicePixelRatioF() or 1.0
+        pos = widget.mapTo(win, QPoint(0, 0)); w = max(1, int(round(widget.width() * dpr))); h = max(1, int(round(widget.height() * dpr)))
+        frame = QImage(w, h, QImage.Format.Format_RGB32); frame.fill(QColor(0, 0, 0))
+        p = QPainter(frame); p.drawImage(QRect(*letterbox(image.width(), image.height(), w, h)), image); p.end()
+
+        class BIH(ctypes.Structure):
+            _fields_ = [('biSize', wintypes.DWORD), ('biWidth', ctypes.c_long), ('biHeight', ctypes.c_long), ('biPlanes', wintypes.WORD),
+                        ('biBitCount', wintypes.WORD), ('biCompression', wintypes.DWORD), ('biSizeImage', wintypes.DWORD),
+                        ('biXPelsPerMeter', ctypes.c_long), ('biYPelsPerMeter', ctypes.c_long), ('biClrUsed', wintypes.DWORD), ('biClrImportant', wintypes.DWORD)]
+        bih = BIH(ctypes.sizeof(BIH), w, -h, 1, 32, 0, 0, 0, 0, 0, 0)
+        bits = (ctypes.c_char * frame.sizeInBytes()).from_buffer_copy(frame.constBits())
+        user32 = ctypes.windll.user32; gdi32 = ctypes.windll.gdi32
+        user32.GetDC.restype = ctypes.c_void_p; user32.GetDC.argtypes = [ctypes.c_void_p]
+        user32.ReleaseDC.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        gdi32.SetDIBitsToDevice.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, wintypes.DWORD, wintypes.DWORD, ctypes.c_int, ctypes.c_int,
+                                            wintypes.UINT, wintypes.UINT, ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT]
+        hdc = user32.GetDC(hwnd)
+        if not hdc:
+            return False
+        try:
+            n = gdi32.SetDIBitsToDevice(hdc, int(pos.x() * dpr), int(pos.y() * dpr), w, h, 0, 0, 0, h, bits, ctypes.byref(bih), 0)
+        finally:
+            user32.ReleaseDC(hwnd, hdc)
+        return bool(n)
+    except Exception:
+        return False
+
+
 class VideoCanvas(QWidget):
     """4.3.11 (chủ máy, 31/10/2026): NBL tự vẽ hình bằng CPU thay vì nhờ card màn hình.
 
@@ -60,6 +111,8 @@ class VideoCanvas(QWidget):
             return
         self.frame = image
         self.update()
+        if _hidden(self):            # 4.3.15: bị kéo khuất -> Qt không vẽ, tự vẽ bằng GDI để Studio vẫn chụp được
+            paint_hidden(self, image)
 
     def clear(self):
         self.frame = QImage(); self.update()

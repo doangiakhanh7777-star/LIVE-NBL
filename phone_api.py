@@ -103,8 +103,8 @@ class ApiError(Exception):
 
 
 class Server:
-    def __init__(self, actions, config, store=None):
-        self.actions = actions; self.config = config; self.store = store
+    def __init__(self, actions, config, store=None, talk=None):
+        self.actions = actions; self.config = config; self.store = store; self.talk = talk
         self.calls = queue.Queue(); self.httpd = None; self.thread = None; self.error = ''
 
     # ---- Qt side ----
@@ -194,6 +194,14 @@ class Server:
                 self.send(h, 200, page.read_bytes(), 'text/html; charset=utf-8'); return
             if route == 'POST /api/upload':
                 self.upload(h, q, n); return
+            if route == 'GET /api/talk':          # 4.3.15: nói qua điện thoại (WebSocket)
+                import ws_mini
+                if self.talk is None:
+                    raise ApiError('Bản NBL này chưa nhận tiếng từ điện thoại.', 404)
+                if not ws_mini.handshake(h):
+                    raise ApiError('Cần kết nối WebSocket.', 400)
+                h.close_connection = True
+                ws_mini.talk_session(h, self.talk); return
             body = {}
             if n:
                 if n > 2 << 20:

@@ -347,11 +347,13 @@ class Console(QMainWindow):
     # ---------- 4.3.13: giữ phím cách để nói thẳng vào LIVE ----------
     def build_voice(self):
         from ptt import PushToTalk, SpaceFilter, TalkBadge
-        self.ptt=PushToTalk(self,DATA);self.talk_badge=None;self.ptt_ducked=None;cfg=self.ptt.settings.load()
+        from ptt import RemoteTalk
+        self.ptt=PushToTalk(self,DATA);self.remote_talk=RemoteTalk(self);self.talk_badge=None;self.ptt_ducked=None;cfg=self.ptt.settings.load()
         v=self.page('🎤 Giọng nói · giữ phím cách')
         intro=QLabel('Giữ phím CÁCH (khoảng trắng) để nói thẳng vào LIVE bằng giọng thật của mày — thời gian thực, không thu rồi phát lại. Thả phím là ngắt.');intro.setWordWrap(True);v.addWidget(intro)
         self.voice_on=QCheckBox('BẬT chế độ giữ phím cách để nói');self.voice_on.setChecked(bool(cfg.get('enabled')));v.addWidget(self.voice_on)
         self.voice_state=QLabel('');self.voice_state.setWordWrap(True);self.voice_state.setObjectName('accountStatus');v.addWidget(self.voice_state)
+        self.voice_phone=QLabel('');self.voice_phone.setWordWrap(True);self.voice_phone.setObjectName('subtitle');v.addWidget(self.voice_phone)
         self.voice_level=QProgressBar();self.voice_level.setRange(0,100);self.voice_level.setTextVisible(False);self.voice_level.setMaximumHeight(12);v.addWidget(self.voice_level)
         lv=QLabel('Thanh trên nhúc nhích theo tiếng mic (kể cả khi chưa giữ phím) — dùng để thử mic.');lv.setObjectName('subtitle');lv.setWordWrap(True);v.addWidget(lv)
         g=QGroupBox('Thiết bị');f=QFormLayout(g);f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
@@ -441,7 +443,11 @@ class Console(QMainWindow):
         except Exception as e:
             self.log('Chưa tự mở lại được NBL: '+str(e)[:150]);QMessageBox.information(self,'Mở lại NBL','Tắt NBL rồi mở lại bằng biểu tượng NBL LIVE.');return
         self.log('Đang mở lại NBL…');QTimer.singleShot(300,self.close)
-    def ptt_changed(self,on):
+    def ptt_changed(self,on,who='phim'):
+        # 4.3.15: phím cách và điện thoại có thể cùng nói; AI im / nhãn đỏ / nhỏ tiếng theo "có ai đang nói"
+        talkers=getattr(self,'talkers',set());self.talkers=talkers
+        was=bool(talkers);(talkers.add if on else talkers.discard)(who);on=bool(talkers)
+        if on==was:return
         ai=getattr(self,'ai',None)
         if ai is not None:ai.set_hold(on)
         if self.talk_badge is None:
@@ -459,11 +465,17 @@ class Console(QMainWindow):
             self.ptt_ducked=None
         self.log('Giọng nói: '+('đang nói vào LIVE…' if on else 'đã ngắt mic.'))
     def voice_refresh(self):
+        rt=getattr(self,'remote_talk',None)
+        if hasattr(self,'voice_phone'):
+            t=rt.status() if rt else ''
+            t=t or '📱 Nói qua điện thoại: mở app NBL trên điện thoại → Tổng quan → giữ nút "🎤 Giữ để nói vào LIVE".'
+            if self.voice_phone.text()!=t:self.voice_phone.setText(t)
         if not hasattr(self,'voice_state'):return
         text=self.ptt.status()
         if self.ptt.armed and getattr(self,'ptt_warn',''):text+='\n⚠ '+self.ptt_warn
         if self.voice_state.text()!=text:self.voice_state.setText(text)
-        self.voice_level.setValue(int(min(1.0,self.ptt.level*1.6)*100) if self.ptt.armed else 0)
+        lv=max(self.ptt.level if self.ptt.armed else 0.0,rt.level if rt and rt.talking else 0.0)
+        self.voice_level.setValue(int(min(1.0,lv*1.6)*100))
     def ai_wait(self,future,done):
         timer=QTimer(self)
         def check():
@@ -1066,7 +1078,7 @@ class Console(QMainWindow):
     def start_phone_api(self):
         import phone_api,phone_actions
         self.phone_cfg=phone_api.Config(DATA/'phone_api.json')
-        self.phone_server=phone_api.Server(phone_actions.Actions(self),self.phone_cfg,self.video_store)
+        self.phone_server=phone_api.Server(phone_actions.Actions(self),self.phone_cfg,self.video_store,getattr(self,'remote_talk',None))
         self.phone_timer=QTimer(self);self.phone_timer.timeout.connect(self.phone_server.drain);self.phone_timer.start(100)
         cfg=self.phone_cfg.load();self.phone_on.blockSignals(True);self.phone_on.setChecked(bool(cfg.get('enabled')));self.phone_on.blockSignals(False)
         self.phone_on.toggled.connect(self.phone_toggle)
@@ -1309,6 +1321,7 @@ class Console(QMainWindow):
         if self.alarm_window:self.alarm_window.close()
         getattr(self,'phone_server',None) and self.phone_server.stop()
         getattr(self,'ptt',None) and self.ptt.disarm(quiet=True)
+        getattr(self,'remote_talk',None) and self.remote_talk.close(quiet=True)
         self.studio_chat.shutdown();getattr(self,'ai',None) and self.ai.shutdown();self.studio_panel.shutdown();__import__('studio_vision_rpc').close_service();self.notifier.close();set_awake(False);self.bridge.close();self.obs.close()
         for handler in self.logger.handlers[:]:handler.close();self.logger.removeHandler(handler)
         super().closeEvent(event)
