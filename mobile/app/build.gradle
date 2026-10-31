@@ -10,7 +10,7 @@ android {
         minSdk 26
         targetSdk 35
         versionCode Integer.parseInt(System.getenv('NBL_VERSION_CODE') ?: '430')
-        versionName System.getenv('NBL_VERSION_NAME') ?: '4.3.0'
+        versionName System.getenv('NBL_VERSION_NAME') ?: '4.3.13'
     }
     signingConfigs {
         release {

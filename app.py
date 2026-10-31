@@ -12,7 +12,7 @@ from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from PySide6.QtCore import QTimer, Qt, QUrl, QDateTime
 from PySide6.QtGui import QIcon, QDesktopServices, QPixmap, QImage, QPainter, QColor
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget, QListWidgetItem, QTabWidget, QLineEdit, QTextEdit, QCheckBox, QComboBox, QSpinBox, QDoubleSpinBox, QFileDialog, QMessageBox, QFormLayout, QGroupBox, QSlider, QDateTimeEdit, QScrollArea, QGridLayout, QSizePolicy, QStyle, QToolButton, QMenu, QAbstractSpinBox, QDialog)
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget, QListWidgetItem, QTabWidget, QLineEdit, QTextEdit, QCheckBox, QComboBox, QSpinBox, QDoubleSpinBox, QFileDialog, QMessageBox, QFormLayout, QGroupBox, QSlider, QDateTimeEdit, QScrollArea, QProgressBar, QGridLayout, QSizePolicy, QStyle, QToolButton, QMenu, QAbstractSpinBox, QDialog)
 from PySide6.QtMultimedia import QMediaDevices
 from model import load, validate, write_json, new_session
 from obs_bridge import OBSBridge
@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.11'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.13'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -77,7 +77,7 @@ class Console(QMainWindow):
         from nav_button import NavButton
         self.navigation=NavButton();self.navigation.setMinimumHeight(42);body.addWidget(self.navigation)
         self.tabs=QTabWidget();self.tabs.tabBar().hide();self.navigation.currentIndexChanged.connect(self.tabs.setCurrentIndex);body.addWidget(self.tabs,1)
-        import pin_scripts;self.pin_store=pin_scripts.Store(DATA/'kich_ban_ghim.json');self.build_video();self.build_script();self.build_chrome();self.build_ai();self.label_timer=QTimer(self);self.label_timer.timeout.connect(self.refresh_playlist_labels);self.label_timer.start(5000);self.build_obs();self.build_schedule();self.build_tools()
+        import pin_scripts;self.pin_store=pin_scripts.Store(DATA/'kich_ban_ghim.json');self.build_video();self.build_script();self.build_chrome();self.build_ai();self.build_voice();self.label_timer=QTimer(self);self.label_timer.timeout.connect(self.refresh_playlist_labels);self.label_timer.start(5000);self.build_obs();self.build_schedule();self.build_tools()
         for form in self.findChildren(QFormLayout): form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
         # 4.3.0 (owner): the activity log is always shown
         logtitle=QLabel('📋 Nhật ký hoạt động');logtitle.setObjectName('subtitle');body.addWidget(logtitle)
@@ -141,6 +141,7 @@ class Console(QMainWindow):
         row = QGridLayout()
         for i,(text, action) in enumerate([('Thêm video',self.add_video),('Xóa video',self.remove_video),('↑',lambda:self.move_video(-1)),('↓',lambda:self.move_video(1))]): row.addWidget(button(text,action),i//2,i%2)
         v.addLayout(row)
+        self.build_store(v)
         options = QHBoxLayout(); self.loop = QCheckBox('Lặp playlist vô hạn'); self.shuffle = QCheckBox('Xáo video mỗi vòng'); self.mute = QCheckBox('Tắt tiếng phiên này')
         options = QVBoxLayout()
         for w in (self.loop,self.shuffle,self.mute): options.addWidget(w)
@@ -343,6 +344,88 @@ class Console(QMainWindow):
         self.ai.settings.save(cfg);self.oai_keys.clear();self.oai_key_count.setText('Đã lưu '+str(len(keys))+' key (mã hóa, chỉ trên máy này)');self.log('Đã lưu '+str(len(keys))+' OpenAI API key.')
     def ai_clear_oai_keys(self):
         cfg=self.ai_cfg();cfg['openai_keys']='';self.ai.settings.save(cfg);self.oai_key_count.setText('Chưa có key');self.log('Đã xóa OpenAI API key.')
+    # ---------- 4.3.13: giữ phím cách để nói thẳng vào LIVE ----------
+    def build_voice(self):
+        from ptt import PushToTalk, SpaceFilter, TalkBadge
+        self.ptt=PushToTalk(self,DATA);self.talk_badge=None;self.ptt_ducked=None;cfg=self.ptt.settings.load()
+        v=self.page('🎤 Giọng nói · giữ phím cách')
+        intro=QLabel('Giữ phím CÁCH (khoảng trắng) để nói thẳng vào LIVE bằng giọng thật của mày — thời gian thực, không thu rồi phát lại. Thả phím là ngắt.');intro.setWordWrap(True);v.addWidget(intro)
+        self.voice_on=QCheckBox('BẬT chế độ giữ phím cách để nói');self.voice_on.setChecked(bool(cfg.get('enabled')));v.addWidget(self.voice_on)
+        self.voice_state=QLabel('');self.voice_state.setWordWrap(True);self.voice_state.setObjectName('accountStatus');v.addWidget(self.voice_state)
+        self.voice_level=QProgressBar();self.voice_level.setRange(0,100);self.voice_level.setTextVisible(False);self.voice_level.setMaximumHeight(12);v.addWidget(self.voice_level)
+        lv=QLabel('Thanh trên nhúc nhích theo tiếng mic (kể cả khi chưa giữ phím) — dùng để thử mic.');lv.setObjectName('subtitle');lv.setWordWrap(True);v.addWidget(lv)
+        g=QGroupBox('Thiết bị');f=QFormLayout(g);f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        self.voice_mic=QComboBox();self.voice_out=QComboBox();self.fill_voice_devices(cfg)
+        f.addRow('Micro',self.voice_mic);f.addRow('Phát vào (Studio phải thu thiết bị này)',self.voice_out)
+        self.voice_anywhere=QCheckBox('Nhận phím cách cả khi đang ở cửa sổ khác (Studio, Chrome…)');self.voice_anywhere.setChecked(bool(cfg.get('anywhere',True)));f.addRow(self.voice_anywhere)
+        self.voice_duck=QCheckBox('Đang nói thì nhỏ tiếng NBL VIDEO');self.voice_duck.setChecked(bool(cfg.get('duck',True)));f.addRow(self.voice_duck);v.addWidget(g)
+        note=QLabel('• Chạm nhanh phím cách (gõ chữ) KHÔNG phát tiếng — phải giữ từ 0,25 giây trở lên mới mở mic.\n'
+                    '• Đang nói: AI trả lời bình luận tạm ngừng đọc, trên màn hình hiện nhãn đỏ "ĐANG NÓI VÀO LIVE".\n'
+                    '• Mặc định phát vào cùng cáp ảo với NBL VIDEO của nick, nên Studio đang thu cáp đó là nghe được, không cần chỉnh Studio.\n'
+                    '• Giữ phím cách khi đang đứng trong ô gõ chữ của app khác thì app đó cũng gõ thêm dấu cách — đứng ở Studio/NBL rồi giữ là gọn nhất.')
+        note.setWordWrap(True);note.setObjectName('subtitle');v.addWidget(note);v.addStretch()
+        self.voice_on.toggled.connect(self.voice_apply)
+        for w in (self.voice_mic,self.voice_out):w.currentIndexChanged.connect(self.voice_apply)
+        for w in (self.voice_anywhere,self.voice_duck):w.toggled.connect(self.voice_apply)
+        self.space_filter=SpaceFilter(self.ptt);QApplication.instance().installEventFilter(self.space_filter)
+        self.voice_devices=QMediaDevices(self);self.voice_devices.audioInputsChanged.connect(self.voice_devices_changed);self.voice_devices.audioOutputsChanged.connect(self.voice_devices_changed)
+        self.voice_timer=QTimer(self);self.voice_timer.timeout.connect(self.voice_refresh);self.voice_timer.start(100)
+        if cfg.get('enabled'):QTimer.singleShot(1500,self.voice_apply)
+        self.voice_refresh()
+    def fill_voice_devices(self,cfg):
+        for w in (self.voice_mic,self.voice_out):w.blockSignals(True);w.clear()
+        self.voice_mic.addItem('Micro mặc định của Windows','')
+        for d in QMediaDevices.audioInputs():self.voice_mic.addItem(d.description(),bytes(d.id()).hex())
+        self.voice_out.addItem('Giống NBL VIDEO của nick (cáp ảo) — nên dùng','')
+        for d in QMediaDevices.audioOutputs():self.voice_out.addItem(d.description(),bytes(d.id()).hex())
+        self.voice_mic.setCurrentIndex(max(0,self.voice_mic.findData(cfg.get('mic',''))));self.voice_out.setCurrentIndex(max(0,self.voice_out.findData(cfg.get('out',''))))
+        for w in (self.voice_mic,self.voice_out):w.blockSignals(False)
+    def voice_cfg(self):
+        return dict(enabled=self.voice_on.isChecked(),mic=self.voice_mic.currentData() or '',out=self.voice_out.currentData() or '',anywhere=self.voice_anywhere.isChecked(),duck=self.voice_duck.isChecked())
+    def voice_apply(self,*args):
+        cfg=self.voice_cfg()
+        try:self.ptt.settings.save(cfg)
+        except Exception as e:self.log('Giọng nói: chưa lưu được cài đặt: '+str(e)[:120])
+        if cfg['enabled']:self.ptt.arm(cfg)
+        else:self.ptt.disarm()
+        self.voice_refresh()
+    def voice_devices_changed(self):
+        cfg=self.voice_cfg();self.fill_voice_devices(cfg)
+        if self.ptt.armed:self.ptt.arm(self.voice_cfg())
+    def ptt_target(self,out_id=''):
+        self.ptt_warn='';outs=QMediaDevices.audioOutputs()
+        def find(want):return next((d for d in outs if want and bytes(d.id()).hex()==want),None)
+        if out_id:return find(out_id) or QMediaDevices.defaultAudioOutput()
+        dev=find((self.current() or {}).get('device','')) if self.data.get('sessions') else None
+        if dev is not None:self.ptt_warn='';return dev
+        from pin_scripts import pick_cable
+        hit=pick_cable([(d.description(),bytes(d.id()).hex()) for d in outs])
+        if hit:self.ptt_warn='';return find(hit[0])
+        self.ptt_warn='Máy chưa có cáp âm thanh ảo — tiếng đang ra loa mặc định, Studio có thể không thu được.'
+        return QMediaDevices.defaultAudioOutput()
+    def ptt_changed(self,on):
+        ai=getattr(self,'ai',None)
+        if ai is not None:ai.set_hold(on)
+        if self.talk_badge is None:
+            from ptt import TalkBadge
+            self.talk_badge=TalkBadge()
+        self.talk_badge.show() if on else self.talk_badge.hide()
+        s=self.current() if self.data.get('sessions') else None
+        if on and s and self.voice_duck.isChecked() and not s.get('mute'):
+            self.ptt_ducked=dict(s)
+            try:self.command('settings',False,{**s,'volume':int(s.get('volume',80)*0.3)})
+            except Exception:self.ptt_ducked=None
+        elif not on and self.ptt_ducked is not None:
+            try:self.command('settings',False,self.ptt_ducked)
+            except Exception:pass
+            self.ptt_ducked=None
+        self.log('Giọng nói: '+('đang nói vào LIVE…' if on else 'đã ngắt mic.'))
+    def voice_refresh(self):
+        if not hasattr(self,'voice_state'):return
+        text=self.ptt.status()
+        if self.ptt.armed and getattr(self,'ptt_warn',''):text+='\n⚠ '+self.ptt_warn
+        if self.voice_state.text()!=text:self.voice_state.setText(text)
+        self.voice_level.setValue(int(min(1.0,self.ptt.level*1.6)*100) if self.ptt.armed else 0)
     def ai_wait(self,future,done):
         timer=QTimer(self)
         def check():
@@ -753,6 +836,113 @@ class Console(QMainWindow):
         except Exception:pass
     def add_video(self):
         paths,_=QFileDialog.getOpenFileNames(self,'Thêm video','','Video (*.mp4 *.mkv *.mov *.avi *.webm);;Tất cả (*)');existing=set(self.playlist_paths());self.add_playlist_items([p for p in paths if p not in existing])
+    # ---------- 4.3.13: kho video NBL (gửi từ điện thoại) ----------
+    def build_store(self,v):
+        from video_store import VideoStore
+        self.video_store=VideoStore(DATA/'videos');self.pending_deletes=[]
+        g=QGroupBox('📱 Kho video NBL — gửi video từ điện thoại');gv=QVBoxLayout(g)
+        self.store_list=QListWidget();self.store_list.setMaximumHeight(130);self.store_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection);gv.addWidget(self.store_list)
+        grid=QGridLayout()
+        for i,(text,action,kind) in enumerate([('📱 Mã QR gửi video từ điện thoại',self.store_qr,'primary'),('➕ Thêm vào playlist',self.store_add,''),('🗑 Xóa khỏi máy',self.store_delete,'danger'),('📂 Mở thư mục kho',lambda:(self.video_store.folder.mkdir(parents=True,exist_ok=True),QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.video_store.folder)))),'')]):
+            grid.addWidget(button(text,action,kind),i//2,i%2)
+        gv.addLayout(grid)
+        self.store_note=QLabel('');self.store_note.setWordWrap(True);self.store_note.setObjectName('subtitle');gv.addWidget(self.store_note);v.addWidget(g)
+        self.store_timer=QTimer(self);self.store_timer.timeout.connect(self.store_tick);self.store_timer.start(5000);self.refresh_store()
+    def refresh_store(self):
+        if not hasattr(self,'store_list'):return
+        from video_store import human
+        used=set()
+        for s in self.data.get('sessions') or []:used.update(os.path.normcase(str(Path(p))) for p in s.get('playlist') or [])
+        try:files=self.video_store.files()
+        except OSError:files=[]
+        keep={it.data(Qt.ItemDataRole.UserRole) for it in self.store_list.selectedItems()}
+        rows=[(f['path'],f['name']+'   · '+human(f['size'])+('   ▶ trong playlist' if os.path.normcase(f['path']) in used else '   · chưa thêm playlist')+('   (đang chờ xóa)' if f['path'] in self.pending_deletes else '')) for f in files]
+        if [(self.store_list.item(i).data(Qt.ItemDataRole.UserRole),self.store_list.item(i).text()) for i in range(self.store_list.count())]!=rows:
+            self.store_list.clear()
+            for path,text in rows:
+                it=QListWidgetItem(text);it.setData(Qt.ItemDataRole.UserRole,path);it.setToolTip(path);self.store_list.addItem(it);it.setSelected(path in keep)
+        total=sum(f['size'] for f in files)
+        self.store_note.setText(('Kho có '+str(len(files))+' video ('+human(total)+'). ' if files else 'Kho chưa có video. ')+'Video gửi từ điện thoại tự vào playlist của nick đang chọn. Xóa ở đây là xóa hẳn file khỏi máy và gỡ khỏi playlist.')
+    def store_tick(self):
+        for path in list(self.pending_deletes):
+            try:self.video_store.delete(path);self.pending_deletes.remove(path);self.log('Kho video: đã xóa '+Path(path).name+' (hết phát).')
+            except PermissionError:pass
+            except Exception:self.pending_deletes.remove(path)
+        self.refresh_store()
+    def store_selected(self):
+        return [it.data(Qt.ItemDataRole.UserRole) for it in self.store_list.selectedItems()]
+    def store_add(self):
+        paths=self.store_selected()
+        if not paths:QMessageBox.information(self,'Kho video','Chọn video trong kho trước.');return
+        have={os.path.normcase(p) for p in self.playlist_paths()};new=[p for p in paths if os.path.normcase(p) not in have]
+        self.add_playlist_items(new);self.save_current();self.refresh_store()
+    def store_delete(self):
+        paths=self.store_selected()
+        if not paths:QMessageBox.information(self,'Kho video','Chọn video trong kho trước.');return
+        if QMessageBox.question(self,'Xóa video','Xóa hẳn '+str(len(paths))+' video khỏi máy và gỡ khỏi playlist?\n\n'+'\n'.join(Path(p).name for p in paths[:8]))!=QMessageBox.StandardButton.Yes:return
+        QMessageBox.information(self,'Kho video',self.delete_videos(paths))
+    def video_uploaded(self,path,source='điện thoại'):
+        """Video vừa gửi xong vào kho: thêm vào playlist của nick đang chọn."""
+        from video_store import human
+        nick=''
+        if self.data.get('sessions'):
+            if os.path.normcase(path) not in {os.path.normcase(p) for p in self.playlist_paths()}:
+                self.add_playlist_items([path])
+            self.save_current();nick=self.current().get('account') or ('nick '+str(self.current().get('number','')))
+        size=Path(path).stat().st_size if Path(path).exists() else 0
+        self.log('Kho video: nhận '+Path(path).name+' ('+human(size)+') từ '+source+(' → đã thêm vào playlist '+nick if nick else '')+'.')
+        self.refresh_store()
+        return dict(ok=True,name=Path(path).name,nick=nick)
+    def delete_videos(self,paths,source=''):
+        """Gỡ khỏi playlist mọi nick; file nằm trong kho NBL thì xóa hẳn (đang phát thì xóa khi hết phát)."""
+        gone={os.path.normcase(str(Path(p))) for p in paths};touched=[]
+        self.collect()
+        for s in self.data.get('sessions') or []:
+            keep=[p for p in s.get('playlist') or [] if os.path.normcase(str(Path(p))) not in gone]
+            if len(keep)!=len(s.get('playlist') or []):s['playlist']=keep;touched.append(s)
+        for i in reversed(range(self.playlist.count())):
+            it=self.playlist.item(i)
+            if os.path.normcase(str(Path(it.data(Qt.ItemDataRole.UserRole) or it.text()))) in gone:self.playlist.takeItem(i)
+        write_json(self.path,self.data)
+        for s in touched:
+            try:self.command('settings',False,s)
+            except Exception:pass
+        deleted,later,kept=[],[],[]
+        for p in paths:
+            if not self.video_store.owns(p):kept.append(Path(p).name);continue
+            try:self.video_store.delete(p);deleted.append(Path(p).name)
+            except PermissionError:
+                later.append(Path(p).name)
+                if p not in self.pending_deletes:self.pending_deletes.append(p)
+            except Exception as e:kept.append(Path(p).name+' ('+str(e)[:60]+')')
+        parts=[]
+        if deleted:parts.append('Đã xóa khỏi máy: '+', '.join(deleted))
+        if later:parts.append('Đang phát nên sẽ tự xóa khi hết clip: '+', '.join(later))
+        if kept:parts.append('Đã gỡ khỏi playlist (file không nằm trong kho NBL nên giữ nguyên): '+', '.join(kept))
+        text='. '.join(parts) or 'Không có gì để xóa.'
+        self.log('Kho video'+(' ('+source+')' if source else '')+': '+text);self.refresh_store();self.refresh_playlist_labels()
+        return text
+    def store_qr(self):
+        import phone_api,qr,ipaddress
+        if not hasattr(self,'phone_cfg'):return
+        cfg=self.phone_cfg.load()
+        if not cfg.get('enabled'):
+            QMessageBox.information(self,'Gửi video từ điện thoại','Bật "Cho phép điều khiển từ điện thoại" ở trang Thiết lập & cảnh báo trước.');return
+        hosts=phone_api.addresses()
+        host=next((h for h in hosts if h[:1].isdigit() and ipaddress.ip_address(h) in phone_api.TAILSCALE),None) or next((h for h in hosts if h[:1].isdigit()),hosts[0])
+        link='http://'+host+':'+str(cfg.get('port',phone_api.PORT))+'/upload?t='+cfg['token']
+        m=qr.encode(link);n=len(m);scale=max(3,260//(n+8));img=QImage((n+8)*scale,(n+8)*scale,QImage.Format.Format_RGB32);img.fill(QColor('white'))
+        painter=QPainter(img)
+        for y,row in enumerate(m):
+            for x,dark in enumerate(row):
+                if dark:painter.fillRect((x+4)*scale,(y+4)*scale,scale,scale,QColor('black'))
+        painter.end()
+        d=QDialog(self);d.setWindowTitle('Gửi video từ điện thoại');lay=QVBoxLayout(d)
+        pic=QLabel();pic.setPixmap(QPixmap.fromImage(img));pic.setAlignment(Qt.AlignmentFlag.AlignCenter);lay.addWidget(pic)
+        t=QLabel('1. Điện thoại bật Tailscale (cùng tài khoản với PC này).\n2. Mở camera / Chrome quét mã → trang "Gửi video vào NBL".\n3. Chọn video → Gửi. Gửi xong video tự vào playlist nick đang chọn.\n\nKhông cần chung wifi. Mất mạng giữa chừng thì bấm Gửi lại, nó gửi tiếp chỗ dở.\n\nĐịa chỉ: '+link)
+        t.setWordWrap(True);t.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse);lay.addWidget(t)
+        row=QHBoxLayout();row.addWidget(button('Chép địa chỉ',lambda:QApplication.clipboard().setText(link)));row.addWidget(button('Đóng',d.accept,'primary'));lay.addLayout(row)
+        d.exec()
     def remove_video(self):
         for i in reversed([self.playlist.row(x) for x in self.playlist.selectedItems()]):self.playlist.takeItem(i)
     def move_video(self,delta):
@@ -838,7 +1028,7 @@ class Console(QMainWindow):
     def start_phone_api(self):
         import phone_api,phone_actions
         self.phone_cfg=phone_api.Config(DATA/'phone_api.json')
-        self.phone_server=phone_api.Server(phone_actions.Actions(self),self.phone_cfg)
+        self.phone_server=phone_api.Server(phone_actions.Actions(self),self.phone_cfg,self.video_store)
         self.phone_timer=QTimer(self);self.phone_timer.timeout.connect(self.phone_server.drain);self.phone_timer.start(100)
         cfg=self.phone_cfg.load();self.phone_on.blockSignals(True);self.phone_on.setChecked(bool(cfg.get('enabled')));self.phone_on.blockSignals(False)
         self.phone_on.toggled.connect(self.phone_toggle)
@@ -1080,6 +1270,7 @@ class Console(QMainWindow):
         # (video_commands: a window that reported in the last 3 s gets the commands).
         if self.alarm_window:self.alarm_window.close()
         getattr(self,'phone_server',None) and self.phone_server.stop()
+        getattr(self,'ptt',None) and self.ptt.disarm(quiet=True)
         self.studio_chat.shutdown();getattr(self,'ai',None) and self.ai.shutdown();self.studio_panel.shutdown();__import__('studio_vision_rpc').close_service();self.notifier.close();set_awake(False);self.bridge.close();self.obs.close()
         for handler in self.logger.handlers[:]:handler.close();self.logger.removeHandler(handler)
         super().closeEvent(event)

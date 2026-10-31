@@ -102,6 +102,12 @@ video{width:100%;border-radius:8px;background:#000;max-height:46vh}
    <div class="row"><div><label>Nghỉ giữa 2 lần ghim từ (giây)</label><input type="number" id="gapMin"></div><div><label>đến</label><input type="number" id="gapMax"></div></div>
    <button class="b p" id="pSave" style="width:100%;margin-top:10px">Lưu cài đặt ghim</button>
   </div>
+  <div class="card"><h3>📤 Gửi video vào NBL</h3>
+   <div class="mut">Chọn video trong điện thoại, gửi thẳng lên PC qua Tailscale (không cần chung wifi). Gửi xong video tự vào playlist nick đang chọn. Để app mở trong lúc gửi; mất mạng thì bấm Gửi lại, gửi tiếp chỗ dở.</div>
+   <input type="file" id="upFile" accept="video/*" multiple style="margin-top:8px">
+   <div id="upQueue"></div>
+   <button class="b p" id="upGo" style="width:100%;margin-top:8px" disabled>Gửi lên NBL</button>
+  </div>
   <div class="card"><h3>Kịch bản cờ ghim theo clip</h3><div class="mut">Chọn clip trong NBL VIDEO, xem trên điện thoại và cắm cờ tại thời điểm cần ghim.</div><div id="clips"></div></div>
   <div class="card hide" id="editor">
    <div class="row"><h3 style="margin:0" id="edName"></h3><button class="b s" id="edClose" style="flex:none">Đóng</button></div>
@@ -275,7 +281,7 @@ let titles=[],clip=null,flags=[];
 async function loadPin(){
  try{const p=await req('/api/pin/settings');$('pMode').value=p.mode;$('pList').value=p.products;for(const k of ['pinMin','pinMax','gapMin','gapMax'])$(k).value=p[k];titles=p.titles||[];fillTitles()}catch(e){toast(e.message,true)}
  try{const c=await req('/api/clips');const box=$('clips');box.innerHTML='';if(!c.length)box.textContent='NBL VIDEO chưa có clip.';
-  for(const x of c){const d=document.createElement('div');d.className='flag';const n=document.createElement('span');n.className='nm';n.textContent=x.name+(x.exists?'':' (mất file)');const f=document.createElement('span');f.className='mut';f.textContent=x.flags+' cờ';d.append(n,f);if(x.exists)d.appendChild(btn('Mở','b s n',()=>openClip(x)));box.appendChild(d)}}catch(e){$('clips').textContent=e.message}
+  for(const x of c){const d=document.createElement('div');d.className='flag';const n=document.createElement('span');n.className='nm';n.textContent=x.name+(x.exists?'':' (mất file)');const f=document.createElement('span');f.className='mut';f.textContent=x.flags+' cờ';d.append(n,f);if(x.exists)d.appendChild(btn('Mở','b s n',()=>openClip(x)));d.appendChild(btn('Xóa','b s',()=>delClip(x)));box.appendChild(d)}}catch(e){$('clips').textContent=e.message}
 }
 function fillTitles(){const dl=$('titles');dl.innerHTML='';for(const t of titles){const o=document.createElement('option');o.value=t;dl.appendChild(o)}}
 $('pSave').onclick=async()=>{try{await req('/api/pin/settings',{method:'PUT',body:{mode:$('pMode').value,products:$('pList').value,pinMin:+$('pinMin').value,pinMax:+$('pinMax').value,gapMin:+$('gapMin').value,gapMax:+$('gapMax').value}});toast('Đã lưu cài đặt ghim')}catch(e){toast(e.message,true)}};
@@ -296,6 +302,58 @@ function renderFlags(){const box=$('flags');box.innerHTML='';if(!flags.length){b
 $('edSave').onclick=async()=>{if(!clip)return;const dur=isFinite($('vid').duration)?$('vid').duration:0;
  try{const r=await req('/api/script?i='+clip.i,{method:'PUT',body:{entries:flags,duration:dur}});flags=r.entries;renderFlags();
   $('edMsg').textContent=[...r.warnings,...(r.missing.length?['Chưa thấy trong giỏ: '+r.missing.join(', ')]:[])].join('\n');toast('Đã lưu '+flags.length+' cờ')}catch(e){toast(e.message,true)}};
+
+// ---- 4.3.13: gửi video vào NBL ----
+const CHUNK=8*1024*1024;let upItems=[],upRunning=false;
+const human=n=>{n=+n||0;for(const u of ['B','KB','MB','GB']){if(n<1024||u==='GB')return (u==='B'?n.toFixed(0):n.toFixed(1))+' '+u;n/=1024}};
+async function delClip(x){
+ if(!confirm(x.store?'Xóa hẳn "'+x.name+'" khỏi PC và khỏi playlist?':'Gỡ "'+x.name+'" khỏi playlist? (file này không nằm trong kho NBL nên giữ nguyên trên PC)'))return;
+ try{const r=await req('/api/videos/delete',{method:'POST',body:{i:x.i}});toast(r.text)}catch(e){toast(e.message,true)}loadPin();
+}
+async function upApi(path,opt={}){
+ const p=pc();if(!p)throw new ApiErr('Chưa ghép PC nào.');
+ const r=await fetch(hostUrl(p.good||p.hosts[0],p)+path,Object.assign({cache:'no-store'},opt,{headers:Object.assign({Authorization:'Bearer '+p.token},opt.headers||{})}));
+ let d={};try{d=await r.json()}catch(e){}
+ if(!r.ok||d.ok===false){const e=new ApiErr(d.error||('Lỗi '+r.status));e.status=r.status;e.received=d.received;throw e}
+ return d.data;
+}
+function upUid(f){const k='nbl-up:'+f.name+':'+f.size+':'+f.lastModified;let v=store.get(k,null);
+ if(!v){v=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');store.set(k,v)}return {k,v}}
+function upRender(){const q=$('upQueue');q.innerHTML='';
+ for(const it of upItems){const d=document.createElement('div');d.className='job';const pct=it.file.size?Math.floor(it.sent*100/it.file.size):0;
+  const n=document.createElement('div');n.style.fontWeight='600';n.style.wordBreak='break-all';n.textContent=it.file.name;
+  const bar=document.createElement('div');bar.style.cssText='height:8px;background:#e3e9ef;border-radius:6px;overflow:hidden;margin:5px 0';
+  const fill=document.createElement('div');fill.style.cssText='height:100%;width:'+pct+'%;background:'+(it.done?'var(--ok)':'var(--orange)');bar.appendChild(fill);
+  const st=document.createElement('div');st.className=it.err?'err':'mut';st.textContent=it.state||(human(it.file.size)+' · chờ gửi');
+  d.append(n,bar,st);q.appendChild(d)}
+ const left=upItems.filter(x=>!x.done);$('upGo').disabled=upRunning||!left.length;$('upGo').textContent=upRunning?'Đang gửi…':(upItems.some(x=>x.err)?'Gửi lại':'Gửi lên NBL');
+}
+$('upFile').onchange=e=>{for(const f of e.target.files){if(!upItems.some(x=>x.file.name===f.name&&x.file.size===f.size&&!x.done))upItems.push({file:f,sent:0,done:false,state:'',err:false})}e.target.value='';upRender()};
+async function upOne(it){
+ const f=it.file,{k,v}=upUid(f);
+ try{it.sent=(await upApi('/api/upload?id='+v)).received||0}catch(e){it.sent=0}
+ let t0=Date.now(),s0=it.sent,fails=0;
+ while(it.sent<f.size){
+  const end=Math.min(f.size,it.sent+CHUNK);
+  try{
+   const d=await upApi('/api/upload?id='+v+'&name='+encodeURIComponent(f.name)+'&size='+f.size+'&off='+it.sent,{method:'POST',body:f.slice(it.sent,end),headers:{'Content-Type':'application/octet-stream'}});
+   it.sent=d.received;fails=0;const sec=(Date.now()-t0)/1000,sp=sec>0?(it.sent-s0)/sec:0;
+   it.state=human(it.sent)+' / '+human(f.size)+(sp?' · '+human(sp)+'/s':'');it.err=false;
+   if(d.done){it.done=true;try{localStorage.removeItem(k)}catch(e){}const a=d.added||{};it.state='✓ Đã gửi'+(a.nick?' · đã thêm vào playlist '+a.nick:'')+(a.ok===false?' · '+a.error:'')}
+  }catch(e){
+   if(e.received!==undefined)it.sent=e.received;
+   if(e.status&&e.status!==409&&e.status!==400&&e.status!==503){it.err=true;it.state='⚠ '+e.message;upRender();return}
+   fails++;it.state='Mạng chập chờn, thử lại ('+fails+')…';upRender();
+   if(fails>=8){it.err=true;it.state='⚠ Mất kết nối PC. Bấm Gửi lại để gửi tiếp chỗ dở.';upRender();return}
+   await new Promise(r=>setTimeout(r,Math.min(15000,1000*fails*fails)));
+   try{it.sent=(await upApi('/api/upload?id='+v)).received||0}catch(_){}
+  }
+  upRender();
+ }
+}
+$('upGo').onclick=async()=>{if(upRunning)return;upRunning=true;try{window.NBL&&NBL.keepScreen(true)}catch(e){}upRender();
+ for(const it of upItems){if(!it.done){it.err=false;await upOne(it)}}
+ upRunning=false;try{window.NBL&&NBL.keepScreen(false)}catch(e){}upRender();loadPin()};
 
 // ---- AI ----
 let aiDefault='';

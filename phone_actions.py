@@ -103,10 +103,38 @@ class Actions:
 
     def clips(self):
         out = []
+        store = getattr(self.app, 'video_store', None)
         for i, path in enumerate(self.playlist()):
             item = self.app.pin_store.get(path) if Path(path).is_file() else {}
-            out.append(dict(i=i, name=Path(path).name, exists=Path(path).is_file(), flags=len(item.get('entries') or []), duration=item.get('duration') or 0))
+            out.append(dict(i=i, name=Path(path).name, exists=Path(path).is_file(), flags=len(item.get('entries') or []), duration=item.get('duration') or 0,
+                            store=bool(store and store.owns(path))))
         return out
+
+    # ---- 4.3.13: kho video (gửi từ điện thoại) ----
+    def uploaded(self, path):
+        return self.app.video_uploaded(path, source='điện thoại')
+
+    def videos(self):
+        from video_store import human
+        used = set()
+        for s in self.app.data.get('sessions') or []:
+            used.update(str(Path(p)) for p in s.get('playlist') or [])
+        store = self.app.video_store
+        return dict(folder=str(store.folder), files=[dict(name=f['name'], size=f['size'], sizeText=human(f['size']), at=f['at'], inPlaylist=str(Path(f['path'])) in used)
+                                                     for f in store.files()])
+
+    def delete_video(self, body):
+        from video_store import StoreError
+        try:
+            if 'i' in body:
+                path = self.playlist()[int(body['i'])]
+            else:
+                path = str(self.app.video_store.find(body.get('name')))
+        except (IndexError, ValueError, TypeError):
+            raise ApiError('Không thấy clip này.', 404)
+        except StoreError as e:
+            raise ApiError(str(e), e.status)
+        return dict(text=self.app.delete_videos([path], source='điện thoại'))
 
     def script(self, i):
         path = self.clip_path(i); item = self.app.pin_store.get(path)
@@ -178,7 +206,10 @@ class Actions:
 
     def set_ai(self, body):
         on = bool(body.get('on'))
-        if on and not self.app.ai.settings.api_keys():
+        st = self.app.ai.settings; cfg = st.load()
+        if on and (cfg.get('engine') or 'gemini') == 'openai' and not st.openai_api_keys(cfg):
+            raise ApiError('Chưa có key ChatGPT (OpenAI): dán key ở mục AI trên NBL PC trước.')
+        if on and (cfg.get('engine') or 'gemini') != 'openai' and not st.api_keys(cfg):
             raise ApiError('Chưa có Gemini API key: dán key ở mục AI trước.')
         self.app.ai_on.setChecked(on); self.app.ai_save(quiet=True)
         self.app.log('Điện thoại: ' + ('BẬT' if on else 'TẮT') + ' AI trả lời bình luận.')
@@ -241,8 +272,13 @@ class Actions:
         if str(body.get('keys') or '').strip():
             if not st.set_keys(cfg, body['keys']):
                 raise ApiError('Chưa thấy key Gemini hợp lệ (dạng AIza…).')
-        if cfg.get('enabled') and not st.api_keys(cfg):
-            raise ApiError('Chưa có Gemini API key: dán key trước khi bật.')
+        # 4.3.13: bật AI chỉ cần key của nguồn AI đang chọn (Gemini hoặc ChatGPT)
+        if cfg.get('enabled'):
+            if (cfg.get('engine') or 'gemini') == 'openai':
+                if not st.openai_api_keys(cfg):
+                    raise ApiError('Chưa có key ChatGPT (OpenAI): dán key trên NBL PC trước khi bật.')
+            elif not st.api_keys(cfg):
+                raise ApiError('Chưa có Gemini API key: dán key trước khi bật.')
         st.save(cfg)
         a = self.app
         for w, value in ((a.ai_mode, cfg['mode']), (a.ai_voice, cfg['voice']), (a.ai_speed, str(cfg['speed']))):

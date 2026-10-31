@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Gửi video vào NBL</title>
+<style>
+:root{--bg:#eef4fb;--card:#fff;--ink:#14213d;--mut:#5b6b82;--line:#d8e2ef;--acc:#f37021;--ok:#12805c;--bad:#c62828;--bar:#e6edf6}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1724;--card:#182235;--ink:#e8eef8;--mut:#9fb0c8;--line:#2a3a55;--bar:#24324a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:560px;margin:0 auto;padding:16px 16px 40px}
+h1{font-size:20px;margin:4px 0 2px}.mut{color:var(--mut);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:14px}
+.pick{display:block;text-align:center;border:2px dashed var(--acc);border-radius:12px;padding:22px 10px;color:var(--acc);font-weight:700;cursor:pointer}
+.pick input{display:none}
+button{font:inherit;border:0;border-radius:10px;padding:11px 14px;font-weight:700;background:var(--acc);color:#fff;cursor:pointer}
+button.s{background:transparent;color:var(--ink);border:1px solid var(--line);padding:7px 10px;font-weight:600}
+button.d{background:transparent;color:var(--bad);border:1px solid var(--bad);padding:7px 10px;font-weight:600}
+button:disabled{opacity:.5}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.item{padding:10px 0;border-top:1px solid var(--line)}.item:first-child{border-top:0}
+.nm{font-weight:600;word-break:break-all}
+.bar{height:8px;background:var(--bar);border-radius:6px;overflow:hidden;margin:6px 0 4px}.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+.done .bar i{background:var(--ok)}.err{color:var(--bad)}.okt{color:var(--ok)}
+#msg{margin-top:10px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Gửi video vào NBL</h1>
+  <div class="mut" id="pc">Đang kết nối PC…</div>
+
+  <div class="card">
+    <label class="pick">＋ Chọn video trong điện thoại<input id="file" type="file" accept="video/*" multiple></label>
+    <div id="queue"></div>
+    <div class="row" style="margin-top:10px"><button id="go" disabled>Gửi lên NBL</button><span class="mut" id="sum"></span></div>
+    <div class="mut" id="msg">Để màn hình sáng và mở trang này trong lúc gửi. Mất mạng thì bấm Gửi lại — gửi tiếp chỗ dở, không gửi lại từ đầu.</div>
+  </div>
+
+  <div class="card">
+    <div class="row"><b>Kho video trên PC</b><button class="s" id="reload">Tải lại</button></div>
+    <div class="mut">Video gửi lên tự vào playlist của nick đang chọn trên NBL. Xóa ở đây là xóa hẳn khỏi máy PC.</div>
+    <div id="store" style="margin-top:6px"></div>
+  </div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const P=new URLSearchParams(location.search), TOKEN=P.get('t')||'';
+const CHUNK=8*1024*1024;
+let items=[], running=false, lock=null;
+
+function human(n){n=+n||0;for(const u of ['B','KB','MB','GB']){if(n<1024||u==='GB')return (u==='B'?n.toFixed(0):n.toFixed(1))+' '+u;n/=1024}}
+async function api(path,opt={}){
+  const r=await fetch(path,Object.assign({cache:'no-store'},opt,{headers:Object.assign({Authorization:'Bearer '+TOKEN},opt.headers||{})}));
+  let d={};try{d=await r.json()}catch(e){}
+  if(!r.ok||d.ok===false){const e=new Error(d.error||('Lỗi '+r.status));e.status=r.status;e.received=d.received;throw e}
+  return d.data;
+}
+function uidFor(f){
+  const k='nbl-up:'+f.name+':'+f.size+':'+f.lastModified;
+  let v=null;try{v=localStorage.getItem(k)}catch(e){}
+  if(!v){v=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');try{localStorage.setItem(k,v)}catch(e){}}
+  return {k,v};
+}
+function render(){
+  const q=$('queue');q.innerHTML='';
+  for(const it of items){
+    const d=document.createElement('div');d.className='item'+(it.done?' done':'');
+    const pct=it.file.size?Math.floor(it.sent*100/it.file.size):0;
+    d.innerHTML='<div class="nm"></div><div class="bar"><i style="width:'+pct+'%"></i></div><div class="mut st"></div>';
+    d.querySelector('.nm').textContent=it.file.name;
+    const st=d.querySelector('.st');st.textContent=it.state||(human(it.file.size)+' · chờ gửi');
+    if(it.err)st.className='st err';else if(it.done)st.className='st okt';
+    q.appendChild(d);
+  }
+  const left=items.filter(x=>!x.done);
+  $('go').disabled=running||!left.length;$('go').textContent=running?'Đang gửi…':(items.some(x=>x.err)?'Gửi lại':'Gửi lên NBL');
+  $('sum').textContent=items.length?(items.length-left.length)+'/'+items.length+' xong':'';
+}
+$('file').onchange=e=>{
+  for(const f of e.target.files){
+    if(items.some(x=>x.file.name===f.name&&x.file.size===f.size&&!x.done))continue;
+    items.push({file:f,sent:0,done:false,state:'',err:false});
+  }
+  e.target.value='';render();
+};
+async function wake(on){
+  try{if(on&&'wakeLock' in navigator&&!lock)lock=await navigator.wakeLock.request('screen');if(!on&&lock){await lock.release();lock=null}}catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(running&&document.visibilityState==='visible')wake(true)});
+async function sendOne(it){
+  const f=it.file,{k,v}=uidFor(f);
+  try{it.sent=(await api('/api/upload?id='+v)).received||0}catch(e){it.sent=0}
+  let t0=Date.now(),s0=it.sent,fails=0;
+  while(it.sent<f.size){
+    const end=Math.min(f.size,it.sent+CHUNK);
+    const q='/api/upload?id='+v+'&name='+encodeURIComponent(f.name)+'&size='+f.size+'&off='+it.sent;
+    try{
+      const d=await api(q,{method:'POST',body:f.slice(it.sent,end),headers:{'Content-Type':'application/octet-stream'}});
+      it.sent=d.received;fails=0;
+      const sec=(Date.now()-t0)/1000,speed=sec>0?(it.sent-s0)/sec:0;
+      it.state=human(it.sent)+' / '+human(f.size)+(speed?' · '+human(speed)+'/s':'');it.err=false;
+      if(d.done){
+        it.done=true;try{localStorage.removeItem(k)}catch(e){}
+        const a=d.added||{};it.state='✓ Đã gửi '+human(f.size)+(a.nick?' · đã thêm vào playlist '+a.nick:'')+(a.ok===false?' · '+a.error:'');
+      }
+    }catch(e){
+      if(e.received!==undefined){it.sent=e.received}
+      if(e.status&&e.status!==409&&e.status!==400&&e.status!==503){it.err=true;it.state='⚠ '+e.message;render();return false}
+      fails++;it.state='Mạng chập chờn, thử lại ('+fails+')… '+(e.message||'');render();
+      if(fails>=8){it.err=true;it.state='⚠ Mất kết nối PC. Bấm Gửi lại để gửi tiếp chỗ dở.';render();return false}
+      await new Promise(r=>setTimeout(r,Math.min(15000,1000*fails*fails)));
+      try{it.sent=(await api('/api/upload?id='+v)).received||0}catch(_){}
+    }
+    render();
+  }
+  return true;
+}
+$('go').onclick=async()=>{
+  if(running)return;running=true;await wake(true);render();
+  for(const it of items){if(it.done)continue;it.err=false;await sendOne(it)}
+  running=false;await wake(false);render();loadStore();
+};
+async function loadStore(){
+  const box=$('store');
+  try{
+    const d=await api('/api/videos');box.innerHTML='';
+    if(!d.files.length){box.innerHTML='<div class="mut">Kho chưa có video.</div>';return}
+    for(const f of d.files){
+      const r=document.createElement('div');r.className='item row';
+      const l=document.createElement('div');l.innerHTML='<div class="nm"></div><div class="mut"></div>';
+      l.querySelector('.nm').textContent=f.name;l.querySelector('.mut').textContent=f.sizeText+(f.inPlaylist?' · trong playlist':' · chưa thêm playlist');
+      const b=document.createElement('button');b.className='d';b.textContent='Xóa';
+      b.onclick=async()=>{if(!confirm('Xóa hẳn "'+f.name+'" khỏi PC?'))return;b.disabled=true;
+        try{const x=await api('/api/videos/delete',{method:'POST',body:JSON.stringify({name:f.name}),headers:{'Content-Type':'application/json'}});alert(x.text)}catch(e){alert(e.message)}loadStore()};
+      r.append(l,b);box.appendChild(r);
+    }
+  }catch(e){box.innerHTML='';const m=document.createElement('div');m.className='err';m.textContent=e.message;box.appendChild(m)}
+}
+$('reload').onclick=loadStore;
+(async()=>{
+  if(!TOKEN){$('pc').textContent='Thiếu mã ghép — quét lại mã QR trên NBL.';return}
+  try{const s=await api('/api/status');$('pc').textContent='PC: '+s.pc+' · NBL '+s.version+(s.nick?' · nick '+s.nick:'')}catch(e){$('pc').textContent='⚠ '+e.message}
+  render();loadStore();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+name: NBL Windows - test va bo cai
+# 4.3.13: chay test bang Python nhung cua NBL tren Windows that va build bo cai NSIS.
+# Ket qua day vao nhanh ci-out-tests / setup-out (artifact khong tai duoc tu may dung ban).
+on:
+  workflow_dispatch:
+  push:
+    branches: [nbl-4.3]
+    paths-ignore: ['mobile/**', '.github/workflows/android.yml', 'NBL_LIVE_HANDOFF.md']
+permissions:
+  contents: write
+concurrency:
+  group: nbl-windows
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test bang runtime\python.exe
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONIOENCODING: utf-8
+        run: |
+          $ErrorActionPreference = 'Continue'
+          New-Item -ItemType Directory -Force out | Out-Null
+          .\runtime\python.exe -X utf8 -m unittest discover -s tests -v *> out\test_windows.txt
+          $u = $LASTEXITCODE
+          $p = Start-Process -FilePath .\runtime\python.exe -ArgumentList '-X','utf8','tests\smoke_qt4313.py' -NoNewWindow -PassThru -RedirectStandardOutput out\smoke_windows.txt -RedirectStandardError out\smoke_windows_err.txt
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); "TREO QUA 5 PHUT" | Add-Content out\smoke_windows.txt; $s = 99 } else { $s = $p.ExitCode }
+          "unittest=$u smoke=$s sha=$env:GITHUB_SHA" | Out-File -Encoding utf8 out\ci_summary.txt
+          Get-Content out\ci_summary.txt
+          Get-Content out\smoke_windows.txt -Tail 30
+          Get-Content out\test_windows.txt -Tail 15
+      - name: Day ket qua vao nhanh ci-out-tests
+        if: always()
+        shell: bash
+        run: |
+          cd out
+          git init -q -b ci-out-tests
+          git config user.name nbl-ci; git config user.email nbl-ci@users.noreply.github.com
+          git add -A; git commit -q -m "test Windows $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/ci-out-tests
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cai NSIS
+        run: sudo apt-get update -q && sudo apt-get install -y -q nsis
+      - name: Build bo cai
+        run: |
+          set -e
+          VER=$(python3 -c "import re;print(re.search(r\"VERSION = '([^']+)'\", open('diagnostics.py').read()).group(1))")
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          python3 build/build_installer.py . . build "$VER"
+          cd build
+          makensis -V2 launcher.nsi
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          m = pathlib.Path('app/SETUP_FILES.json'); d = json.loads(m.read_text(encoding='utf-8'))
+          d['NBL_LIVE.exe'] = hashlib.sha256(pathlib.Path('app/NBL_LIVE.exe').read_bytes()).hexdigest()
+          m.write_text(json.dumps(d, ensure_ascii=False, indent=0, sort_keys=True), encoding='utf-8')
+          PY
+          makensis -V2 -DVER="$VER" setup.nsi
+          ls -la NBL_LIVE_Setup_$VER.exe
+          sha256sum NBL_LIVE_Setup_$VER.exe | tee NBL_LIVE_Setup_$VER.exe.sha256
+      - name: Day bo cai vao nhanh setup-out
+        run: |
+          set -e
+          mkdir out; cd out
+          split -b 45M -d -a 2 ../build/NBL_LIVE_Setup_$VER.exe setup.part.
+          cp ../build/NBL_LIVE_Setup_$VER.exe.sha256 .
+          python3 -c "import json;print(json.dumps(sorted(json.load(open('../build/app/SETUP_FILES.json'))),ensure_ascii=False))" > files.json
+          git init -q -b setup-out
+          git config user.name nbl-ci; git config user.email nbl-ci@users.noreply.github.com
+          for f in setup.part.*; do git add "$f"; git commit -q -m "bo cai $VER $f"; done
+          git add -A; git commit -q -m "bo cai $VER xong ($GITHUB_SHA)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/setup-out

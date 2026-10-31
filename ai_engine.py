@@ -39,6 +39,7 @@ class AIEngine(QObject):
         self.player = None
         self.ducked = None
         self.preview = None
+        self.hold = False           # 4.3.13: chủ máy đang giữ phím cách nói -> AI không đọc
         self.timer = QTimer(self); self.timer.timeout.connect(self.tick); self.timer.start(500)
 
     # ---------- on / off ----------
@@ -220,8 +221,17 @@ class AIEngine(QObject):
             self.voice.append(dict(future=self.pool.submit(speak), session=session, at=time.time()))
 
     # ---------- voice ----------
+    def set_hold(self, on):
+        """4.3.13: chủ máy giữ phím cách nói vào LIVE: dừng câu AI đang đọc, chờ thả phím mới đọc tiếp."""
+        self.hold = bool(on)
+        if on and self.player is not None:
+            try:
+                self.player.stop()
+            except Exception:
+                pass
+
     def play_next(self):
-        if self.player is not None or not self.voice:
+        if self.hold or self.player is not None or not self.voice:
             return
         item = self.voice[0]
         if not item['future'].done():
@@ -268,6 +278,8 @@ class AIEngine(QObject):
         player.play()
 
     def finish(self, player, path):
+        if self.ducked is not None and player is self.player and self.hold:
+            self.ducked = None          # đang giữ phím nói: tiếng video do phần giọng nói lo
         if self.ducked is not None and player is self.player:
             try:
                 self.owner.command('settings', False, self.ducked)

@@ -40,13 +40,13 @@ jobs:
         run: |
           if [ -n "$NBL_KEYSTORE" ]; then
             gradle assembleRelease --no-daemon
-            cp app/build/outputs/apk/release/app-release.apk "../NBL_LIVE_Android_4.3.0.apk"
+            cp app/build/outputs/apk/release/app-release.apk "../NBL_LIVE_Android_4.3.13.apk"
           else
             gradle assembleDebug --no-daemon
-            cp app/build/outputs/apk/debug/app-debug.apk "../NBL_LIVE_Android_4.3.0.apk"
+            cp app/build/outputs/apk/debug/app-debug.apk "../NBL_LIVE_Android_4.3.13.apk"
           fi
-          sha256sum ../NBL_LIVE_Android_4.3.0.apk
+          sha256sum ../NBL_LIVE_Android_4.3.13.apk
       - uses: actions/upload-artifact@v4
         with:
           name: NBL_LIVE_Android
-          path: NBL_LIVE_Android_4.3.0.apk
+          path: NBL_LIVE_Android_4.3.13.apk

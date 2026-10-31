@@ -4,6 +4,9 @@ A small HTTP API on port 8766, answered only to the phone's network (Tailscale
 100.64.0.0/10, the home wifi, this PC) and only with the pairing code. Everything that
 touches NBL runs on the Qt thread (Server.drain, called by a 100 ms timer); the HTTP
 threads only wait for the answer, read a Studio screenshot or stream a clip file.
+
+4.3.13: nhận video từ điện thoại theo từng khúc (POST /api/upload, video_store.py) và
+trang tải video mở bằng trình duyệt điện thoại (GET /upload?t=<mã>), không cần app mới.
 """
 import hmac
 import ipaddress
@@ -84,14 +87,24 @@ def pair_link(token, port=PORT, hosts=None):
     return 'nblive://pair?n=' + quote(socket.gethostname()) + '&h=' + quote(','.join(hosts)) + '&p=' + str(port) + '&t=' + quote(token)
 
 
+class _Counted:
+    """Đếm số byte đã đọc từ phần thân yêu cầu."""
+    def __init__(self, f):
+        self.f = f; self.count = 0
+
+    def read(self, n=-1):
+        data = self.f.read(n); self.count += len(data)
+        return data
+
+
 class ApiError(Exception):
     def __init__(self, text, status=400):
         super().__init__(text); self.status = status
 
 
 class Server:
-    def __init__(self, actions, config):
-        self.actions = actions; self.config = config
+    def __init__(self, actions, config, store=None):
+        self.actions = actions; self.config = config; self.store = store
         self.calls = queue.Queue(); self.httpd = None; self.thread = None; self.error = ''
 
     # ---- Qt side ----
@@ -173,14 +186,20 @@ class Server:
             if not hmac.compare_digest(given.encode(), token.encode()):
                 time.sleep(0.5)
                 raise ApiError('Sai mã ghép. Quét lại mã QR trên NBL.', 401)
-            body = {}
-            n = int(h.headers.get('Content-Length') or 0)
-            if n:
-                if n > 2 << 20:
-                    raise ApiError('Dữ liệu quá lớn.', 413)
-                body = json.loads(h.rfile.read(n).decode('utf-8') or '{}')
             route = method + ' ' + url.path.rstrip('/')
             a = self.actions
+            n = int(h.headers.get('Content-Length') or 0)
+            if route == 'GET /upload':
+                page = Path(__file__).resolve().parent / 'assets' / 'upload.html'
+                self.send(h, 200, page.read_bytes(), 'text/html; charset=utf-8'); return
+            if route == 'POST /api/upload':
+                self.upload(h, q, n); return
+            body = {}
+            if n:
+                if n > 2 << 20:
+                    h.close_connection = True
+                    raise ApiError('Dữ liệu quá lớn.', 413)
+                body = json.loads(h.rfile.read(n).decode('utf-8') or '{}')
             if route == 'GET /api/screenshot':
                 profile = self.on_main(a.screenshot_profile)
                 self.send(h, 200, a.screenshot(profile), 'image/jpeg'); return
@@ -204,6 +223,9 @@ class Server:
                 'PUT /api/script': lambda: a.save_script(q.get('i'), body),
                 'GET /api/ai/settings': lambda: a.ai_settings(),
                 'PUT /api/ai/settings': lambda: a.save_ai_settings(body),
+                'GET /api/upload': lambda: self.upload_status(q.get('id')),
+                'GET /api/videos': lambda: a.videos(),
+                'POST /api/videos/delete': lambda: a.delete_video(body),
             }
             if route not in table:
                 raise ApiError('Không có mục này.', 404)
@@ -219,6 +241,50 @@ class Server:
                 self.send(h, 500, json.dumps(dict(ok=False, error=type(e).__name__ + ': ' + str(e)), ensure_ascii=False).encode('utf-8'))
             except Exception:
                 pass
+
+    def upload_status(self, uid):
+        if self.store is None:
+            raise ApiError('Bản NBL này chưa nhận video từ điện thoại.', 404)
+        from video_store import StoreError
+        try:
+            return self.store.status(uid)
+        except StoreError as e:
+            raise ApiError(str(e), e.status)
+
+    def upload(self, h, q, n):
+        """Một khúc video. Lỗi trả kèm received = số byte PC đã có, để điện thoại gửi tiếp đúng chỗ."""
+        from video_store import StoreError
+        if self.store is None:
+            h.close_connection = True
+            raise ApiError('Bản NBL này chưa nhận video từ điện thoại.', 404)
+        body = _Counted(h.rfile)
+        try:
+            res = self.store.write(q.get('id'), q.get('name'), q.get('size') or 0, q.get('off') or 0, body, n)
+        except StoreError as e:
+            # đọc bỏ phần thân còn lại để điện thoại nhận được câu trả lời (thay vì "đứt kết nối")
+            left = n - body.count
+            if 0 < left <= (32 << 20):
+                try:
+                    while left > 0:
+                        chunk = h.rfile.read(min(1 << 18, left))
+                        if not chunk:
+                            break
+                        left -= len(chunk)
+                except OSError:
+                    pass
+            if left > 0:
+                h.close_connection = True
+            out = dict(ok=False, error=str(e))
+            if e.received is not None:
+                out['received'] = e.received
+            self.send(h, e.status, json.dumps(out, ensure_ascii=False).encode('utf-8')); return
+        if res.get('done'):
+            try:
+                res['added'] = self.on_main(lambda: self.actions.uploaded(res['path']), timeout=30)
+            except ApiError as e:
+                res['added'] = dict(ok=False, error=str(e))
+            res.pop('path', None)
+        self.send(h, 200, json.dumps(dict(ok=True, data=res), ensure_ascii=False).encode('utf-8'))
 
     def send(self, h, status, data, kind='application/json; charset=utf-8'):
         h.send_response(status); h.cors()
