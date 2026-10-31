@@ -1,0 +1,21 @@
+OK    tiêu đề đúng phiên bản
+OK    có trang Giọng nói + AI
+OK    chọn Gemini/ChatGPT
+OK    make_ai đúng lớp
+OK    trang Giọng nói đủ ô
+OK    bật giọng nói khi máy không có micro
+OK    mic chỉ vào cáp khi đang giữ phím, không trễ dần
+OK    giữ phím: chạm nhanh không mở, giữ mới mở, có đuôi
+OK    đang nói: AI im + nhãn đỏ
+OK    kho video: nhận -> playlist -> xóa
+OK    kho video không xóa file ngoài kho
+OK    phone API nhận kho video
+OK    phím + điện thoại cùng nói: AI im/nhãn đỏ bật tắt 1 lần
+OK    phone API có đường nói qua điện thoại
+OK    NBL VIDEO có đường vẽ khi bị khuất
+OK    Ẩn hết khi LIVE rồi Hiện lại (cấm chuột khi ẩn)
+OK    khay hệ thống + khung camera ảo
+      camera trong NBL VIDEO: {'state': 'ready', 'sent': 1}
+OK    NBL VIDEO đẩy hình vào NBL Camera, ẩn/hiện cửa sổ theo lệnh
+
+KET QUA: 18/18 OK

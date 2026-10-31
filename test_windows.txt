@@ -1,0 +1,539 @@
+test_audio_wav_or_pcm (test_ai430.Answers.test_audio_wav_or_pcm) ... ok
+test_interactions_and_old_shapes (test_ai430.Answers.test_interactions_and_old_shapes) ... ok
+test_skip_and_length (test_ai430.Answers.test_skip_and_length) ... ok
+test_unknown_model_falls_back_to_generate_content (test_ai430.Answers.test_unknown_model_falls_back_to_generate_content) ... ok
+test_all_wrong_keys_say_so (test_ai430.Keys.test_all_wrong_keys_say_so) ... ok
+test_no_key (test_ai430.Keys.test_no_key) ... ok
+test_out_of_quota_key_rests_and_the_next_one_answers (test_ai430.Keys.test_out_of_quota_key_rests_and_the_next_one_answers) ... ok
+test_keywords_first_most_specific_wins (test_ai430.Rules.test_keywords_first_most_specific_wins) ... ok
+test_anchor403 (unittest.loader._FailedTest.test_anchor403) ... ERROR
+test_every_self_attribute_exists (test_app_attrs435.AppAttributes.test_every_self_attribute_exists) ... ok
+test_actual_checker_under_cp1258_and_cp1252_default (test_audit402.EncodingAlarmTests.test_actual_checker_under_cp1258_and_cp1252_default) ... D:\a\LIVE-NBL\LIVE-NBL\ocr_vendor\onnxruntime\capi\onnxruntime_validation.py:26: UserWarning: Unsupported Windows version (2025server). ONNX Runtime supports Windows 10 and above, only.
+  warnings.warn(
+ok
+test_alarm_runs_actual_file (test_audit402.EncodingAlarmTests.test_alarm_runs_actual_file) ... ok
+test_runtime_text_reads_specify_encoding (test_audit402.EncodingAlarmTests.test_runtime_text_reads_specify_encoding) ... FAIL
+test_common_ocr_rn_m (test_audit402.MatcherTests.test_common_ocr_rn_m) ... ok
+test_currency_glyph_missing_or_dong_alias (test_audit402.MatcherTests.test_currency_glyph_missing_or_dong_alias) ... ok
+test_decorated_inline_author (test_audit402.MatcherTests.test_decorated_inline_author) ... ok
+test_decorated_other_author_not_equal (test_audit402.MatcherTests.test_decorated_other_author_not_equal) ... ok
+test_emoji_author (test_audit402.MatcherTests.test_emoji_author) ... ok
+test_no_price_phone_or_negative_regression (test_audit402.MatcherTests.test_no_price_phone_or_negative_regression) ... ok
+test_numeric_confusion_is_not_guessed (test_audit402.MatcherTests.test_numeric_confusion_is_not_guessed) ... ok
+test_lost_tab_does_not_leave_pending_commands (test_audit402.RecoveryBridgeTests.test_lost_tab_does_not_leave_pending_commands) ... ok
+test_repeated_stop_bookkeeping_is_bounded (test_audit402.RecoveryBridgeTests.test_repeated_stop_bookkeeping_is_bounded) ... ok
+test_stale_attempt_preserves_uncertainty (test_audit402.RecoveryBridgeTests.test_stale_attempt_preserves_uncertainty) ... ok
+test_studio_backup_and_recovery (test_audit402.RecoveryBridgeTests.test_studio_backup_and_recovery) ... ok
+test_studio_salvage_keeps_valid_profile (test_audit402.RecoveryBridgeTests.test_studio_salvage_keeps_valid_profile) ... ok
+test_changed_draft_is_never_erased (test_audit402.VisionAuditTests.test_changed_draft_is_never_erased) ... ok
+test_expired_cancelled_guard_stays_user_cancel (test_audit402.VisionAuditTests.test_expired_cancelled_guard_stays_user_cancel) ... ok
+test_failed_model_load_has_backoff (test_audit402.VisionAuditTests.test_failed_model_load_has_backoff) ... ok
+test_fixed_recognizer_width_uses_batch_maximum (test_audit402.VisionAuditTests.test_fixed_recognizer_width_uses_batch_maximum) ... ok
+test_focus_change_before_backspace_does_not_erase_other_field (test_audit402.VisionAuditTests.test_focus_change_before_backspace_does_not_erase_other_field) ... ok
+test_owned_failed_draft_is_cleared_without_send (test_audit402.VisionAuditTests.test_owned_failed_draft_is_cleared_without_send) ... ok
+test_periodic_status_reuses_warning_ocr (test_audit402.VisionAuditTests.test_periodic_status_reuses_warning_ocr) ... ok
+test_queue_timeout_before_input_retries (test_audit402.VisionAuditTests.test_queue_timeout_before_input_retries) ... ok
+test_timeout_after_input_stays_uncertain (test_audit402.VisionAuditTests.test_timeout_after_input_stays_uncertain) ... ok
+test_unknown_empty_input_is_retryable_before_click (test_audit402.VisionAuditTests.test_unknown_empty_input_is_retryable_before_click) ... ok
+test_generated_images_do_not_become_native_evidence (test_benchmark402.BenchmarkTests.test_generated_images_do_not_become_native_evidence) ... ok
+test_twenty_duplicates_do_not_count_as_twenty_screenshots (test_benchmark402.BenchmarkTests.test_twenty_duplicates_do_not_count_as_twenty_screenshots) ... ok
+test_protocol_rejects_old_extension (test_bridge_network401.BridgeNetworkTests.test_protocol_rejects_old_extension) ... ok
+test_real_socket_confirms_stop (test_bridge_network401.BridgeNetworkTests.test_real_socket_confirms_stop) ... ok
+test_chat_changes_are_ignored (test_budget403.AlertReuse.test_chat_changes_are_ignored) ... ok
+test_new_command_scans_fresh (test_budget403.AlertReuse.test_new_command_scans_fresh) ... ok
+test_old_scan_or_big_change_reads_everything (test_budget403.AlertReuse.test_old_scan_or_big_change_reads_everything) ... ok
+test_only_changed_area_is_read_and_warning_found (test_budget403.AlertReuse.test_only_changed_area_is_read_and_warning_found) ... ok
+test_unchanged_window_is_not_read_twice (test_budget403.AlertReuse.test_unchanged_window_is_not_read_twice) ... ok
+test_other_actions_unchanged (test_budget403.Budget.test_other_actions_unchanged) ... ok
+test_schedule_end_still_caps (test_budget403.Budget.test_schedule_end_still_caps) ... ok
+test_stale_queued_command_still_expires (test_budget403.Budget.test_stale_queued_command_still_expires) ... ok
+test_started_send_gets_time_for_slow_ocr (test_budget403.Budget.test_started_send_gets_time_for_slow_ocr) ... ok
+test_a_captcha_that_stays_does_not_flood_the_chat (test_captcha4116.Burst.test_a_captcha_that_stays_does_not_flood_the_chat) ... ok
+test_captcha_is_sent_5_times_in_a_row (test_captcha4116.Burst.test_captcha_is_sent_5_times_in_a_row) ... ok
+test_ordinary_alerts_are_unchanged (test_captcha4116.Burst.test_ordinary_alerts_are_unchanged) ... ok
+test_without_accents_and_english_too (test_captcha4116.Burst.test_without_accents_and_english_too) ... ok
+test_captcha_on_the_chrome_live_page_raises_the_alarm (test_captcha4116.ChromeCaptcha.test_captcha_on_the_chrome_live_page_raises_the_alarm) ... ok
+test_no_captcha_no_alarm (test_captcha4116.ChromeCaptcha.test_no_captcha_no_alarm) ... ok
+test_the_page_reports_it_every_tick_and_the_bridge_keeps_it (test_captcha4116.ChromeCaptcha.test_the_page_reports_it_every_tick_and_the_bridge_keeps_it) ... ok
+test_blinking_caret_read_does_not_block_send_click (test_caret403.Caret.test_blinking_caret_read_does_not_block_send_click) ... ok
+test_caret_before_placeholder_is_empty (test_caret403.Caret.test_caret_before_placeholder_is_empty) ... ok
+test_caret_only_difference_is_same_draft (test_caret403.Caret.test_caret_only_difference_is_same_draft) ... ok
+test_changed_draft_still_blocks (test_caret403.Caret.test_changed_draft_still_blocks) ... ok
+test_real_edits_are_not_same_draft (test_caret403.Caret.test_real_edits_are_not_same_draft) ... ok
+test_a_set_number_asks_chrome_to_replace_the_cart (test_cart415.Cart.test_a_set_number_asks_chrome_to_replace_the_cart) ... ok
+test_next_schedule_is_prepared_only_after_the_live_before_it (test_cart415.Cart.test_next_schedule_is_prepared_only_after_the_live_before_it) ... ok
+test_old_ready_carts_are_prepared_again_after_the_update (test_cart415.Cart.test_old_ready_carts_are_prepared_again_after_the_update) ... ok
+test_set_zero_keeps_the_hand_filled_cart (test_cart415.Cart.test_set_zero_keeps_the_hand_filled_cart) ... ok
+test_cart_command_also_switches_off_pin_and_reply_of_the_live_before (test_cart418.Cart.test_cart_command_also_switches_off_pin_and_reply_of_the_live_before) ... ok
+test_chrome_live_reloading_is_a_wait_not_a_failed_attempt (test_cart418.Cart.test_chrome_live_reloading_is_a_wait_not_a_failed_attempt) ... ok
+test_finished_live_switches_chrome_pin_reply_off (test_cart418.Cart.test_finished_live_switches_chrome_pin_reply_off) ... ok
+test_lost_chrome_tab_while_waiting_does_not_freeze_the_cart (test_cart418.Cart.test_lost_chrome_tab_while_waiting_does_not_freeze_the_cart) ... ok
+test_chat_is_read_with_ids_and_names (test_cdp421.FakeStudio.test_chat_is_read_with_ids_and_names) ... skipped 'cần Chromium'
+test_full_live (test_cdp421.FakeStudio.test_full_live) ... skipped 'cần Chromium'
+test_selfcheck_and_screenshot_read_only (test_cdp421.FakeStudio.test_selfcheck_and_screenshot_read_only) ... skipped 'cần Chromium'
+test_reads_upload_and_fps (test_cdp421.Health.test_reads_upload_and_fps) ... ok
+test_closed_studio_means_live_over_and_nothing_opened_for_status (test_cdp421.Routing.test_closed_studio_means_live_over_and_nothing_opened_for_status) ... ok
+test_send_without_studio_is_not_touched (test_cdp421.Routing.test_send_without_studio_is_not_touched) ... ok
+test_tab_reports_land_in_the_two_report_folders (test_chrome_report403.ChromeReports.test_tab_reports_land_in_the_two_report_folders) ... ok
+test_enter_ignored_then_second_enter_then_send_click (test_clipboard403.Clipboard.test_enter_ignored_then_second_enter_then_send_click) ... ok
+test_live_ended_after_paste_erases_only_our_line (test_clipboard403.Clipboard.test_live_ended_after_paste_erases_only_our_line) ... ok
+test_long_two_line_message_is_verified_exactly_and_sent (test_clipboard403.Clipboard.test_long_two_line_message_is_verified_exactly_and_sent) ... ok
+test_no_copy_support_falls_back_to_screen_reading (test_clipboard403.Clipboard.test_no_copy_support_falls_back_to_screen_reading) ... ok
+test_someone_typing_is_never_touched (test_clipboard403.Clipboard.test_someone_typing_is_never_touched) ... ok
+test_wrong_text_in_box_is_not_sent_and_our_paste_is_not_erased (test_clipboard403.Clipboard.test_wrong_text_in_box_is_not_sent_and_our_paste_is_not_erased) ... ok
+test_failure_saves_debug (test_clock403.ClockTests.test_failure_saves_debug) ... ok
+test_frozen_timer_is_not_live (test_clock403.ClockTests.test_frozen_timer_is_not_live) ... ok
+test_plain_unreadable_then_inverted_copy (test_clock403.ClockTests.test_plain_unreadable_then_inverted_copy) ... ok
+test_slow_warning_scan_uses_screenshot_time (test_clock403.ClockTests.test_slow_warning_scan_uses_screenshot_time) ... ok
+test_timer_with_button_text_and_dots (test_clock403.ClockTests.test_timer_with_button_text_and_dots) ... ok
+test_wrong_jump_rejected (test_clock403.ClockTests.test_wrong_jump_rejected) ... ok
+test_nothing_configured_checks_middle (test_cover403.CoverTests.test_nothing_configured_checks_middle) ... ok
+test_other_app_over_chat_is_reported (test_cover403.CoverTests.test_other_app_over_chat_is_reported) ... ok
+test_other_app_over_unused_corner_is_fine (test_cover403.CoverTests.test_other_app_over_unused_corner_is_fine) ... ok
+test_studio_own_panel_is_fine (test_cover403.CoverTests.test_studio_own_panel_is_fine) ... ok
+test_no_dock_icon_means_no_click (test_dock416.Dock.test_no_dock_icon_means_no_click) ... ok
+test_owner_photo_of_the_bug (test_dock416.Dock.test_owner_photo_of_the_bug) ... ok
+test_window_with_close_icon_still_docks (test_dock416.Dock.test_window_with_close_icon_still_docks) ... ok
+test_window_without_close_icon_picks_ghep_not_the_gear (test_dock416.Dock.test_window_without_close_icon_picks_ghep_not_the_gear) ... ok
+test_a_button_the_owner_picked_wins (test_dock416.Greeting.test_a_button_the_owner_picked_wins) ... ok
+test_builtin_sample_finds_every_chao_button_on_the_owner_screen (test_dock416.Greeting.test_builtin_sample_finds_every_chao_button_on_the_owner_screen) ... ok
+test_sample_is_installed_with_the_app (test_dock416.Greeting.test_sample_is_installed_with_the_app) ... ok
+test_all_ends_running_cancels_pending_and_ends_hand_live (test_emergency420.Emergency.test_all_ends_running_cancels_pending_and_ends_hand_live) ... ok
+test_not_ended_is_said_loudly (test_emergency420.Emergency.test_not_ended_is_said_loudly) ... ok
+test_one_nick_only (test_emergency420.Emergency.test_one_nick_only) ... ok
+test_result_is_sent_with_reminder_to_schedule_again (test_emergency420.Emergency.test_result_is_sent_with_reminder_to_schedule_again) ... ok
+test_a_wrong_nick_live_window_is_still_refused (test_endpage4115.EndPageCoversAvatar.test_a_wrong_nick_live_window_is_still_refused) ... ok
+test_cleanup_summary_closes_the_late_page_without_the_avatar_check (test_endpage4115.EndPageCoversAvatar.test_cleanup_summary_closes_the_late_page_without_the_avatar_check) ... ok
+test_end_page_appearing_after_end_now_is_closed_not_called_a_failure (test_endpage4115.EndPageCoversAvatar.test_end_page_appearing_after_end_now_is_closed_not_called_a_failure) ... ok
+test_new_end_page_layout_that_hides_the_avatar (test_endpage4115.EndPageCoversAvatar.test_new_end_page_layout_that_hides_the_avatar) ... ok
+test_status_probe_sees_the_live_as_ended_when_the_avatar_is_covered (test_endpage4115.EndPageCoversAvatar.test_status_probe_sees_the_live_as_ended_when_the_avatar_is_covered) ... ok
+test_stop_from_live_still_verifies_the_nick_before_clicking_end (test_endpage4115.EndPageCoversAvatar.test_stop_from_live_still_verifies_the_nick_before_clicking_end) ... ok
+test_stop_on_the_end_page_succeeds_instead_of_failing_on_the_avatar (test_endpage4115.EndPageCoversAvatar.test_stop_on_the_end_page_succeeds_instead_of_failing_on_the_avatar) ... ok
+test_box_emptied_counts_as_sent_without_chat_match (test_enter403.Enter.test_box_emptied_counts_as_sent_without_chat_match) ... ok
+test_changed_box_after_enter_stops_further_keys (test_enter403.Enter.test_changed_box_after_enter_stops_further_keys) ... ok
+test_enter_confirmed_in_chat (test_enter403.Enter.test_enter_confirmed_in_chat) ... ok
+test_never_more_than_two_enters_and_one_send_click (test_enter403.Enter.test_never_more_than_two_enters_and_one_send_click) ... ok
+test_second_enter_when_first_ignored (test_enter403.Enter.test_second_enter_when_first_ignored) ... ok
+test_send_region_click_when_enter_ignored_twice (test_enter403.Enter.test_send_region_click_when_enter_ignored_twice) ... ok
+test_a_quick_retry_does_not_reload_again (test_feat419.ChromeReload.test_a_quick_retry_does_not_reload_again) ... ok
+test_bridge_accepts_the_new_commands (test_feat419.ChromeReload.test_bridge_accepts_the_new_commands) ... ok
+test_no_reload_under_a_live_the_owner_started_by_hand (test_feat419.ChromeReload.test_no_reload_under_a_live_the_owner_started_by_hand) ... ok
+test_page_is_reloaded_before_the_cart_is_added (test_feat419.ChromeReload.test_page_is_reloaded_before_the_cart_is_added) ... ok
+test_page_is_reloaded_once_before_the_live_and_then_checked (test_feat419.ChromeReload.test_page_is_reloaded_once_before_the_live_and_then_checked) ... ok
+test_old_video_status_is_not_sent (test_feat419.ClipSync.test_old_video_status_is_not_sent) ... ok
+test_running_live_sends_the_video_position_every_10_seconds (test_feat419.ClipSync.test_running_live_sends_the_video_position_every_10_seconds) ... ok
+test_end_page_already_there_and_stuck (test_feat419.StuckEndPage.test_end_page_already_there_and_stuck) ... ok
+test_live_ended_with_an_end_page_that_will_not_close (test_feat419.StuckEndPage.test_live_ended_with_an_end_page_that_will_not_close) ... ok
+test_a_failure_never_touches_the_job_and_is_reported_at_the_end (test_feat419.StudioEndPage.test_a_failure_never_touches_the_job_and_is_reported_at_the_end) ... ok
+test_every_finished_live_is_watched_and_the_page_closed (test_feat419.StudioEndPage.test_every_finished_live_is_watched_and_the_page_closed) ... ok
+test_live_ended_outside_the_schedule_is_cleaned_too (test_feat419.StudioEndPage.test_live_ended_outside_the_schedule_is_cleaned_too) ... ok
+test_never_while_the_next_live_of_the_nick_is_being_started (test_feat419.StudioEndPage.test_never_while_the_next_live_of_the_nick_is_being_started) ... ok
+test_nick_without_image_reading_is_not_watched (test_feat419.StudioEndPage.test_nick_without_image_reading_is_not_watched) ... ok
+test_page_not_there_yet_is_looked_for_again (test_feat419.StudioEndPage.test_page_not_there_yet_is_looked_for_again) ... ok
+test_vision_gives_up_after_the_wait (test_feat419.StudioEndPage.test_vision_gives_up_after_the_wait) ... ok
+test_vision_waits_for_a_late_page_and_closes_it (test_feat419.StudioEndPage.test_vision_waits_for_a_late_page_and_closes_it) ... ok
+test_default_cable_is_replaced_by_real_mic (test_fix4314.MicChoiceTest.test_default_cable_is_replaced_by_real_mic) ... ok
+test_only_cables_or_nothing (test_fix4314.MicChoiceTest.test_only_cables_or_nothing) ... ok
+test_real_default_kept (test_fix4314.MicChoiceTest.test_real_default_kept) ... ok
+test_user_pick_wins_but_warns_for_cable (test_fix4314.MicChoiceTest.test_user_pick_wins_but_warns_for_cable) ... ok
+test_captcha_still_rings_five_times (test_fix4314.NotifyTest.test_captcha_still_rings_five_times) ... ok
+test_chatdock_message_does_not_use_burst (test_fix4314.NotifyTest.test_chatdock_message_does_not_use_burst) ... ok
+test_non_captcha_alarm_is_sent_once (test_fix4314.NotifyTest.test_non_captcha_alarm_is_sent_once) ... ok
+test_publish_custom_cooldown (test_fix4314.NotifyTest.test_publish_custom_cooldown) ... ok
+test_all_common_pairs (test_fix4314.PipelineTest.test_all_common_pairs) ... ok
+test_is_cable (test_fix4314.PipelineTest.test_is_cable) ... ok
+test_pure_python_matches_numpy (test_fix4314.PipelineTest.test_pure_python_matches_numpy) ... ok
+test_closed_window_or_dead_process_opens_new (test_fix4314.ReuseWindowTest.test_closed_window_or_dead_process_opens_new) ... ok
+test_stale_status_but_live_process_is_reused (test_fix4314.ReuseWindowTest.test_stale_status_but_live_process_is_reused) ... ok
+test_unreadable_status_is_read_again (test_fix4314.ReuseWindowTest.test_unreadable_status_is_read_again) ... ok
+test_window_of_another_nick_folder_is_reused (test_fix4314.ReuseWindowTest.test_window_of_another_nick_folder_is_reused) ... ok
+test_busy_chrome_is_retried_in_20_seconds_without_using_an_attempt (test_fixes413.Cart.test_busy_chrome_is_retried_in_20_seconds_without_using_an_attempt) ... ok
+test_real_failure_near_the_live_is_retried_after_one_minute (test_fixes413.Cart.test_real_failure_near_the_live_is_retried_after_one_minute) ... ok
+test_bridge_keeps_the_last_start_error_per_module (test_fixes413.ChromeModules.test_bridge_keeps_the_last_start_error_per_module) ... ok
+test_no_reply_rules_means_pin_only_not_an_error (test_fixes413.ChromeModules.test_no_reply_rules_means_pin_only_not_an_error) ... ok
+test_notice_says_why_pin_did_not_start (test_fixes413.ChromeModules.test_notice_says_why_pin_did_not_start) ... ok
+test_still_live_after_its_end_is_ended_again_later (test_fixes413.StuckJob.test_still_live_after_its_end_is_ended_again_later) ... ok
+test_stuck_job_is_looked_at_again (test_fixes413.StuckJob.test_stuck_job_is_looked_at_again) ... ok
+test_studio_off_finishes_it_and_frees_the_next_schedule (test_fixes413.StuckJob.test_studio_off_finishes_it_and_frees_the_next_schedule) ... ok
+test_unreadable_studio_while_stuck_does_not_flood_telegram (test_fixes413.StuckJob.test_unreadable_studio_while_stuck_does_not_flood_telegram) ... ok
+test_app_installs_the_guard (test_fixes413.Wheel.test_app_installs_the_guard) ... ok
+test_lists_text_boxes_scroll_bars_and_open_dropdown_lists_scroll_normally (test_fixes413.Wheel.test_lists_text_boxes_scroll_bars_and_open_dropdown_lists_scroll_normally) ... ok
+test_other_events_pass (test_fixes413.Wheel.test_other_events_pass) ... ok
+test_wheel_never_reaches_numbers_dates_dropdowns_or_sliders (test_fixes413.Wheel.test_wheel_never_reaches_numbers_dates_dropdowns_or_sliders) ... ok
+test_clear_error_names_the_window_in_front (test_front403.Front.test_clear_error_names_the_window_in_front) ... ok
+test_focus_lost_between_greeting_steps_is_recovered (test_front403.Front.test_focus_lost_between_greeting_steps_is_recovered) ... ok
+test_slow_studio_still_comes_to_front (test_front403.Front.test_slow_studio_still_comes_to_front) ... ok
+test_title_click_used_when_other_ways_fail (test_front403.Front.test_title_click_used_when_other_ways_fail) ... ok
+test_cart_waits_while_the_nick_is_live_by_hand (test_hand417.HandLiveCart.test_cart_waits_while_the_nick_is_live_by_hand) ... ok
+test_due_schedule_goes_on_to_studio_when_the_nick_is_live_by_hand (test_hand417.HandLiveCart.test_due_schedule_goes_on_to_studio_when_the_nick_is_live_by_hand) ... ok
+test_nick_is_looked_at_before_the_cart_is_touched (test_hand417.HandLiveCart.test_nick_is_looked_at_before_the_cart_is_touched) ... ok
+test_unreadable_studio_does_not_block_the_cart (test_hand417.HandLiveCart.test_unreadable_studio_does_not_block_the_cart) ... ok
+test_hand_live_at_schedule_time_is_taken_over_not_ended (test_hand417.HandLiveTakeover.test_hand_live_at_schedule_time_is_taken_over_not_ended) ... ok
+test_hand_live_that_could_not_be_ended_and_then_stops_moves_the_schedule (test_hand417.HandLiveTakeover.test_hand_live_that_could_not_be_ended_and_then_stops_moves_the_schedule) ... ok
+test_moved_schedule_never_runs_into_the_next_one (test_hand417.HandLiveTakeover.test_moved_schedule_never_runs_into_the_next_one) ... ok
+test_no_room_left_means_the_schedule_is_dropped (test_hand417.HandLiveTakeover.test_no_room_left_means_the_schedule_is_dropped) ... ok
+test_own_live_after_an_earlier_click_is_still_adopted (test_hand417.HandLiveTakeover.test_own_live_after_an_earlier_click_is_still_adopted) ... ok
+test_closed_studio_means_the_live_is_over (test_hand417.Rebind.test_closed_studio_means_the_live_is_over) ... ok
+test_main_window_wins_over_studio_small_windows (test_hand417.Rebind.test_main_window_wins_over_studio_small_windows) ... ok
+test_two_big_windows_are_still_not_guessed (test_hand417.Rebind.test_two_big_windows_are_still_not_guessed) ... ok
+test_window_list_failure_is_not_taken_as_closed (test_hand417.Rebind.test_window_list_failure_is_not_taken_as_closed) ... ok
+test_window_list_reports_the_size (test_hand417.Rebind.test_window_list_reports_the_size) ... ok
+test_added_set_is_checked_before_it_counts (test_hand417.StrictCart.test_added_set_is_checked_before_it_counts) ... ok
+test_failed_add_retries_on_a_reloaded_page (test_hand417.StrictCart.test_failed_add_retries_on_a_reloaded_page) ... ok
+test_hand_live_over_at_preflight_without_cart_does_not_start (test_hand417.StrictCart.test_hand_live_over_at_preflight_without_cart_does_not_start) ... ok
+test_old_fallback_or_other_bundle_is_not_ready (test_hand417.StrictCart.test_old_fallback_or_other_bundle_is_not_ready) ... ok
+test_set_not_added_never_goes_live_even_with_products_in_the_cart (test_hand417.StrictCart.test_set_not_added_never_goes_live_even_with_products_in_the_cart) ... ok
+test_slot_over_without_cart_is_dropped_and_told (test_hand417.StrictCart.test_slot_over_without_cart_is_dropped_and_told) ... ok
+test_unreadable_or_empty_cart_is_not_ready (test_hand417.StrictCart.test_unreadable_or_empty_cart_is_not_ready) ... ok
+test_fit_portrait (test_hide4316.CameraFitTest.test_fit_portrait) ... ok
+test_missing_dll_is_quiet (test_hide4316.CameraFitTest.test_missing_dll_is_quiet) ... ok
+test_old_mouse_path_refused_when_hidden (test_hide4316.NoMouseTest.test_old_mouse_path_refused_when_hidden) ... ok
+test_vision_path_refused_when_hidden (test_hide4316.NoMouseTest.test_vision_path_refused_when_hidden) ... ok
+test_studio_launched_without_background_throttling (test_hide4316.StudioFlagsTest.test_studio_launched_without_background_throttling) ... ok
+test_window_command_accepted_and_never_opens_a_window (test_hide4316.WindowCommandTest.test_window_command_accepted_and_never_opens_a_window) ... ok
+test_noop_off_windows (test_hide4316.WinhideTest.test_noop_off_windows) ... ok
+test_real_words_are_never_ignored (test_icons403.Icons.test_real_words_are_never_ignored) ... ok
+test_region_covering_icons_stops_before_them (test_icons403.Icons.test_region_covering_icons_stops_before_them) ... ok
+test_send_arrow_noise_is_ignored (test_icons403.Icons.test_send_arrow_noise_is_ignored) ... ok
+test_text_only_region_is_unchanged (test_icons403.Icons.test_text_only_region_is_unchanged) ... ok
+test_after_login_callback_is_not_a_login_page (test_livechrome434.Watch.test_after_login_callback_is_not_a_login_page) ... ok
+test_busy_page_with_recent_beat_is_not_reloaded (test_livechrome434.Watch.test_busy_page_with_recent_beat_is_not_reloaded) ... ok
+test_dashboard_url_match (test_livechrome434.Watch.test_dashboard_url_match) ... ok
+test_exactly_one_tab_extra_closed_linked_kept (test_livechrome434.Watch.test_exactly_one_tab_extra_closed_linked_kept) ... ok
+test_frozen_page_reloaded_same_tab_never_new (test_livechrome434.Watch.test_frozen_page_reloaded_same_tab_never_new) ... ok
+test_logged_in_page_or_new_tab_becomes_dashboard_not_a_new_tab (test_livechrome434.Watch.test_logged_in_page_or_new_tab_becomes_dashboard_not_a_new_tab) ... ok
+test_login_and_no_extension (test_livechrome434.Watch.test_login_and_no_extension) ... ok
+test_not_logged_in_landing_never_opens_more_tabs (test_livechrome434.Watch.test_not_logged_in_landing_never_opens_more_tabs) ... ok
+test_not_started_until_asked_then_relaunched_when_closed (test_livechrome434.Watch.test_not_started_until_asked_then_relaunched_when_closed) ... ok
+test_close_delivers_stop_before_shutdown (test_nbl.ChromeBridgeTests.test_close_delivers_stop_before_shutdown) ... ok
+test_alert_after_repeated_not_touched (test_nbl.InteractionTests.test_alert_after_repeated_not_touched) ... ok
+test_not_touched_keeps_feature_on_and_retries_same_line (test_nbl.InteractionTests.test_not_touched_keeps_feature_on_and_retries_same_line) ... ok
+test_uncertain_failure_still_stops (test_nbl.InteractionTests.test_uncertain_failure_still_stops) ... ok
+test_accentless_ocr_still_matches (test_nbl.MatchingTests.test_accentless_ocr_still_matches) ... ok
+test_clock_ocr_confusions (test_nbl.MatchingTests.test_clock_ocr_confusions) ... ok
+test_confirmation_when_old_copy_scrolled_away (test_nbl.MatchingTests.test_confirmation_when_old_copy_scrolled_away) ... ok
+test_draft_state (test_nbl.MatchingTests.test_draft_state) ... ok
+test_greeting_rows (test_nbl.MatchingTests.test_greeting_rows) ... ok
+test_no_confirmation_when_same_text_was_already_newest (test_nbl.MatchingTests.test_no_confirmation_when_same_text_was_already_newest) ... ok
+test_same_line_author_and_other_author (test_nbl.MatchingTests.test_same_line_author_and_other_author) ... ok
+test_seen_names_forgets_oldest (test_nbl.MatchingTests.test_seen_names_forgets_oldest) ... ok
+test_wrapped_own_message_is_counted (test_nbl.MatchingTests.test_wrapped_own_message_is_counted) ... ok
+test_backoff_steps (test_nbl.MiscTests.test_backoff_steps) ... ok
+test_diagnostics_hide_secrets (test_nbl.MiscTests.test_diagnostics_hide_secrets) ... ok
+test_windows_paths_compare_equal (test_nbl.MiscTests.test_windows_paths_compare_equal) ... ok
+test_backup_and_recovery (test_nbl.ModelTests.test_backup_and_recovery) ... ok
+test_salvage_keeps_valid_sessions (test_nbl.ModelTests.test_salvage_keeps_valid_sessions) ... ok
+test_failure_after_click_stays_a_hard_error (test_nbl.VisionTests.test_failure_after_click_stays_a_hard_error) ... ok
+test_live_and_alert_results_are_cached (test_nbl.VisionTests.test_live_and_alert_results_are_cached) ... ok
+test_real_alert_outside_chat_is_reported (test_nbl.VisionTests.test_real_alert_outside_chat_is_reported) ... ok
+test_untouched_failures_become_not_touched (test_nbl.VisionTests.test_untouched_failures_become_not_touched) ... ERROR
+test_viewer_comment_does_not_raise_alert (test_nbl.VisionTests.test_viewer_comment_does_not_raise_alert) ... ok
+test_first_time_pairs (test_nick_pair4316.NickPairTest.test_first_time_pairs) ... ok
+test_legacy_pair_from_old_studio_nick_is_repaired (test_nick_pair4316.NickPairTest.test_legacy_pair_from_old_studio_nick_is_repaired) ... ok
+test_same_studio_nick_with_another_chrome_login_is_still_refused (test_nick_pair4316.NickPairTest.test_same_studio_nick_with_another_chrome_login_is_still_refused) ... ok
+test_studio_switched_nick_repairs (test_nick_pair4316.NickPairTest.test_studio_switched_nick_repairs) ... ok
+test_any_popup_with_close_button (test_notice403.Button.test_any_popup_with_close_button) ... ok
+test_captcha_security_or_end_live_is_never_closed (test_notice403.Button.test_captcha_security_or_end_live_is_never_closed) ... ok
+test_far_away_text_does_not_block (test_notice403.Button.test_far_away_text_does_not_block) ... ok
+test_lone_button_word_without_message_is_ignored (test_notice403.Button.test_lone_button_word_without_message_is_ignored) ... ok
+test_no_button_or_two_buttons (test_notice403.Button.test_no_button_or_two_buttons) ... ok
+test_ok_of_restriction_notice_is_found (test_notice403.Button.test_ok_of_restriction_notice_is_found) ... ok
+test_violation_notice_is_closed_now (test_notice403.Button.test_violation_notice_is_closed_now) ... ok
+test_notice_closed_and_work_continues (test_notice403.Close.test_notice_closed_and_work_continues) ... ok
+test_notice_still_there_stops (test_notice403.Close.test_notice_still_there_stops) ... ok
+test_read_only_status_never_clicks (test_notice403.Close.test_read_only_status_never_clicks) ... ok
+test_result_reports_dismissed (test_notice403.Close.test_result_reports_dismissed) ... ok
+test_studio_dialog_counts_as_in_front (test_notice403.Front.test_studio_dialog_counts_as_in_front) ... ok
+setUpClass (test_ocr401.RealOCRTests) ... skipped 'Rendered fixture requires DejaVu Sans'
+test_emergency_needs_confirm (test_phone430.Actions430.test_emergency_needs_confirm) ... ok
+test_running_end_or_drop (test_phone430.Actions430.test_running_end_or_drop) ... ok
+test_schedule_add_cancel_and_cart_retry (test_phone430.Actions430.test_schedule_add_cancel_and_cart_retry) ... ok
+test_allowed_ips (test_phone430.Server430.test_allowed_ips) ... ok
+test_clip_range_with_query_token (test_phone430.Server430.test_clip_range_with_query_token) ... ok
+test_pair_link_is_qr (test_phone430.Server430.test_pair_link_is_qr) ... ok
+test_post_body_and_options (test_phone430.Server430.test_post_body_and_options) ... ok
+test_token_required_and_main_thread (test_phone430.Server430.test_token_required_and_main_thread) ... ok
+test_token_rotation (test_phone430.Server430.test_token_rotation) ... ok
+test_preroll_then_flow_and_never_lags (test_phone_talk4315.JitterTest.test_preroll_then_flow_and_never_lags) ... ok
+test_take_respects_free_space (test_phone_talk4315.JitterTest.test_take_respects_free_space) ... ok
+test_accept_key_rfc_example (test_phone_talk4315.TalkTest.test_accept_key_rfc_example) ... ok
+test_bad_rate_and_pc_cannot_open (test_phone_talk4315.TalkTest.test_bad_rate_and_pc_cannot_open) ... ok
+test_phone_vanishes_mid_talk_ends_the_talk (test_phone_talk4315.TalkTest.test_phone_vanishes_mid_talk_ends_the_talk) ... ok
+test_plain_get_is_not_websocket (test_phone_talk4315.TalkTest.test_plain_get_is_not_websocket) ... unittest\case.py:589: ResourceWarning: unclosed <socket.socket fd=2224, family=2, type=1, proto=0, laddr=('127.0.0.1', 63014), raddr=('127.0.0.1', 63013)>
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+socket.py:791: ResourceWarning: unclosed <socket.socket fd=2092, family=2, type=1, proto=0, laddr=('127.0.0.1', 63015), raddr=('127.0.0.1', 63013)>
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_talk_start_audio_stop (test_phone_talk4315.TalkTest.test_talk_start_audio_stop) ... ok
+test_wrong_code_refused (test_phone_talk4315.TalkTest.test_wrong_code_refused) ... ----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 63019)
+Traceback (most recent call last):
+  File "socketserver.py", line 697, in process_request_thread
+  File "socketserver.py", line 362, in finish_request
+  File "socketserver.py", line 766, in __init__
+  File "http\server.py", line 438, in handle
+  File "http\server.py", line 404, in handle_one_request
+  File "socket.py", line 720, in readinto
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+----------------------------------------
+ok
+test_app_has_the_page_the_editor_and_the_cable_button (test_pinscript4111.AppSide.test_app_has_the_page_the_editor_and_the_cable_button) ... ok
+test_script_reaches_chrome_even_for_a_live_started_by_hand (test_pinscript4111.AppSide.test_script_reaches_chrome_even_for_a_live_started_by_hand) ... ok
+test_export_and_import_to_another_pc (test_pinscript4111.Logic.test_export_and_import_to_another_pc) ... ok
+test_flags_are_saved_per_clip_and_survive_moving_the_file (test_pinscript4111.Logic.test_flags_are_saved_per_clip_and_survive_moving_the_file) ... ok
+test_hold_rules_3_seconds_to_6_hours_default_60 (test_pinscript4111.Logic.test_hold_rules_3_seconds_to_6_hours_default_60) ... ok
+test_mistakes_are_caught_before_saving (test_pinscript4111.Logic.test_mistakes_are_caught_before_saving) ... ok
+test_names_missing_from_the_cart (test_pinscript4111.Logic.test_names_missing_from_the_cart) ... ok
+test_paste_from_notepad_or_excel (test_pinscript4111.Logic.test_paste_from_notepad_or_excel) ... ok
+test_times_the_way_the_owner_writes_them (test_pinscript4111.Logic.test_times_the_way_the_owner_writes_them) ... ok
+test_virtual_cable_choice (test_pinscript4111.Logic.test_virtual_cable_choice) ... ok
+test_what_chrome_receives (test_pinscript4111.Logic.test_what_chrome_receives) ... ok
+test_after_send_caret_only_ocr_is_empty_by_pixels (test_pixels403.Flow.test_after_send_caret_only_ocr_is_empty_by_pixels) ... ok
+test_confident_words_beat_pixels (test_pixels403.Flow.test_confident_words_beat_pixels) ... ok
+test_typed_text_never_empty_and_no_esc (test_pixels403.Flow.test_typed_text_never_empty_and_no_esc) ... ok
+test_unsure_then_esc_then_hint_readable (test_pixels403.Flow.test_unsure_then_esc_then_hint_readable) ... ok
+test_hint_caret_icons_are_empty_text_is_not (test_pixels403.Pixels.test_hint_caret_icons_are_empty_text_is_not) ... ok
+test_owner_screens (test_pixels403.Pixels.test_owner_screens) ... ok
+test_hinh_doc_trong_o_doc_vua_khit (test_player4311.GiuDungTiLe.test_hinh_doc_trong_o_doc_vua_khit) ... ok
+test_hinh_doc_trong_o_ngang_thi_vien_den_hai_ben (test_player4311.GiuDungTiLe.test_hinh_doc_trong_o_ngang_thi_vien_den_hai_ben) ... ok
+test_hinh_ngang_trong_o_doc_thi_vien_den_tren_duoi (test_player4311.GiuDungTiLe.test_hinh_ngang_trong_o_doc_thi_vien_den_tren_duoi) ... ok
+test_khong_bao_gio_tran_ra_ngoai_o_ve (test_player4311.GiuDungTiLe.test_khong_bao_gio_tran_ra_ngoai_o_ve) ... ok
+test_so_0_khong_lam_vang_loi (test_player4311.GiuDungTiLe.test_so_0_khong_lam_vang_loi) ... ok
+test_dua_hinh_vao_khung_tu_ve (test_player4311.TuVeBangCPU.test_dua_hinh_vao_khung_tu_ve) ... ok
+test_khong_con_dung_khung_video_cua_qt (test_player4311.TuVeBangCPU.test_khong_con_dung_khung_video_cua_qt) ... ok
+test_ve_xong_phai_bao_ve_lai (test_player4311.TuVeBangCPU.test_ve_xong_phai_bao_ve_lai)
+Nhận khung hình mà quên gọi update() thì màn hình đứng y như lỗi cũ. ... ok
+test_double_click_or_button_opens_the_editor_and_the_old_page_is_gone (test_playlist4113.Playlist.test_double_click_or_button_opens_the_editor_and_the_old_page_is_gone) ... ok
+test_each_item_keeps_its_path_and_shows_the_script_state (test_playlist4113.Playlist.test_each_item_keeps_its_path_and_shows_the_script_state) ... ok
+test_paths_are_never_read_from_the_label (test_playlist4113.Playlist.test_paths_are_never_read_from_the_label) ... ok
+test_app_has_no_qr_page_or_menu (test_qr411.QrRemoved.test_app_has_no_qr_page_or_menu) ... ok
+test_bind_never_jumps_to_a_login_page (test_qr411.QrRemoved.test_bind_never_jumps_to_a_login_page) ... ok
+test_bridge_refuses_login_commands (test_qr411.QrRemoved.test_bridge_refuses_login_commands) ... ok
+test_files_are_gone (test_qr411.QrRemoved.test_files_are_gone) ... ok
+test_unreadable_nick_explains_what_to_do (test_qr411.QrRemoved.test_unreadable_nick_explains_what_to_do) ... ok
+test_actual_console_opens_and_closes (test_qt402.QtSmokeTests.test_actual_console_opens_and_closes) ... ok
+test_actual_console_recovers_bad_studio_file_and_notifies (test_qt402.QtSmokeTests.test_actual_console_recovers_bad_studio_file_and_notifies) ... ok
+test_khan_cap_captcha_chan_thi_tat_han_studio (test_quit_studio439.NickChuaBatKetNoiTuDong.test_khan_cap_captcha_chan_thi_tat_han_studio) ... ok
+test_khan_cap_ket_thuc_duoc_thi_khong_dung_den_tien_trinh (test_quit_studio439.NickChuaBatKetNoiTuDong.test_khan_cap_ket_thuc_duoc_thi_khong_dung_den_tien_trinh) ... ok
+test_khan_cap_van_bao_dang_live_thi_cung_tat_han (test_quit_studio439.NickChuaBatKetNoiTuDong.test_khan_cap_van_bao_dang_live_thi_cung_tat_han) ... ok
+test_tat_studio_theo_ten_file (test_quit_studio439.NickChuaBatKetNoiTuDong.test_tat_studio_theo_ten_file) ... ok
+test_captcha_chan_thi_bao_da_tat_han_studio (test_quit_studio439.TatStudio.test_captcha_chan_thi_bao_da_tat_han_studio) ... ok
+test_doc_dung_pid_giu_cong_dieu_khien (test_quit_studio439.TatStudio.test_doc_dung_pid_giu_cong_dieu_khien)
+netstat liệt kê nhiều cổng: phải lấy đúng PID của cổng Studio, không lấy nhầm. ... ok
+test_het_lich_live_thi_tat_han_studio (test_quit_studio439.TatStudio.test_het_lich_live_thi_tat_han_studio) ... ok
+test_quit_studio_nam_trong_danh_sach_lenh_tu_dong (test_quit_studio439.TatStudio.test_quit_studio_nam_trong_danh_sach_lenh_tu_dong) ... ok
+test_studio_da_tat_roi_thi_khong_gui_them (test_quit_studio439.TatStudio.test_studio_da_tat_roi_thi_khong_gui_them) ... ok
+test_tat_studio_that_bai_thi_khong_lam_hong_lich (test_quit_studio439.TatStudio.test_tat_studio_that_bai_thi_khong_lam_hong_lich) ... ok
+test_error_not_ack (test_regressions401.BridgeTests.test_error_not_ack) ... ok
+test_missing_module_not_ack (test_regressions401.BridgeTests.test_missing_module_not_ack) ... ok
+test_no_start_when_closing (test_regressions401.BridgeTests.test_no_start_when_closing) ... ok
+test_queue_not_ack (test_regressions401.BridgeTests.test_queue_not_ack) ... ok
+test_still_running_not_ack (test_regressions401.BridgeTests.test_still_running_not_ack) ... ok
+test_stopped_ack (test_regressions401.BridgeTests.test_stopped_ack) ... ok
+test_wrong_client_not_ack (test_regressions401.BridgeTests.test_wrong_client_not_ack) ... ok
+test_deadline (test_regressions401.InteractionsTests.test_deadline) ... ok
+test_old_guard_revoked (test_regressions401.InteractionsTests.test_old_guard_revoked) ... ok
+test_stale_error (test_regressions401.InteractionsTests.test_stale_error) ... ok
+test_stale_retry (test_regressions401.InteractionsTests.test_stale_retry) ... ok
+test_stale_success (test_regressions401.InteractionsTests.test_stale_success) ... ok
+test_actual_tick_accepts_windows_path (test_regressions401.ScheduleTests.test_actual_tick_accepts_windows_path) ... ok
+test_actual_tick_reacts_to_warning_immediately (test_regressions401.ScheduleTests.test_actual_tick_reacts_to_warning_immediately) ... ok
+test_accents_and_wrapping (test_regressions401.TextTests.test_accents_and_wrapping) ... ok
+test_author_prefix (test_regressions401.TextTests.test_author_prefix) ... ok
+test_decimal_sign_currency_phone (test_regressions401.TextTests.test_decimal_sign_currency_phone) ... ok
+test_inline_author (test_regressions401.TextTests.test_inline_author) ... ok
+test_missing_negative_word (test_regressions401.TextTests.test_missing_negative_word) ... ok
+test_not_a_placeholder (test_regressions401.TextTests.test_not_a_placeholder) ... ok
+test_wrong_author (test_regressions401.TextTests.test_wrong_author) ... ok
+test_wrong_price_body (test_regressions401.TextTests.test_wrong_price_body) ... ok
+test_wrong_price_draft (test_regressions401.TextTests.test_wrong_price_draft) ... ok
+test_cache_scope (test_regressions401.VisionTests.test_cache_scope) ... ok
+test_cancel_not_retry (test_regressions401.VisionTests.test_cancel_not_retry) ... ok
+test_failed_model_status (test_regressions401.VisionTests.test_failed_model_status) ... ok
+test_fresh_warning (test_regressions401.VisionTests.test_fresh_warning) ... ok
+test_missing_model_status (test_regressions401.VisionTests.test_missing_model_status) ... ok
+test_real_warning_not_retry (test_regressions401.VisionTests.test_real_warning_not_retry) ... ok
+test_scheduled_status_always_reads_fresh (test_regressions401.VisionTests.test_scheduled_status_always_reads_fresh) ... ok
+test_summary_image_confirms_offline (test_regressions401.VisionTests.test_summary_image_confirms_offline) ... ok
+test_faint_hint_twice_counts_as_empty_once_does_not (test_report403.Caret.test_faint_hint_twice_counts_as_empty_once_does_not) ... ok
+test_send_after_previous_send_with_blinking_caret (test_report403.Caret.test_send_after_previous_send_with_blinking_caret) ... ok
+test_dock_icon_found_on_real_floating_chat (test_report403.Dock.test_dock_icon_found_on_real_floating_chat) ... ok
+test_dock_icon_with_invisible_border_and_150_percent (test_report403.Dock.test_dock_icon_with_invisible_border_and_150_percent) ... ok
+test_failed_vision_action_writes_error_report_with_picture (test_report403.Reports.test_failed_vision_action_writes_error_report_with_picture) ... ok
+test_only_newest_100_per_kind_and_kinds_never_touch_each_other (test_report403.Reports.test_only_newest_100_per_kind_and_kinds_never_touch_each_other) ... ok
+test_same_error_repeating_updates_one_report (test_report403.Reports.test_same_error_repeating_updates_one_report) ... ok
+test_two_kinds_in_two_folders_with_date_time (test_report403.Reports.test_two_kinds_in_two_folders_with_date_time) ... ok
+test_app_is_orange (test_reset4110.LookAndGuide.test_app_is_orange) ... ok
+test_region_dialog_shows_the_owner_chao_picture (test_reset4110.LookAndGuide.test_region_dialog_shows_the_owner_chao_picture) ... ok
+test_one_call_starts_waits_and_ends_under_10_seconds (test_reset4110.VisionReset.test_one_call_starts_waits_and_ends_under_10_seconds) ... ok
+test_refuses_when_studio_is_already_live (test_reset4110.VisionReset.test_refuses_when_studio_is_already_live) ... ok
+test_failed_stop_can_close_with_warning (test_rpc_close402.CloseTests.test_failed_stop_can_close_with_warning) ... ok
+test_failed_stop_can_keep_app_open (test_rpc_close402.CloseTests.test_failed_stop_can_keep_app_open) ... ok
+test_first_close_tries_stop_once (test_rpc_close402.CloseTests.test_first_close_tries_stop_once) ... ok
+test_stop_submission_failure_does_not_trap_close (test_rpc_close402.CloseTests.test_stop_submission_failure_does_not_trap_close) ... ok
+test_actual_powershell_client_uses_same_service (test_rpc_close402.RPCTests.test_actual_powershell_client_uses_same_service) ... skipped 'PowerShell needed for real client test'
+test_revoked_profile_cannot_probe (test_rpc_close402.RPCTests.test_revoked_profile_cannot_probe) ... ok
+test_shared_executor_across_requests (test_rpc_close402.RPCTests.test_shared_executor_across_requests) ... ok
+test_wrong_auth_rejected (test_rpc_close402.RPCTests.test_wrong_auth_rejected) ... ok
+test_actual_regex_matches_prefixed_warning_labels (test_rpc_close402.WarningFilterTests.test_actual_regex_matches_prefixed_warning_labels) ... skipped 'PowerShell required'
+test_cart_emptied_by_tiktok_is_added_again_once (test_schedule41.Cart.test_cart_emptied_by_tiktok_is_added_again_once) ... ok
+test_cart_is_prepared_right_away_with_chosen_set (test_schedule41.Cart.test_cart_is_prepared_right_away_with_chosen_set) ... ok
+test_chrome_not_connected_counts_as_failure (test_schedule41.Cart.test_chrome_not_connected_counts_as_failure) ... ok
+test_done_partial_add_is_ready_and_checked_before_start (test_schedule41.Cart.test_done_partial_add_is_ready_and_checked_before_start) ... ok
+test_failures_are_retried_until_the_live (test_schedule41.Cart.test_failures_are_retried_until_the_live) ... ok
+test_never_adds_while_the_nick_is_live (test_schedule41.Cart.test_never_adds_while_the_nick_is_live) ... ok
+test_next_live_without_sales_means_no_cart_now (test_schedule41.Cart.test_next_live_without_sales_means_no_cart_now) ... ok
+test_black_screen_alerts_restarts_video_then_ends_live (test_schedule41.Dark.test_black_screen_alerts_restarts_video_then_ends_live) ... ok
+test_picture_back_resets (test_schedule41.Dark.test_picture_back_resets) ... ok
+test_unreadable_status_line_is_not_black (test_schedule41.Dark.test_unreadable_status_line_is_not_black) ... ok
+test_add_job_needs_bundle_and_two_minutes (test_schedule41.Decisions.test_add_job_needs_bundle_and_two_minutes) ... ok
+test_failed_stop_is_retried (test_schedule41.Decisions.test_failed_stop_is_retried) ... ok
+test_late_start_is_still_made_while_time_remains (test_schedule41.Decisions.test_late_start_is_still_made_while_time_remains) ... ok
+test_no_start_in_the_last_minute (test_schedule41.Decisions.test_no_start_in_the_last_minute) ... ok
+test_sales_live_waits_for_cart (test_schedule41.Decisions.test_sales_live_waits_for_cart) ... ok
+test_failed_start_is_retried_then_adopted_when_studio_is_live (test_schedule41.StartStop.test_failed_start_is_retried_then_adopted_when_studio_is_live) ... ok
+test_start_failing_near_the_end_gives_up_loudly (test_schedule41.StartStop.test_start_failing_near_the_end_gives_up_loudly) ... ok
+test_started_enables_messages_greetings_and_chrome (test_schedule41.StartStop.test_started_enables_messages_greetings_and_chrome) ... ok
+test_status_warning_still_marks_attention (test_schedule41.StartStop.test_status_warning_still_marks_attention) ... ok
+test_stop_is_retried_five_times_then_shouts (test_schedule41.StartStop.test_stop_is_retried_five_times_then_shouts) ... ok
+test_stop_success_keeps_video_playing_and_closes_chrome_summary (test_schedule41.StartStop.test_stop_success_keeps_video_playing_and_closes_chrome_summary) ... ok
+test_other_nick_overlap_is_reported (test_schedule41.TwoNicks.test_other_nick_overlap_is_reported) ... ok
+test_same_speaker_for_two_lives_is_warned (test_schedule41.TwoNicks.test_same_speaker_for_two_lives_is_warned) ... ok
+test_separate_devices_are_fine (test_schedule41.TwoNicks.test_separate_devices_are_fine) ... ok
+test_cancel_offers_drop_and_reconnect_is_not_blocked_by_a_stuck_job (test_stuck414.Panel.test_cancel_offers_drop_and_reconnect_is_not_blocked_by_a_stuck_job) ... ok
+test_closing_nbl_leaves_nbl_video_playing (test_stuck414.Panel.test_closing_nbl_leaves_nbl_video_playing) ... ok
+test_rebound_window_is_saved_on_the_nick (test_stuck414.Panel.test_rebound_window_is_saved_on_the_nick) ... ok
+test_stuck_job_can_always_be_dropped_without_touching_studio (test_stuck414.Panel.test_stuck_job_can_always_be_dropped_without_touching_studio) ... ok
+test_execute_reattaches_and_reports_the_new_window (test_stuck414.Rebind.test_execute_reattaches_and_reports_the_new_window) ... ok
+test_never_guesses_between_two_studios (test_stuck414.Rebind.test_never_guesses_between_two_studios) ... ok
+test_no_studio_open (test_stuck414.Rebind.test_no_studio_open) ... ok
+test_one_free_studio_window_is_taken (test_stuck414.Rebind.test_one_free_studio_window_is_taken) ... ok
+test_the_other_nicks_studio_is_not_taken (test_stuck414.Rebind.test_the_other_nicks_studio_is_not_taken) ... ok
+test_unclear_new_window_says_what_to_do (test_stuck414.Rebind.test_unclear_new_window_says_what_to_do) ... ok
+test_idle_chat_hint_counts_as_empty (test_studio_live41.Placeholder.test_idle_chat_hint_counts_as_empty) ... ok
+test_dialog_without_ket_thuc_ngay_is_cancelled_with_esc (test_studio_live41.StudioLive.test_dialog_without_ket_thuc_ngay_is_cancelled_with_esc) ... ok
+test_full_stop_sequence (test_studio_live41.StudioLive.test_full_stop_sequence) ... ok
+test_health_reads_fps_and_upload (test_studio_live41.StudioLive.test_health_reads_fps_and_upload) ... ok
+test_never_clicks_tam_dung (test_studio_live41.StudioLive.test_never_clicks_tam_dung) ... ok
+test_screen_state_reads_button_clock_and_summary (test_studio_live41.StudioLive.test_screen_state_reads_button_clock_and_summary) ... ok
+test_start_clicks_phat_live_then_docks_chat (test_studio_live41.StudioLive.test_start_clicks_phat_live_then_docks_chat) ... ok
+test_start_on_a_live_studio_does_not_click (test_studio_live41.StudioLive.test_start_on_a_live_studio_does_not_click) ... ok
+test_start_without_button_touches_nothing (test_studio_live41.StudioLive.test_start_without_button_touches_nothing) ... ok
+test_stop_when_already_idle_or_on_summary (test_studio_live41.StudioLive.test_stop_when_already_idle_or_on_summary) ... ok
+test_new_end_page_is_closed_with_its_x_not_the_window_x (test_summary413.EndPageTests.test_new_end_page_is_closed_with_its_x_not_the_window_x) ... ok
+test_new_end_page_layout_is_recognised (test_summary413.EndPageTests.test_new_end_page_layout_is_recognised) ... ok
+test_next_schedule_closes_the_old_end_page_then_starts (test_summary413.EndPageTests.test_next_schedule_closes_the_old_end_page_then_starts) ... ok
+test_ordinary_screens_are_not_end_pages (test_summary413.EndPageTests.test_ordinary_screens_are_not_end_pages) ... ok
+test_stop_closes_an_end_page_that_appears_after_phat_live (test_summary413.EndPageTests.test_stop_closes_an_end_page_that_appears_after_phat_live) ... ok
+test_auto_connect_khong_hoi_windows (test_timstudio4310.KhongLamKhungGiaoDien.test_auto_connect_khong_hoi_windows) ... ok
+test_hoi_hong_thi_cung_khong_chay_lai_ngay (test_timstudio4310.KhongLamKhungGiaoDien.test_hoi_hong_thi_cung_khong_chay_lai_ngay) ... ok
+test_nho_ket_qua_hoi_windows_khong_chay_lai_lien_tuc (test_timstudio4310.KhongLamKhungGiaoDien.test_nho_ket_qua_hoi_windows_khong_chay_lai_lien_tuc)
+Giả os.name='nt' trên Linux thì pathlib chuyển sang kiểu Windows và kiểm tra ... ok
+test_loi_lap_lai_van_nhac_lai_sau_5_phut (test_timstudio4310.KhongNuotCauLoi.test_loi_lap_lai_van_nhac_lai_sau_5_phut) ... ok
+test_cai_co_tang_thu_muc_phien_ban (test_timstudio4310.TimFileStudio.test_cai_co_tang_thu_muc_phien_ban)
+Đúng cảnh máy khách: ...\TikTok LIVE Studio\1.38.0\TikTok LIVE Studio.exe ... ok
+test_cai_kieu_cu_ngay_trong_thu_muc (test_timstudio4310.TimFileStudio.test_cai_kieu_cu_ngay_trong_thu_muc) ... ok
+test_duong_dan_da_luu_con_dung_thi_khong_hoi_lai (test_timstudio4310.TimFileStudio.test_duong_dan_da_luu_con_dung_thi_khong_hoi_lai) ... ok
+test_hoi_windows_duoc_thi_uu_tien_duong_dan_do (test_timstudio4310.TimFileStudio.test_hoi_windows_duoc_thi_uu_tien_duong_dan_do) ... ok
+test_khong_co_gi_thi_tra_rong_chu_khong_vang_loi (test_timstudio4310.TimFileStudio.test_khong_co_gi_thi_tra_rong_chu_khong_vang_loi) ... ok
+test_nhieu_phien_ban_thi_lay_ban_moi_nhat (test_timstudio4310.TimFileStudio.test_nhieu_phien_ban_thi_lay_ban_moi_nhat) ... ok
+test_co_file_studio_thi_duoc_tu_mo_lan_dau (test_timstudio4310.VanNoiKhiKhongThayFile.test_co_file_studio_thi_duoc_tu_mo_lan_dau) ... ok
+test_khong_thay_file_studio_van_gui_lenh_ket_noi (test_timstudio4310.VanNoiKhiKhongThayFile.test_khong_thay_file_studio_van_gui_lenh_ket_noi) ... ok
+test_bad_hash_changes_nothing (test_update401.UpdateTests.test_bad_hash_changes_nothing) ... skipped 'Requires Linux PowerShell for disposable executable fixtures'
+test_bad_powershell_changes_nothing (test_update401.UpdateTests.test_bad_powershell_changes_nothing) ... skipped 'Requires Linux PowerShell for disposable executable fixtures'
+test_post_install_failure_rolls_back_and_removes_new_files (test_update401.UpdateTests.test_post_install_failure_rolls_back_and_removes_new_files) ... skipped 'Requires Linux PowerShell for disposable executable fixtures'
+test_repeat_never_overwrites_old_backup (test_update401.UpdateTests.test_repeat_never_overwrites_old_backup) ... skipped 'Requires Linux PowerShell for disposable executable fixtures'
+test_success_and_backup (test_update401.UpdateTests.test_success_and_backup) ... skipped 'Requires Linux PowerShell for disposable executable fixtures'
+test_auto_rate_limit_keep_and_no_keys (test_update430.Diag430.test_auto_rate_limit_keep_and_no_keys) ... ok
+test_download_checks_sha (test_update430.Update430.test_download_checks_sha) ... ok
+test_latest_reads_exe_and_sha (test_update430.Update430.test_latest_reads_exe_and_sha) ... ok
+test_no_exe_is_none (test_update430.Update430.test_no_exe_is_none) ... ok
+test_manifest_matches (test_version438.VersionTest.test_manifest_matches) ... ok
+test_setup_check_has_no_hardcoded_version (test_version438.VersionTest.test_setup_check_has_no_hardcoded_version)
+kiem_tra_cai_dat.py must read the version, never spell one out. ... ok
+test_window_title_matches (test_version438.VersionTest.test_window_title_matches) ... ok
+test_no_path_sends_stop_to_nbl_video (test_video412.NeverStop.test_no_path_sends_stop_to_nbl_video) ... ok
+test_schedule_needs_no_clips (test_video412.NeverStop.test_schedule_needs_no_clips) ... ok
+test_no_window_opens_one (test_video412.OneWindow.test_no_window_opens_one) ... ok
+test_open_window_from_before_a_restart_gets_the_command (test_video412.OneWindow.test_open_window_from_before_a_restart_gets_the_command) ... ok
+test_stop_to_a_closed_window_does_nothing (test_video412.OneWindow.test_stop_to_a_closed_window_does_nothing) ... ok
+test_lost_video_file_is_refused (test_video412.Replay.test_lost_video_file_is_refused) ... ok
+test_nick_without_video_is_refused_before_studio (test_video412.Replay.test_nick_without_video_is_refused_before_studio) ... ok
+test_press_phat_live_only_after_the_video_restarted (test_video412.Replay.test_press_phat_live_only_after_the_video_restarted) ... ok
+test_start_replays_the_nicks_own_playlist_without_replacing_it (test_video412.Replay.test_start_replays_the_nicks_own_playlist_without_replacing_it) ... ok
+test_nick_without_regions_is_refused_and_nothing_is_sent_to_studio (test_vision412.VisionRequired.test_nick_without_regions_is_refused_and_nothing_is_sent_to_studio) ... ok
+test_old_picked_buttons_are_no_longer_enough (test_vision412.VisionRequired.test_old_picked_buttons_are_no_longer_enough) ... ok
+test_once_regions_are_saved_the_start_goes_ahead (test_vision412.VisionRequired.test_once_regions_are_saved_the_start_goes_ahead) ... ok
+test_regions_without_clock_are_refused (test_vision412.VisionRequired.test_regions_without_clock_are_refused) ... ok
+test_saving_a_schedule_checks_the_regions (test_vision412.VisionRequired.test_saving_a_schedule_checks_the_regions) ... ok
+test_int16_float_roundtrip (test_voice_upload4313.ConvertTest.test_int16_float_roundtrip) ... ok
+test_mono_to_stereo_and_back (test_voice_upload4313.ConvertTest.test_mono_to_stereo_and_back) ... ok
+test_odd_byte_count_is_safe (test_voice_upload4313.ConvertTest.test_odd_byte_count_is_safe) ... ok
+test_peak (test_voice_upload4313.ConvertTest.test_peak) ... ok
+test_hold_opens_after_250ms_and_closes_150ms_after_release (test_voice_upload4313.GateTest.test_hold_opens_after_250ms_and_closes_150ms_after_release) ... ok
+test_quick_taps_never_open_the_mic (test_voice_upload4313.GateTest.test_quick_taps_never_open_the_mic) ... ok
+test_short_gap_while_talking_does_not_cut (test_voice_upload4313.GateTest.test_short_gap_while_talking_does_not_cut) ... ok
+test_json_routes_still_work (test_voice_upload4313.HttpUploadTest.test_json_routes_still_work) ... ok
+test_upload_20mb_in_chunks_with_a_broken_connection_then_resume (test_voice_upload4313.HttpUploadTest.test_upload_20mb_in_chunks_with_a_broken_connection_then_resume) ... ok
+test_upload_page_needs_the_code (test_voice_upload4313.HttpUploadTest.test_upload_page_needs_the_code) ... ok
+test_wrong_code_and_wrong_type (test_voice_upload4313.HttpUploadTest.test_wrong_code_and_wrong_type) ... ok
+test_defaults_and_unknown_keys (test_voice_upload4313.SettingsTest.test_defaults_and_unknown_keys) ... ok
+test_bad_ids_and_sizes (test_voice_upload4313.StoreTest.test_bad_ids_and_sizes) ... ok
+test_chunks_assemble_exact_file_and_names_do_not_clash (test_voice_upload4313.StoreTest.test_chunks_assemble_exact_file_and_names_do_not_clash) ... ok
+test_delete_only_inside_store (test_voice_upload4313.StoreTest.test_delete_only_inside_store) ... ok
+test_disk_full_is_refused_before_writing (test_voice_upload4313.StoreTest.test_disk_full_is_refused_before_writing) ... ok
+test_network_cut_mid_chunk_rolls_back_that_chunk (test_voice_upload4313.StoreTest.test_network_cut_mid_chunk_rolls_back_that_chunk) ... ok
+test_safe_name (test_voice_upload4313.StoreTest.test_safe_name) ... ok
+test_stale_parts_are_cleaned (test_voice_upload4313.StoreTest.test_stale_parts_are_cleaned) ... ok
+test_wrong_offset_tells_where_to_resume (test_voice_upload4313.StoreTest.test_wrong_offset_tells_where_to_resume) ... ok
+
+======================================================================
+ERROR: test_anchor403 (unittest.loader._FailedTest.test_anchor403)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_anchor403
+Traceback (most recent call last):
+  File "unittest\loader.py", line 396, in _find_test_path
+  File "unittest\loader.py", line 339, in _get_module_from_name
+  File "D:\a\LIVE-NBL\LIVE-NBL\tests\test_anchor403.py", line 6, in <module>
+    from PIL import Image,ImageDraw,ImageEnhance
+ModuleNotFoundError: No module named 'PIL'
+
+
+======================================================================
+ERROR: test_untouched_failures_become_not_touched (test_nbl.VisionTests.test_untouched_failures_become_not_touched)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\LIVE-NBL\LIVE-NBL\tests\test_nbl.py", line 149, in test_untouched_failures_become_not_touched
+    self.V.execute_vision(dict(vision=self.cfg, pid='1'), 'status')
+  File "D:\a\LIVE-NBL\LIVE-NBL\studio_vision.py", line 1899, in execute_vision
+    return _execute_vision_inner(profile,action,deadline,payload,holder)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\LIVE-NBL\LIVE-NBL\studio_vision.py", line 1909, in _execute_vision_inner
+    session=VisionSession(profile,deadline)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\LIVE-NBL\LIVE-NBL\studio_vision.py", line 1036, in __init__
+    self.native = native or NativeStudio(profile, deadline)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\LIVE-NBL\LIVE-NBL\studio_vision.py", line 273, in __init__
+    raise StudioAttention('Cửa sổ Studio đã đổi. Kết nối lại cửa sổ, giữ các vùng đã lưu.')
+studio_vision_logic.StudioAttention: Cửa sổ Studio đã đổi. Kết nối lại cửa sổ, giữ các vùng đã lưu.
+
+======================================================================
+FAIL: test_runtime_text_reads_specify_encoding (test_audit402.EncodingAlarmTests.test_runtime_text_reads_specify_encoding)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\LIVE-NBL\LIVE-NBL\tests\test_audit402.py", line 26, in test_runtime_text_reads_specify_encoding
+    self.assertEqual(bad,[])
+AssertionError: Lists differ: [('_meson.py', 66), ('dimacs.py', 68), ('compilation.py', 572)] != []
+
+First list contains 3 additional elements.
+First extra element 0:
+('_meson.py', 66)
+
+- [('_meson.py', 66), ('dimacs.py', 68), ('compilation.py', 572)]
++ []
+
+----------------------------------------------------------------------
+Ran 465 tests in 42.997s
+
+FAILED (failures=1, errors=2, skipped=11)

@@ -1,0 +1,16 @@
+== dich vu am thanh ==
+
+Status  Name                 DisplayName
+------  ----                 -----------
+Running AudioEndpointBuilder Windows Audio Endpoint Builder
+Running Audiosrv             Windows Audio
+
+
+
+Status Class         FriendlyName                            InstanceId
+------ -----         ------------                            ----------
+OK     AudioEndpoint Speakers (VB-Audio Virtual Cable)       SWD\MMDEVAPI\{0.0.0.00000000}.{BD7EA008-B64A-4776-B757-C45…
+OK     AudioEndpoint CABLE Output (VB-Audio Virtual Cable)   SWD\MMDEVAPI\{0.0.1.00000000}.{36611700-1EB8-41A2-8E38-2F4…
+OK     AudioEndpoint CABLE In 16 Ch (VB-Audio Virtual Cable) SWD\MMDEVAPI\{0.0.0.00000000}.{268464E8-62EF-409D-B842-B02…
+
+
