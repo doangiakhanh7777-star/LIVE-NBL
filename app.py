@@ -375,7 +375,7 @@ class Console(QMainWindow):
         self.voice_devices=QMediaDevices(self);self.voice_devices.audioInputsChanged.connect(self.voice_devices_changed);self.voice_devices.audioOutputsChanged.connect(self.voice_devices_changed)
         self.voice_timer=QTimer(self);self.voice_timer.timeout.connect(self.voice_refresh);self.voice_timer.start(100)
         if cfg.get('enabled'):QTimer.singleShot(1500,self.voice_apply)
-        self.voice_refresh()
+        self.voice_refresh(force=True)
     def fill_voice_devices(self,cfg):
         for w in (self.voice_mic,self.voice_out):w.blockSignals(True);w.clear()
         self.voice_mic.addItem('Micro mặc định của Windows','')
@@ -466,8 +466,8 @@ class Console(QMainWindow):
             except Exception:pass
             self.ptt_ducked=None
         self.log('Giọng nói: '+('đang nói vào LIVE…' if on else 'đã ngắt mic.'))
-    def voice_refresh(self):
-        if hasattr(self,'voice_state') and not self.voice_state.isVisible():return     # 4.3.16: trang không mở thì thôi
+    def voice_refresh(self,force=False):
+        if not force and hasattr(self,'voice_state') and not self.voice_state.isVisible():return     # 4.3.16: trang không mở thì thôi
         rt=getattr(self,'remote_talk',None)
         if hasattr(self,'voice_phone'):
             t=rt.status() if rt else ''
