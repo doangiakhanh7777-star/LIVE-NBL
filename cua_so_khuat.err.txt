@@ -1,0 +1,33 @@
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'D:/a/LIVE-NBL/LIVE-NBL/probe.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf63.1.102
+  Duration: 00:00:20.00, start: 0.000000, bitrate: 840 kb/s
+  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(progressive), 360x640 [SAR 1:1 DAR 9:16], 837 kb/s, 30 fps, 30 tbr, 15360 tbn (default)
+    Metadata:
+      handler_name    : VideoHandler
+      encoder         : Lavc63.1.102 libx264
+[av1_mf @ 000001F4212611C0] could not find any MFT for the given media type
+[av1_mf @ 000001F4212611C0] could not create MFT
+[h264_mf @ 000001F42125E940] MFT name: 'H264 Encoder MFT'
+[hevc_mf @ 000001F42125E940] could not find any MFT for the given media type
+[hevc_mf @ 000001F42125E940] could not create MFT
+[AVHWFramesContext @ 000001F4212889C0] Could not create the surfaces
+[AVHWFramesContext @ 000001F4212889C0] Error creating an internal frame pool
+[h264 @ 000001F42125FF40] Failed setup for format dxva2_vld: hwaccel initialisation returned error.
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'D:/a/LIVE-NBL/LIVE-NBL/probe.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf63.1.102
+  Duration: 00:00:20.00, start: 0.000000, bitrate: 840 kb/s
+  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(progressive), 360x640 [SAR 1:1 DAR 9:16], 837 kb/s, 30 fps, 30 tbr, 15360 tbn (default)
+    Metadata:
+      handler_name    : VideoHandler
+      encoder         : Lavc63.1.102 libx264
+[AVHWFramesContext @ 000001F42173F500] Could not create the surfaces
+[AVHWFramesContext @ 000001F42173F500] Error creating an internal frame pool
+[h264 @ 000001F421261580] Failed setup for format dxva2_vld: hwaccel initialisation returned error.

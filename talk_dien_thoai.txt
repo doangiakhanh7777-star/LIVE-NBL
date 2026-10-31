@@ -1,0 +1,14 @@
+Thu tại CABLE Output: 48000 Hz 2 kênh f32 | lỗi NoError | phát vào CABLE Input: 48000 Hz 2 kênh f32
+  ĐỐI CHỨNG phát thẳng: 2.37 s, ~375 Hz, hụt 351 ms
+LOG Điện thoại nói: đang nói vào LIVE (mic điện thoại 48000 Hz → "CABLE Input (VB-Audio Virtual Cable)").
+LOG Điện thoại nói: đã ngắt (nhận 188 KB).
+  tiếng thu được: 2.01 s, tần số ~440 Hz, trễ ~258 ms, hụt tiếng 0 ms, RemoteTalk nhận 192512 byte ghi 770048 byte
+LOG Điện thoại nói: đang nói vào LIVE (mic điện thoại 48000 Hz → "CABLE Input (VB-Audio Virtual Cable)").
+LOG Điện thoại nói: đã ngắt (nhận 76 KB).
+OK   tiếng điện thoại vào tới CABLE Output (Studio thu được)  [2.01]
+OK   đúng tiếng 440 Hz (±40)  [440]
+OK   độ trễ điện thoại -> cáp 0–400 ms (mạng nội bộ)  [0.25841666666667606]
+OK   không hụt tiếng quá 60 ms trong 2 giây (không rè)  [0.0]
+OK   bật/tắt "đang nói" đúng một lần  [[(True, 'dien_thoai'), (False, 'dien_thoai')]]
+OK   điện thoại mất mạng giữa lúc nói -> NBL tự ngắt  [(True, False, [(True, 'dien_thoai'), (False, 'dien_thoai')])]
+KET QUA NOI QUA DIEN THOAI: 6/6

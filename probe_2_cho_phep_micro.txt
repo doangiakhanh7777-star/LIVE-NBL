@@ -1,0 +1,33 @@
+Qt 6.12.0
+mic: CABLE Output (VB-Audio Virtual Cable) | null: False
+preferred: 48000 2 SampleFormat.Float | min/max rate 8000 192000 | ch 1 2 | formats [<SampleFormat.UInt8: 1>, <SampleFormat.Int16: 2>, <SampleFormat.Int32: 3>, <SampleFormat.Float: 4>]
+Quyền micro (registry):
+   HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone -> Value    REG_SZ    Allow
+   HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone\NonPackaged -> (không có)
+   HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone -> Value    REG_SZ    Allow
+   HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone\NonPackaged -> Value    REG_SZ    Allow
+  Qt checkPermission(Microphone): PermissionStatus.Granted
+
+--- lần 1 (quyền như mặc định) ---
+preferred push                     supported=True  io=True  ngay_sau_start: state=IdleState error=NoError | 1,5s: state=ActiveState error=NoError bytes=572160 | doi=[('IdleState', 'NoError'), ('ActiveState', 'NoError')]
+preferred push + buffer 20ms       supported=True  io=True  ngay_sau_start: state=IdleState error=NoError | 1,5s: state=ActiveState error=NoError bytes=576000 | doi=[('IdleState', 'NoError'), ('ActiveState', 'NoError')]
+preferred pull                     supported=True  io=True  ngay_sau_start: state=ActiveState error=NoError | 1,5s: state=ActiveState error=NoError bytes=572160 | doi=[('ActiveState', 'NoError')]
+48k 2ch Int16 push                 supported=True  io=True  ngay_sau_start: state=IdleState error=NoError | 1,5s: state=ActiveState error=NoError bytes=286080 | doi=[('IdleState', 'NoError'), ('ActiveState', 'NoError')]
+48k 1ch Int16 push                 supported=True  io=True  ngay_sau_start: state=IdleState error=NoError | 1,5s: state=ActiveState error=NoError bytes=144000 | doi=[('IdleState', 'NoError'), ('ActiveState', 'NoError')]
+44.1k 2ch Float push               supported=True  io=True  ngay_sau_start: state=IdleState error=NoError | 1,5s: state=ActiveState error=NoError bytes=528952 | doi=[('IdleState', 'NoError'), ('ActiveState', 'NoError')]
+requestPermission lỗi: TypeError('requestPermission expected 3 arguments, got 2')
+
+--- lần 2 (sau requestPermission) ---
+preferred push                     supported=True  io=True  ngay_sau_start: state=IdleState error=NoError | 1,5s: state=ActiveState error=NoError bytes=572160 | doi=[('IdleState', 'NoError'), ('ActiveState', 'NoError')]
+preferred push + buffer 20ms       supported=True  io=True  ngay_sau_start: state=IdleState error=NoError | 1,5s: state=ActiveState error=NoError bytes=576000 | doi=[('IdleState', 'NoError'), ('ActiveState', 'NoError')]
+preferred pull                     supported=True  io=True  ngay_sau_start: state=ActiveState error=NoError | 1,5s: state=ActiveState error=NoError bytes=576000 | doi=[('ActiveState', 'NoError')]
+
+--- lần 3: mic + cáp cùng lúc (như NBL) ---
+nguồn trước, cáp sau                         src: io=True err=NoError state=ActiveState bytes=460800 | sink: io=True err=NoError state=IdleState
+cáp trước, nguồn sau                         src: io=True err=NoError state=ActiveState bytes=456960 | sink: io=True err=NoError state=IdleState
+cáp trước + bộ đệm nhỏ + có parent           src: io=True err=NoError state=ActiveState bytes=456960 | sink: io=True err=NoError state=IdleState
+cáp trước, không đặt bộ đệm                  src: io=True err=NoError state=ActiveState bytes=456960 | sink: io=True err=NoError state=IdleState
+đang phát tiếng thử + cáp trước              src: io=True err=NoError state=ActiveState bytes=456960 | sink: io=True err=NoError state=IdleState
+đang phát tiếng thử + nguồn trước            src: io=True err=NoError state=ActiveState bytes=460800 | sink: io=True err=NoError state=IdleState
+
+KET QUA DO: lan1 [True, True, True, True, True, True] lan2 [True, True, True]

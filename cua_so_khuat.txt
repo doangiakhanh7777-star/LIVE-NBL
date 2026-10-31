@@ -1,0 +1,26 @@
+Màn hình: 1024 x 768 | dpr 1.0
+  [cu] trong màn hình       vẽ  21.3 lần/s | exposed=True | PrintWindow khớp 6/6 đổi=True R=[224, 3, 38, 80, 115, 150] | BitBlt đổi=True R=[224, 3, 38, 80, 115, 150]
+  [cu] khuất 90% bên phải   vẽ  21.3 lần/s | exposed=True | PrintWindow khớp 5/6 đổi=True R=[192, 48, 83, 118, 160, 195] | BitBlt đổi=True R=[192, 48, 83, 118, 160, 195]
+  [cu] khuất hẳn bên phải   vẽ  20.0 lần/s | exposed=True | PrintWindow khớp 6/6 đổi=True R=[51, 86, 121, 156, 191, 226] | BitBlt đổi=True R=[51, 86, 121, 156, 191, 226]
+  [cu] khuất hẳn bên trái   vẽ  21.3 lần/s | exposed=True | PrintWindow khớp 6/6 đổi=True R=[82, 117, 159, 194, 229, 15] | BitBlt đổi=True R=[82, 117, 159, 194, 229, 15]
+  [repaint] trong màn hình       vẽ  20.7 lần/s | exposed=True | PrintWindow khớp 6/6 đổi=True R=[224, 3, 38, 80, 115, 150] | BitBlt đổi=True R=[224, 3, 38, 80, 115, 150]
+  [repaint] khuất 90% bên phải   vẽ  21.3 lần/s | exposed=True | PrintWindow khớp 5/6 đổi=True R=[185, 41, 76, 118, 153, 188] | BitBlt đổi=True R=[185, 41, 76, 118, 153, 188]
+  [repaint] khuất hẳn bên phải   vẽ  21.3 lần/s | exposed=True | PrintWindow khớp 6/6 đổi=True R=[44, 86, 121, 156, 198, 233] | BitBlt đổi=True R=[44, 86, 121, 156, 198, 233]
+  [repaint] khuất hẳn bên trái   vẽ  21.3 lần/s | exposed=True | PrintWindow khớp 6/6 đổi=True R=[89, 124, 166, 201, 236, 22] | BitBlt đổi=True R=[89, 124, 166, 201, 236, 22]
+  [ban_sua_4315] trong màn hình       vẽ  20.7 lần/s | exposed=True | PrintWindow khớp 6/6 đổi=True R=[224, 3, 38, 73, 108, 143] | BitBlt đổi=True R=[224, 3, 38, 73, 108, 143]
+  [ban_sua_4315] khuất 90% bên phải   vẽ  21.3 lần/s | exposed=True | PrintWindow khớp 5/6 đổi=True R=[178, 34, 76, 111, 153, 188] | BitBlt đổi=True R=[178, 34, 76, 111, 153, 188]
+  [ban_sua_4315] khuất hẳn bên phải   vẽ  22.0 lần/s | exposed=True | PrintWindow khớp 6/6 đổi=True R=[44, 79, 114, 156, 191, 226] | BitBlt đổi=True R=[44, 79, 114, 156, 191, 226]
+  [ban_sua_4315] khuất hẳn bên trái   vẽ  21.3 lần/s | exposed=True | PrintWindow khớp 6/6 đổi=True R=[82, 117, 159, 194, 229, 15] | BitBlt đổi=True R=[82, 117, 159, 194, 229, 15]
+  [video cu] trong màn hình       khung giải mã  30.0/s | PrintWindow hình đổi=True (4 kiểu) | BitBlt hình đổi=True (4 kiểu) | trạng thái PlayingState
+  [video cu] khuất hẳn bên phải   khung giải mã  30.0/s | PrintWindow hình đổi=False (3 kiểu) | BitBlt hình đổi=True (4 kiểu) | trạng thái PlayingState
+  [video cu] khuất hẳn bên trái   khung giải mã  30.0/s | PrintWindow hình đổi=True (5 kiểu) | BitBlt hình đổi=True (5 kiểu) | trạng thái PlayingState
+  [video cu] quay lại màn hình    khung giải mã  30.0/s | PrintWindow hình đổi=True (7 kiểu) | BitBlt hình đổi=True (5 kiểu) | trạng thái PlayingState
+  [video ban_sua_4315] trong màn hình       khung giải mã  30.0/s | PrintWindow hình đổi=True (4 kiểu) | BitBlt hình đổi=True (4 kiểu) | trạng thái PlayingState
+  [video ban_sua_4315] khuất hẳn bên phải   khung giải mã  30.0/s | PrintWindow hình đổi=True (4 kiểu) | BitBlt hình đổi=True (4 kiểu) | trạng thái PlayingState
+  [video ban_sua_4315] khuất hẳn bên trái   khung giải mã  30.0/s | PrintWindow hình đổi=True (5 kiểu) | BitBlt hình đổi=True (4 kiểu) | trạng thái PlayingState
+  [video ban_sua_4315] quay lại màn hình    khung giải mã  30.0/s | PrintWindow hình đổi=True (6 kiểu) | BitBlt hình đổi=True (5 kiểu) | trạng thái PlayingState
+
+TÓM TẮT (hình còn chạy khi khuất hẳn?):
+  cu              CÒN CHẠY
+  repaint         CÒN CHẠY
+  ban_sua_4315    CÒN CHẠY

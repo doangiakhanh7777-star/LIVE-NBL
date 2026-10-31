@@ -1,0 +1,13 @@
+Thiết bị ghi âm: ['CABLE Output (VB-Audio Virtual Cable)']
+Thiết bị phát: ['CABLE Input (VB-Audio Virtual Cable)', 'CABLE In 16ch (VB-Audio Virtual Cable)']
+Cáp ảo: 48000 Hz 2 kênh f32 | micro ảo: 48000 Hz 2 kênh f32
+LOG Giọng nói: mic "CABLE Output (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32) → "CABLE Input (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32). Thiết bị ghi âm: CABLE Output (VB-Audio Virtual Cable)
+LOG Giọng nói: SẴN SÀNG — giữ phím cách để nói. Đang dùng thiết bị ảo "CABLE Output (VB-Audio Virtual Cable)" làm micro — Studio sẽ nghe tiếng video, không phải giọng mày.
+  cáp: bytesFree lúc đầu 23040 | bufferSize 23040 | state IdleState | error NoError
+OK   arm() mở được micro + cáp thật bằng định dạng gốc  []
+OK   micro gửi tiếng (byte nhận > 0)  [1148160]
+OK   nhận ra tiếng thử 440 Hz (mức > 0,05)  [0.4]
+OK   không báo lỗi quyền micro sau 2,5 giây  []
+OK   giữ phím: đang nói + tiếng ghi vào cáp (byte đã ghi > 0)  [(True, 668160, 0, 1740000)]
+OK   thả phím: ngắt mic  [[True, False]]
+KET QUA AM THANH THAT: 6/6

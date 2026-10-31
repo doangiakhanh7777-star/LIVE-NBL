@@ -1,0 +1,30 @@
+Thiết bị ghi âm: ['CABLE Output (VB-Audio Virtual Cable)']
+Thiết bị phát: ['CABLE Input (VB-Audio Virtual Cable)', 'CABLE In 16ch (VB-Audio Virtual Cable)']
+Cáp ảo: 48000 Hz 2 kênh f32 | micro ảo: 48000 Hz 2 kênh f32
+LOG Giọng nói: mic "CABLE Output (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32) → "CABLE Input (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32). Thiết bị ghi âm: CABLE Output (VB-Audio Virtual Cable)
+LOG Giọng nói: micro báo OpenError / StoppedState (không có luồng) · quyền micro Windows: {'machine': 'Allow', 'user': 'Deny', 'desktop': 'Allow'}
+LOG Giọng nói: Không mở được micro "CABLE Output (VB-Audio Virtual Cable)". Windows có thể đang chặn quyền micro: Cài đặt → Quyền riêng tư & bảo mật → Micro → bật "Truy cập micro" và "Cho phép ứng dụng máy tính truy cập micro". Hoặc micro đang bị app khác giữ riêng (tắt chế độ độc quyền trong Âm thanh → Ghi âm → Thuộc tính → Nâng cao).
+NBL HỎI BẬT QUYỀN MICRO (quyền hiện tại: {'machine': 'Allow', 'user': 'Deny', 'desktop': 'Allow'})
+Windows chặn micro -> NBL bật quyền cho tài khoản này: True {'machine': 'Allow', 'user': 'Allow', 'desktop': 'Allow'}
+LOG Giọng nói: mic "CABLE Output (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32) → "CABLE Input (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32). Thiết bị ghi âm: CABLE Output (VB-Audio Virtual Cable)
+LOG Giọng nói: micro báo OpenError / StoppedState (không có luồng) · quyền micro Windows: {'machine': 'Allow', 'user': 'Allow', 'desktop': 'Allow'}
+LOG Giọng nói: Không mở được micro "CABLE Output (VB-Audio Virtual Cable)". Windows có thể đang chặn quyền micro: Cài đặt → Quyền riêng tư & bảo mật → Micro → bật "Truy cập micro" và "Cho phép ứng dụng máy tính truy cập micro". Hoặc micro đang bị app khác giữ riêng (tắt chế độ độc quyền trong Âm thanh → Ghi âm → Thuộc tính → Nâng cao).
+  thử lại sau 0.8 s: False
+LOG Giọng nói: mic "CABLE Output (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32) → "CABLE Input (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32). Thiết bị ghi âm: CABLE Output (VB-Audio Virtual Cable)
+LOG Giọng nói: micro báo OpenError / StoppedState (không có luồng) · quyền micro Windows: {'machine': 'Allow', 'user': 'Allow', 'desktop': 'Allow'}
+LOG Giọng nói: Không mở được micro "CABLE Output (VB-Audio Virtual Cable)". Windows có thể đang chặn quyền micro: Cài đặt → Quyền riêng tư & bảo mật → Micro → bật "Truy cập micro" và "Cho phép ứng dụng máy tính truy cập micro". Hoặc micro đang bị app khác giữ riêng (tắt chế độ độc quyền trong Âm thanh → Ghi âm → Thuộc tính → Nâng cao).
+  thử lại sau 2.0 s: False
+LOG Giọng nói: mic "CABLE Output (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32) → "CABLE Input (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32). Thiết bị ghi âm: CABLE Output (VB-Audio Virtual Cable)
+LOG Giọng nói: micro báo OpenError / StoppedState (không có luồng) · quyền micro Windows: {'machine': 'Allow', 'user': 'Allow', 'desktop': 'Allow'}
+LOG Giọng nói: Không mở được micro "CABLE Output (VB-Audio Virtual Cable)". Windows có thể đang chặn quyền micro: Cài đặt → Quyền riêng tư & bảo mật → Micro → bật "Truy cập micro" và "Cho phép ứng dụng máy tính truy cập micro". Hoặc micro đang bị app khác giữ riêng (tắt chế độ độc quyền trong Âm thanh → Ghi âm → Thuộc tính → Nâng cao).
+  thử lại sau 4.0 s: False
+LOG Giọng nói: mic "CABLE Output (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32) → "CABLE Input (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32). Thiết bị ghi âm: CABLE Output (VB-Audio Virtual Cable)
+LOG Giọng nói: micro báo OpenError / StoppedState (không có luồng) · quyền micro Windows: {'machine': 'Allow', 'user': 'Allow', 'desktop': 'Allow'}
+LOG Giọng nói: Không mở được micro "CABLE Output (VB-Audio Virtual Cable)". Windows có thể đang chặn quyền micro: Cài đặt → Quyền riêng tư & bảo mật → Micro → bật "Truy cập micro" và "Cho phép ứng dụng máy tính truy cập micro". Hoặc micro đang bị app khác giữ riêng (tắt chế độ độc quyền trong Âm thanh → Ghi âm → Thuộc tính → Nâng cao).
+  thử lại sau 8.0 s: False
+LOG Giọng nói: mic "CABLE Output (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32) → "CABLE Input (VB-Audio Virtual Cable)" (48000 Hz 2 kênh f32). Thiết bị ghi âm: CABLE Output (VB-Audio Virtual Cable)
+LOG Giọng nói: micro báo OpenError / StoppedState (không có luồng) · quyền micro Windows: {'machine': 'Allow', 'user': 'Allow', 'desktop': 'Allow'}
+LOG Giọng nói: Không mở được micro "CABLE Output (VB-Audio Virtual Cable)". Windows có thể đang chặn quyền micro: Cài đặt → Quyền riêng tư & bảo mật → Micro → bật "Truy cập micro" và "Cho phép ứng dụng máy tính truy cập micro". Hoặc micro đang bị app khác giữ riêng (tắt chế độ độc quyền trong Âm thanh → Ghi âm → Thuộc tính → Nâng cao).
+  thử lại sau 15.0 s: False
+KHONG TINH DIEM: cùng lần chạy mở được sau khi bật quyền: False (Windows chỉ áp dụng khi mở lại app)
+KET QUA AM THANH THAT: lần chạy này chỉ để đo quyền micro
