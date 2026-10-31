@@ -26,9 +26,9 @@ class Emergency(unittest.TestCase):
         p.jobs = [run, later]
         p.emergency(None)
         self.assertEqual(later['state'], 'cancelled')
-        self.assertIn(('r', 'stop'), p.submitted)
+        self.assertIn(('r', 'emergency_stop'), p.submitted)     # 4.3.9: ket thuc LIVE, chan thi tat han Studio
         hand = [j for j in p.jobs if j['profile'] == 'p2']
-        self.assertEqual(len(hand), 1); self.assertIn((hand[0]['id'], 'stop'), p.submitted)
+        self.assertEqual(len(hand), 1); self.assertIn((hand[0]['id'], 'emergency_stop'), p.submitted)
         self.assertTrue(any('TẮT KHẨN CẤP' in a for a in p.alerts))
         self.assertNotIn('play', [x[0] for x in p.played])          # NBL VIDEO untouched
 
@@ -38,7 +38,8 @@ class Emergency(unittest.TestCase):
         b = job(id='b', profile='p2', state='running', start=now - 60, end=now + 3600)
         p.jobs = [a, b]
         p.emergency('p2')
-        self.assertIn(('b', 'stop'), p.submitted); self.assertNotIn(('a', 'stop'), p.submitted)
+        self.assertIn(('b', 'emergency_stop'), p.submitted)
+        self.assertNotIn('a', [x[0] for x in p.submitted])
         self.assertEqual(a['state'], 'running')
 
     def test_result_is_sent_with_reminder_to_schedule_again(self):

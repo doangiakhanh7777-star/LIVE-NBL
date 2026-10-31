@@ -204,7 +204,7 @@ finally{if(!submitted&&inputText(input)===text)changeInput(input,'');}}
 // whose name starts with those words, otherwise the first; the box is cleared after.
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 let manualScrollAt=0,findBusy=false;
-document.addEventListener('wheel',e=>{if(!e.composedPath().includes(host))manualScrollAt=Date.now();},{capture:true,passive:true});
+document.addEventListener('wheel',e=>{if(e.isTrusted&&!e.composedPath().includes(host))manualScrollAt=Date.now();},{capture:true,passive:true});
 const nn=x=>NBL.norm(x).replace(/\s+/g,' ');
 function searchBox(){return [...document.querySelectorAll('input')].filter(visible).find(i=>!host.contains(i)&&/Tìm ID hoặc tên sản phẩm|Search.*(ID|product)/i.test(i.getAttribute('placeholder')||''))||null;}
 function numberSpec(el){const input=el.matches&&el.matches('input')?el:el.querySelector&&el.querySelector('input')||el;const s=selector(input,true);return /^[a-z]+\./.test(s)?s:'input';}
@@ -222,8 +222,36 @@ function numberRows(){const cells=numberCells();if(!cells.length)return [];
   let box=c.el;while(box&&box.parentElement&&!(pin.concat(unpin)).every(b=>box.contains(b)))box=box.parentElement;
   const text=(box&&(pin.length||unpin.length)?box.textContent:'').replace(/\s+/g,' ').trim();
   return {number:c.number,cell:c.el,pin:pin[0]||null,unpin:unpin[0]||null,pinned:unpin.length>0,text,top:c.top};});}
-function listBox(){const c=numberCells()[0];let el=c&&c.el.parentElement;while(el&&el!==document.body&&el!==document.documentElement){const st=getComputedStyle(el);if(/(auto|scroll)/.test(st.overflowY||'')&&el.scrollHeight>el.clientHeight+20)return el;el=el.parentElement;}return null;}
-async function scrollTo(box,top){box.scrollTop=Math.max(0,top);box.dispatchEvent(new Event('scroll',{bubbles:true}));await pause(350);}
+// 4.3.9: TikTok đổi giao diện thì khung cuộn của giỏ cũng đổi (có khi là cả trang, có khi
+// dùng overflow:overlay). Lấy mọi khung cuộn được bọc cột số rồi chọn khung NHỎ NHẤT còn ôm
+// trọn cột số — khung to hơn thường là cả trang, cuộn vào đó là cuộn nhầm.
+function scrollBoxes(){const cells=numberCells();if(!cells.length)return [];const seen=new Set(),out=[];
+ for(const c of cells.slice(0,8)){let el=c.el.parentElement;
+  while(el&&el!==document.body&&el!==document.documentElement){
+   if(!seen.has(el)){seen.add(el);const st=getComputedStyle(el);
+    if(/(auto|scroll|overlay)/.test((st.overflowY||'')+' '+(st.overflow||''))&&el.scrollHeight>el.clientHeight+20)out.push(el);}
+   el=el.parentElement;}}
+ const page=document.scrollingElement||document.documentElement;
+ if(page&&page.scrollHeight>page.clientHeight+20)out.push(page);
+ return out;}
+function listBox(){const all=scrollBoxes();if(!all.length)return null;const cells=numberCells();
+ let best=null,bestHas=-1;
+ for(const el of all){const has=cells.filter(c=>el.contains(c.el)).length;
+  if(has>bestHas||(has===bestHas&&best&&el.clientHeight<best.clientHeight)){best=el;bestHas=has;}}
+ return best||all[0];}
+function rowKey(){return numberCells().map(c=>c.number).join(',');}
+async function scrollTo(box,top){const want=Math.max(0,top),before=box.scrollTop,keyBefore=rowKey();
+ if(Math.abs(want-before)<1){await pause(120);return box.scrollTop;}
+ box.scrollTop=want;box.dispatchEvent(new Event('scroll',{bubbles:true}));await pause(130);
+ // danh sách chỉ vẽ phần nhìn thấy nhiều khi không nghe scrollTop: đẩy thêm bằng cú lăn
+ // chuột. Chỉ là cách chữa thêm — trang nào không có WheelEvent thì bỏ qua, tuyệt đối
+ // không được vì chuyện này mà văng lỗi giữa lúc đang ghim.
+ if(Math.abs(box.scrollTop-before)<1&&typeof WheelEvent==='function')
+  for(let i=0;i<3&&Math.abs(box.scrollTop-before)<1;i++){
+   try{box.dispatchEvent(new WheelEvent('wheel',{deltaY:want-before,deltaMode:0,bubbles:true,cancelable:true}));}catch(e){}
+   box.scrollTop=want;await pause(130);}
+ const t0=Date.now();while(Date.now()-t0<1200){if(rowKey()!==keyBefore)break;await pause(100);}
+ await pause(150);return box.scrollTop;}
 async function waitOwner(){const end=Date.now()+15000;while(Date.now()-manualScrollAt<3000&&Date.now()<end)await pause(400);}
 async function rowOf(number,{scroll=true}={}){
  let row=numberRows().find(r=>r.number===number);if(row||!scroll)return row||null;
@@ -232,7 +260,8 @@ async function rowOf(number,{scroll=true}={}){
   const first=rows[0],last=rows[rows.length-1],pitch=rows.length>1&&last.number!==first.number?Math.max(40,(last.top-first.top)/(last.number-first.number)):Math.max(80,box.clientHeight/4);
   const ref=number<first.number?first:last,before=box.scrollTop;await scrollTo(box,before+(number-ref.number)*pitch);if(Math.abs(box.scrollTop-before)<1)break;}
  row=numberRows().find(r=>r.number===number);if(row)return row;
- await scrollTo(box,0);for(let i=0;i<150;i++){row=numberRows().find(r=>r.number===number);if(row)return row;const before=box.scrollTop;await scrollTo(box,before+box.clientHeight*.8);if(Math.abs(box.scrollTop-before)<1)break;}
+ await scrollTo(box,0);for(let i=0,stuck=0;i<150;i++){row=numberRows().find(r=>r.number===number);if(row)return row;const before=box.scrollTop;await scrollTo(box,before+box.clientHeight*.8);
+  if(Math.abs(box.scrollTop-before)<1){if(++stuck>2)break;await pause(900);}else stuck=0;}
  row=numberRows().find(r=>r.number===number);if(!row)await scrollTo(box,0);return row||null;}
 async function typeSearch(text){const input=searchBox();if(!input)throw Error('Chưa thấy ô "Tìm ID hoặc tên sản phẩm" trên trang');
  const before=JSON.stringify(numberRows().map(r=>r.number));changeInput(input,text);input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,bubbles:true}));input.dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',code:'Enter',keyCode:13,bubbles:true}));
@@ -283,7 +312,8 @@ async function doUnpin(item){assertContext();
 
 // "Kiểm tra cột số" / "Tìm thử": read-only checks, never click Ghim.
 async function checkColumn(){const box=listBox();const seen=new Map();const add=()=>{for(const r of numberRows())seen.set(r.number,r);};add();
- if(box){await waitOwner();await scrollTo(box,0);add();for(let i=0;i<150;i++){const before=box.scrollTop;await scrollTo(box,before+box.clientHeight*.8);add();if(Math.abs(box.scrollTop-before)<1)break;}await scrollTo(box,0);}
+ if(box){await waitOwner();await scrollTo(box,0);add();for(let i=0,stuck=0;i<150;i++){const before=box.scrollTop;await scrollTo(box,before+box.clientHeight*.8);add();
+  if(Math.abs(box.scrollTop-before)<1){if(++stuck>2)break;await pause(900);add();}else stuck=0;}await scrollTo(box,0);}
  const nums=[...seen.keys()].sort((a,b)=>a-b);if(!nums.length)return 'Chưa đọc được ô số nào. Mở Bảng điều khiển LIVE có giỏ hàng, rồi khoanh lại "Một ô số thứ tự".';
  const missing=[];for(let n=nums[0];n<=nums[nums.length-1];n++)if(!seen.has(n))missing.push(n);const noButton=nums.filter(n=>{const r=seen.get(n);return !r.pin&&!r.unpin;});
  return 'Đọc được '+nums.length+' ô số · từ '+nums[0]+' tới '+nums[nums.length-1]+(missing.length?' · thiếu số: '+missing.slice(0,15).join(', '):' · không thiếu số nào')+(noButton.length?' · số chưa thấy nút Ghim: '+noButton.slice(0,15).join(', '):' · đủ nút Ghim');}

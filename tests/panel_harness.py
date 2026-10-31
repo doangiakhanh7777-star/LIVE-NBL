@@ -50,8 +50,8 @@ def make(jobs, profiles=None, sessions=None):
     p.profiles = profiles or [dict(id='p1', name='Khánh Car Auto', session='s1', vision=dict(enabled=True, regions=dict(clock=[1, 1, 50, 20])),
                                    exePath='x', windowTitle='TikTok LIVE Studio', accountAnchor='a', interaction={})]
     sessions = sessions or {'s1': dict(id='s1', device='', mute=False, playlist=[CLIP])}
-    p.alerts = []; p.alarms = []; p.played = []; p.submitted = []; p.enabled = []
-    p.owner = types.SimpleNamespace(log=lambda s: None, notifier=types.SimpleNamespace(publish=lambda k, t: p.alerts.append(t), alarm=lambda k, t: (p.alarms.append((k, t)), True)[1]),
+    p.alerts = []; p.alarms = []; p.played = []; p.submitted = []; p.enabled = []; p.logs = []
+    p.owner = types.SimpleNamespace(log=lambda s: p.logs.append(s), notifier=types.SimpleNamespace(publish=lambda k, t: p.alerts.append(t), alarm=lambda k, t: (p.alarms.append((k, t)), True)[1]),
                                     bridge=Bridge(), command=lambda action, save, session: p.played.append((action, session['id'])),
                                     path=types.SimpleNamespace(parent=Path('/nonexistent')),
                                     studio_chat=types.SimpleNamespace(engine=types.SimpleNamespace(enable=lambda prof, kind, cfg: p.enabled.append(kind), stop=lambda pid, kind: None)))

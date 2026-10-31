@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>Gio hang gia</title>
+<style>
+ body{margin:0;font:14px system-ui;height:3000px}           /* trang cung cuon duoc: bay khung cuon nham */
+ .banner{height:400px;background:#eee}
+ #wrap{height:520px;overflow:hidden;border:1px solid #ccc;width:700px}
+ #list{height:520px;overflow-y:overlay}                        /* khung cuon THAT cua gio */
+ .row{display:flex;align-items:center;gap:12px;height:88px;border-bottom:1px solid #eee;padding:0 10px}
+ .row input{width:46px;text-align:center}
+ .name{flex:1}
+</style>
+<div class="banner">quang cao</div>
+<input placeholder="Tìm ID hoặc tên sản phẩm" style="width:300px">
+<div id="wrap"><div id="list"></div></div>
+<script>
+// Giong TikTok Shop: danh sach TAI DAN — chi co 20 dong, cuon toi day moi tai them 20 dong nua,
+// toi da 120 dong. Tai them mat 600 ms (goi may chu).
+const LIST=document.getElementById('list');
+let loaded=0, loading=false;
+const TOTAL=120;
+function addRows(n){
+ for(let i=0;i<n&&loaded<TOTAL;i++){
+  loaded++;
+  const r=document.createElement('div');r.className='row';
+  r.innerHTML='<input data-tid="m4b_input_number" value="'+loaded+'">'
+   +'<span class="name">San pham so '+loaded+' - ao thun cotton</span>'
+   +'<button>Ghim</button>';
+  LIST.appendChild(r);
+ }
+}
+addRows(20);
+LIST.addEventListener('scroll',()=>{
+ if(loading||loaded>=TOTAL)return;
+ if(LIST.scrollTop+LIST.clientHeight>=LIST.scrollHeight-40){
+  loading=true;setTimeout(()=>{addRows(20);loading=false;},600);
+ }
+});
+</script>

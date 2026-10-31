@@ -328,6 +328,61 @@ class Studio:
         error.touched = True
         raise error
 
+    def browser_command(self, method, params=None):
+        """Lệnh ở mức trình duyệt (không thuộc trang nào): Browser.close đóng cả ứng dụng."""
+        from websockets.sync.client import connect
+        url = (self.get('/json/version') or {}).get('webSocketDebuggerUrl')
+        if not url:
+            raise RuntimeError('Studio không mở đường điều khiển trình duyệt.')
+        with connect(url, open_timeout=self.timeout) as ws:
+            ws.send(json.dumps({'id': 1, 'method': method, 'params': params or {}}))
+            try:
+                ws.recv(timeout=3)
+            except Exception:
+                pass   # Browser.close cắt luôn đường truyền: không có trả lời là đúng
+
+    def quit(self, exe='', wait=10):
+        """Đóng hẳn ứng dụng TikTok LIVE Studio KHÔNG bấm dấu X.
+
+        Browser.close là lệnh của DevTools, gửi thẳng vào ứng dụng, nên captcha hay
+        hộp thoại đang che màn hình không chặn được. Còn sống thì tắt tiến trình đang
+        giữ cổng điều khiển. Studio tắt = nguồn phát đứt, nên LIVE dừng theo (TikTok
+        đánh dấu phiên kết thúc chậm hơn khoảng nửa phút)."""
+        out = dict(closed=False, method='', pid=port_pid(self.port))
+        if not self.alive():
+            return dict(out, closed=True, already=True, method='da_tat')
+        try:
+            self.browser_command('Browser.close'); out['method'] = 'cdp'
+        except Exception as e:
+            out['error'] = str(e)[:150]
+        end = time.time() + wait
+        while time.time() < end:
+            time.sleep(.5)
+            if not self.alive() and not pid_alive(out['pid']):
+                out['closed'] = True; break
+        if not out['closed']:
+            k = kill_studio(exe, self.port)
+            out['closed'] = k['closed'] or (not self.alive() and not pid_alive(out['pid']))
+            out['method'] = k['method'] or out['method']
+        return out
+
+    def stop_or_quit(self, expected, exe=''):
+        """TẮT KHẨN CẤP: kết thúc LIVE như thường; vướng captcha hay hộp thoại lạ
+        thì đóng hẳn Studio, nên LIVE chắc chắn dừng."""
+        why = ''
+        try:
+            r = self.stop(expected)
+            if not r.get('live'):
+                return dict(r, quit=False)
+            why = 'Studio vẫn báo đang LIVE sau lệnh kết thúc'
+        except Exception as e:
+            why = str(e)
+        q = self.quit(exe)
+        if not q.get('closed'):
+            raise ValueError('Chưa kết thúc được LIVE và cũng chưa tắt được Studio. Lý do: ' + why[:200])
+        return dict(live=False, confirmed=True, method='quit', quit=True, quitMethod=q.get('method'),
+                    studioClosed=True, why=why[:200])
+
     def close_end_page(self):
         result = dict(seen=False, closed=False)
         try:
@@ -488,6 +543,64 @@ def health(perf):
     return dict(upload=up, fps=fps)
 
 
+# ---- 4.3.9: tắt hẳn Studio mà không bấm chuột ----
+def port_pid(port):
+    """PID của tiến trình đang giữ cổng điều khiển (Windows). 0 = không đọc được."""
+    if os.name != 'nt':
+        return 0
+    try:
+        out = subprocess.run(['netstat', '-ano', '-p', 'TCP'], capture_output=True, text=True, errors='replace',
+                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout
+    except Exception:
+        return 0
+    want = ':' + str(int(port))
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[0].upper() == 'TCP' and parts[1].endswith(want) and parts[3].upper() == 'LISTENING':
+            try:
+                return int(parts[4])
+            except ValueError:
+                return 0
+    return 0
+
+
+def pid_alive(pid):
+    if os.name != 'nt' or not pid:
+        return False
+    try:
+        out = subprocess.run(['tasklist', '/FI', 'PID eq ' + str(int(pid)), '/FO', 'CSV', '/NH'], capture_output=True,
+                             text=True, errors='replace', creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout
+    except Exception:
+        return False
+    return ('"' + str(int(pid)) + '"') in out
+
+
+def taskkill(*args):
+    if os.name != 'nt':
+        return False
+    try:
+        r = subprocess.run(['taskkill', '/F', '/T'] + list(args), capture_output=True, text=True, errors='replace',
+                           creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def kill_studio(exe='', port=0):
+    """Tắt Studio khi không còn nói chuyện được qua cổng: theo PID giữ cổng trước,
+    không có thì theo tên file Studio. Dùng cho cả nick chưa bật kết nối tự động."""
+    out = dict(closed=False, method='', pid=0)
+    pid = port_pid(port) if port else 0
+    out['pid'] = pid
+    if pid and taskkill('/PID', str(pid)):
+        out.update(closed=not pid_alive(pid), method='taskkill-pid')
+    if not out['closed'] and exe and Path(exe).name.lower().endswith('.exe'):
+        if taskkill('/IM', Path(exe).name):
+            time.sleep(1)
+            out.update(closed=not running_studio(exe), method='taskkill-ten')
+    return out
+
+
 # ---- starting Studio with the port ----
 def running_studio(exe):
     if os.name != 'nt':
@@ -550,15 +663,19 @@ def execute_cdp(profile, action, deadline=0, payload=None):
     port = int(profile.get('cdpPort') or BASE_PORT)
     expected = profile.get('accountName') or profile.get('name') or ''
     others = [int(p) for p in profile.get('_otherPorts') or []]
-    if action in ('status', 'stop', 'close_summary', 'probe', 'chat_check', 'send', 'chat_read', 'captcha', 'screenshot', 'selfcheck', 'dock_chat'):
+    if action in ('status', 'stop', 'close_summary', 'probe', 'chat_check', 'send', 'chat_read', 'captcha', 'screenshot', 'selfcheck', 'dock_chat', 'quit_studio', 'emergency_stop'):
         studio = connect(profile.get('exePath'), port, others, open_if_closed=False)
         if studio is None:
             if action == 'probe':
                 return dict(windowFound=False)
             if running_studio(profile.get('exePath')) and not any(Studio(p).alive() for p in others):
                 raise NotTouched('TikTok LIVE Studio đang mở nhưng không phải do NBL mở; NBL chưa đọc được nick này.')
-            if action in ('status', 'stop', 'close_summary'):
+            if action in ('status', 'stop', 'close_summary', 'emergency_stop'):
                 return dict(live=False, studioClosed=True, closed=True, method='cdp')
+            if action == 'quit_studio':
+                # cổng đã im: Studio của NBL đã tắt, nhưng có thể còn một Studio mở tay
+                k = kill_studio(profile.get('exePath'), port) if running_studio(profile.get('exePath')) else dict(closed=True, method='da_tat')
+                return dict(k, studioClosed=True, live=False, method='cdp')
             if action in ('screenshot', 'selfcheck'):
                 raise NotTouched('TikTok LIVE Studio chưa mở.')
             if action in ('chat_read', 'captcha', 'dock_chat'):
@@ -576,6 +693,10 @@ def execute_cdp(profile, action, deadline=0, payload=None):
         return studio.start(expected)
     if action == 'stop':
         return studio.stop(expected)
+    if action == 'quit_studio':
+        return dict(studio.quit(profile.get('exePath')), studioClosed=True, live=False, method='cdp')
+    if action == 'emergency_stop':
+        return studio.stop_or_quit(expected, profile.get('exePath'))
     if action == 'close_summary':
         r = studio.close_end_page()
         return dict(closed=not r['seen'] or r['closed'], seen=r['seen'], method='cdp')
@@ -598,7 +719,7 @@ def execute_cdp(profile, action, deadline=0, payload=None):
     raise NotTouched('Kết nối tự động chưa làm mục này: ' + action)
 
 
-CDP_ACTIONS = ('probe', 'status', 'start', 'stop', 'close_summary', 'chat_check', 'send', 'connect', 'chat_read', 'captcha', 'screenshot', 'selfcheck', 'dock_chat')
+CDP_ACTIONS = ('probe', 'status', 'start', 'stop', 'close_summary', 'chat_check', 'send', 'connect', 'chat_read', 'captcha', 'screenshot', 'selfcheck', 'dock_chat', 'quit_studio', 'emergency_stop')
 
 
 # ---- 4.3.0: Studio icons open Studio with NBL's port (owner agreed 28/10/2026) ----

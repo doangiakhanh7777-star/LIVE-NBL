@@ -48,7 +48,7 @@ STATE_LABELS={'start_retry':'Đang thử phát lại','stop_retry':'Đang thử 
 
 class StudioPanel(QWidget):
  def __init__(self,owner):
-  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.8 · Lịch phát LIVE');self.resize(450,740)
+  super().__init__();self.owner=owner;self.setWindowTitle('NBL LIVE 4.3.9 · Lịch phát LIVE');self.resize(450,740)
   self.connection_checks={};self.probe_futures={};self.last_connection_probe=0;self.current_session_id='';self.controls={};self.path=owner.path.parent/'studio_schedules.json';self.pool=StudioWorker();self.futures={};self.profiles=[];self.jobs=[];self.library=[];self.stopped=False
   from studio_store import load as load_studio
   saved,self.recovery_notice=load_studio(self.path)
@@ -409,7 +409,7 @@ class StudioPanel(QWidget):
   return s,client
  def submit(self,j,action,payload=None):
   p=self.profile(j['profile'])
-  if action=='stop':
+  if action in ('stop','emergency_stop'):
    self.cancel_pending_starts(j)
    if hasattr(self.owner,'studio_chat'):
     for kind in ('message','greeting'):self.owner.studio_chat.engine.stop(j['profile'],kind)
@@ -417,9 +417,9 @@ class StudioPanel(QWidget):
   if any(key[0]==j['id'] and key[2]==action for key in self.futures.values()):return
   try:self.save()
   except OSError:
-   if action!='stop':raise
+   if action not in ('stop','emergency_stop'):raise
    self.owner.log('Chưa lưu được lịch; vẫn gửi lệnh kết thúc Studio.')
-  future=self.pool.submit_priority(0 if action in ('stop','reset_stop') else 5 if action=='reset_live' else 10 if action=='start' else 25 if action=='close_summary' else 20,execute,dict(copy.deepcopy(self.effective_profile(p)),_otherHandles=[str(q.get('windowHandle','')) for q in self.profiles if q is not p and q.get('windowHandle')],_otherPorts=[q['cdpPort'] for q in self.profiles if q is not p and q.get('cdpPort')]),'status' if action in ('preflight','live_probe') else 'stop' if action=='reset_stop' else action,j['end'] if action=='start' else 0,payload);self.futures[future]=(j['id'],None,action)
+  future=self.pool.submit_priority(0 if action in ('stop','emergency_stop','reset_stop','quit_studio') else 5 if action=='reset_live' else 10 if action=='start' else 25 if action=='close_summary' else 20,execute,dict(copy.deepcopy(self.effective_profile(p)),_otherHandles=[str(q.get('windowHandle','')) for q in self.profiles if q is not p and q.get('windowHandle')],_otherPorts=[q['cdpPort'] for q in self.profiles if q is not p and q.get('cdpPort')]),'status' if action in ('preflight','live_probe') else 'stop' if action=='reset_stop' else action,j['end'] if action=='start' else 0,payload);self.futures[future]=(j['id'],None,action)
  def notify(self,j,key,text,kind='loi',image=None):
   p=self.profile(j['profile']);name=p['name'] if p else j['profile']
   self.owner.log(name+' · '+text)
@@ -442,6 +442,11 @@ class StudioPanel(QWidget):
      continue
     if jid=='autoconnect':
      self.auto_connected(future,widget);continue
+    if jid=='quitstudio':
+     try:r=future.result() or {}
+     except Exception as e:self.owner.log('Chưa tắt được TikTok LIVE Studio: '+str(e)[:200]);continue
+     self.owner.log('Đã tắt hẳn TikTok LIVE Studio.' if r.get('closed') else 'Chưa tắt được TikTok LIVE Studio; tắt tay giúp NBL.')
+     continue
     if jid=='chatdock':
      try:r=future.result() or {}
      except Exception:r={}
@@ -493,11 +498,14 @@ class StudioPanel(QWidget):
       cart=j.setdefault('cart',dict(state='none',attempts=0,next=0));was=(cart.get('probe') or {}).get('live')
       cart['probe']=dict(at=time.time(),live=bool(result.get('live')))
       if cart['probe']['live'] and not was:self.owner.log(str(self.profile(j['profile']).get('name',''))+' · Nick đang LIVE (bật tay): chưa đụng giỏ, chờ phiên này kết thúc.')
-     elif action=='stop':
+     elif action in ('stop','emergency_stop'):
       if result.get('live'):raise ValueError('Chưa xác nhận LIVE đã kết thúc')
-      if result.get('studioClosed'):self.owner.log('Không còn cửa sổ TikTok LIVE Studio nào: Studio đã tắt nên LIVE đã dừng.')
+      if result.get('quit'):self.owner.log('Không kết thúc LIVE bằng nút được ('+str(result.get('why') or '')[:120]+') nên NBL đã TẮT HẲN TikTok LIVE Studio: nguồn phát đứt, LIVE dừng theo.')
+      elif result.get('studioClosed'):self.owner.log('Không còn cửa sổ TikTok LIVE Studio nào: Studio đã tắt nên LIVE đã dừng.')
       if j.get('takeover'):self.postpone(j);continue
-      self.on_stopped(j)
+      self.on_stopped(j,studio_closed=bool(result.get('studioClosed')))
+     elif action=='quit_studio':
+      self.owner.log('Đã tắt hẳn TikTok LIVE Studio.' if result.get('closed') else 'Chưa tắt được TikTok LIVE Studio; tắt tay giúp NBL.')
      elif action=='start':
       if j['state']=='attention':continue
       if not result.get('live'):raise ValueError('Chưa xác nhận bắt đầu LIVE')
@@ -616,7 +624,9 @@ class StudioPanel(QWidget):
    self.status.setText(j['error']);return
   if action=='status' and j['state']=='attention':
    j['error']=j.get('error') or text;return     # silent: it is already reported
-  if action=='stop':
+  if action=='quit_studio':
+   self.owner.log('Chưa tắt được TikTok LIVE Studio: '+text);return
+  if action in ('stop','emergency_stop'):
    j['stop_attempts']=j.get('stop_attempts',0)+1
    if j['stop_attempts']<STOP_TRIES:
     j['state']='stop_retry';j['retry_at']=now+RETRY_GAP;j['error']='Kết thúc LIVE chưa được (lần '+str(j['stop_attempts'])+'): '+text
@@ -625,7 +635,7 @@ class StudioPanel(QWidget):
     j['state']='attention';j['error']='LIVE CÓ THỂ VẪN ĐANG CHẠY: kết thúc thất bại '+str(STOP_TRIES)+' lần: '+text
     self.notify(j,'stop','⚠ LIVE CÓ THỂ VẪN ĐANG CHẠY. Đã thử kết thúc '+str(STOP_TRIES)+' lần không được. Tắt tay ngay! Lý do: '+text)
    self.status.setText(j['error']);return
-  j['state']='attention' if action in ('start','stop','status') else 'failed';j['error']=text;self.status.setText(text)
+  j['state']='attention' if action in ('start','stop','emergency_stop','status') else 'failed';j['error']=text;self.status.setText(text)
   if hasattr(self.owner,'studio_chat'):
    for kind in ('message','greeting'):self.owner.studio_chat.engine.stop(j['profile'],kind)
   self.notify(j,'status',text)
@@ -667,9 +677,14 @@ class StudioPanel(QWidget):
    try:
     future=self.pool.submit_priority(25,execute,copy.deepcopy(self.effective_profile(p)),'collapse_chat',min(j['end'],time.time()+15));self.futures[future]=(j['id'],None,'collapse_chat')
    except Exception as e:self.owner.log('Thu cửa sổ trò chuyện: '+str(e))
- def on_stopped(self,j):
+ def on_stopped(self,j,studio_closed=False):
   dark=j.get('dark_stop')
   j['state']='finished';j['error']='Tự kết thúc vì màn hình đen' if dark else '';self.stop_owned_video(j,force=True);self.stop_chrome(j);self.close_chrome_summary(j);self.watch_summary(j)
+  # 4.3.9 (chủ máy, 31/10/2026): kết thúc LIVE xong thì đóng hẳn ứng dụng Studio luôn,
+  # không bấm dấu X (captcha che màn hình là bấm X không được).
+  if not studio_closed:
+   try:self.submit(j,'quit_studio')
+   except Exception as e:self.owner.log('Chưa gửi được lệnh tắt Studio: '+str(e)[:150])
   if j.get('emergency'):self.owner.log(str((self.profile(j['profile']) or {}).get('name',''))+' · Đã tắt LIVE (TẮT KHẨN CẤP).');return
   self.notify(j,'stopped','Đã kết thúc LIVE'+(' (vì màn hình đen quá 2 phút)' if dark else ' theo lịch'),'hoat_dong')
  def watch_dark(self,j,health):
@@ -979,6 +994,13 @@ class StudioPanel(QWidget):
   try:p=self.profile(j['profile']);session,client=self.client(p);self.owner.bridge.command(client,dict(action='stop',module='all'))
   except Exception:pass
  # ---------------- 4.2.0 tắt LIVE khẩn cấp ----------------
+ def quit_studio_now(self):
+  """4.3.9: tắt hẳn ứng dụng TikTok LIVE Studio bằng tay (không bấm dấu X)."""
+  p=self.current_profile()
+  if not p:raise ValueError('Chưa có nick nào kết nối LIVE Studio.')
+  if any(key[0]=='quitstudio' for key in self.futures.values()):return
+  future=self.pool.submit_priority(0,execute,copy.deepcopy(self.effective_profile(p)),'quit_studio',0,None)
+  self.futures[future]=('quitstudio',None,'quit_studio')
  def emergency(self,profile_id=None):
   """Owner, 28/10/2026: one nick (profile_id) or every nick (None). Cancels the
   schedules not started yet, ends every LIVE (also one started by hand), switches
@@ -999,8 +1021,8 @@ class StudioPanel(QWidget):
     self.jobs.append(j)
    j['state']='stopping';j['emergency']=True;j['end_stop_attempted']=True;j.pop('takeover',None);j['stop_attempts']=0
    self.stop_chrome(j)
-   try:self.submit(j,'stop')
-   except Exception as e:self.action_failed(j,'stop',e)
+   try:self.submit(j,'emergency_stop')
+   except Exception as e:self.action_failed(j,'emergency_stop',e)
    watch.append(j['id'])
   self.emergency_watch=dict(at=now,jobs=watch,cancelled=cancelled,all=profile_id is None)
   names=', '.join(str(p.get('name','')) for p in targets)

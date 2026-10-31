@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.8'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.9'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -71,6 +71,7 @@ class Console(QMainWindow):
         for text,callback in [('Xóa nick',self.remove_session),('Xuất cấu hình',self.export),('Nhập cấu hình',self.import_config),('Xuất gói chẩn đoán (không kèm mã bí mật)',self.export_diagnostics),('Mở gói chẩn đoán NBL tự gom',lambda:((DATA/'chan_doan').mkdir(parents=True,exist_ok=True),QDesktopServices.openUrl(QUrl.fromLocalFile(str(DATA/'chan_doan')))))]:menu.addAction(text,callback)
         manage.setMenu(menu);connect=QToolButton();connect.setText('Kết nối nick  ▾');connect.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup);connect_menu=QMenu(connect)
         connect_menu.addAction('Kết nối Chrome',lambda:self.navigation.setCurrentIndex(max(0,self.navigation.findText('Giỏ hàng & ghim · TikTok Shop'))))
+        connect_menu.addAction('Tắt hẳn TikTok LIVE Studio',self.quit_studio)
         connect_menu.addAction('Kết nối lại TikTok LIVE Studio',lambda:(setattr(self.studio_panel,'auto_at',0),setattr(self.studio_panel,'auto_launched',False),self.log('Đang tìm và kết nối lại Studio…')))
         connect.setMenu(connect_menu);actions=QHBoxLayout();actions.addWidget(connect,1);actions.addWidget(manage,1);body.addLayout(actions)
         from nav_button import NavButton
@@ -782,6 +783,13 @@ class Console(QMainWindow):
     def cancel_cycle(self):
         if self.cycle.cancel():self.obs.submit('stop')
         self.cycle_id=None;self.log('Đã hủy lịch OBS.')
+    def quit_studio(self):
+        """4.3.9 (chủ máy, 31/10/2026): đóng hẳn Studio bằng lệnh bên trong, không bấm
+        dấu X — captcha hay hộp thoại che màn hình cũng tắt được."""
+        try:self.studio_panel.quit_studio_now()
+        except Exception as e:
+            QMessageBox.warning(self,'Tắt TikTok LIVE Studio',str(e));return
+        self.log('Đang tắt TikTok LIVE Studio…')
     def emergency(self):
         if hasattr(self,'studio_chat'):self.studio_chat.engine.stop_all()
         # 4.2.0 (owner, 28/10/2026): TẮT HẾT = end every LIVE (also by hand), cancel the
