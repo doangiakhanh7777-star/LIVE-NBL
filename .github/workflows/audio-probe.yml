@@ -1,0 +1,51 @@
+name: Do am thanh that (VB-CABLE)
+# 4.3.14: tim nguyen nhan "khong mo duoc micro" tren Windows that. Ket qua -> nhanh ci-out-audio.
+on:
+  workflow_dispatch:
+  push:
+    branches: [nbl-4.3]
+    paths: ['tests/audio_probe4314.py', 'tests/audio_e2e4314.py', 'ptt.py', 'ptt_core.py', '.github/workflows/audio-probe.yml']
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cai VB-CABLE + do
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONIOENCODING: utf-8
+        run: |
+          $ErrorActionPreference = 'Continue'
+          New-Item -ItemType Directory -Force out | Out-Null
+          Set-Service Audiosrv -StartupType Automatic; Start-Service Audiosrv
+          Invoke-WebRequest https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip -OutFile vbc.zip -TimeoutSec 120
+          Expand-Archive vbc.zip vbc -Force
+          Get-ChildItem vbc -Filter *.cat | ForEach-Object { $c = (Get-AuthenticodeSignature $_.FullName).SignerCertificate; if ($c) { $f = "$env:TEMP\vb.cer"; Export-Certificate -Cert $c -FilePath $f | Out-Null; Import-Certificate -FilePath $f -CertStoreLocation Cert:\LocalMachine\TrustedPublisher | Out-Null } }
+          $p = Start-Process vbc\VBCABLE_Setup_x64.exe -ArgumentList '-i','-h' -PassThru
+          if (-not $p.WaitForExit(180000)) { $p.Kill() }
+          Start-Sleep 10; Restart-Service Audiosrv -Force; Start-Sleep 5
+          function run($name, $script) {
+            $q = Start-Process -FilePath .\runtime\python.exe -ArgumentList '-X','utf8',$script -NoNewWindow -PassThru -RedirectStandardOutput "out\$name.txt" -RedirectStandardError "out\$name.err.txt"
+            if (-not $q.WaitForExit(150000)) { $q.Kill(); "TREO" | Add-Content "out\$name.txt" }
+            Get-Content "out\$name.txt"
+          }
+          run 'probe_1_mac_dinh' 'tests\audio_probe4314.py'
+          run 'e2e_1_mac_dinh' 'tests\audio_e2e4314.py'
+          foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone','HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone','HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone\NonPackaged') {
+            New-Item -Path $k -Force | Out-Null; Set-ItemProperty -Path $k -Name Value -Value 'Allow'
+          }
+          run 'probe_2_cho_phep_micro' 'tests\audio_probe4314.py'
+          run 'e2e_2_cho_phep_micro' 'tests\audio_e2e4314.py'
+      - name: Day ket qua vao nhanh ci-out-audio
+        if: always()
+        shell: bash
+        run: |
+          cd out
+          git init -q -b ci-out-audio
+          git config user.name nbl-ci; git config user.email nbl-ci@users.noreply.github.com
+          git add -A; git commit -q -m "do am thanh $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:refs/heads/ci-out-audio
