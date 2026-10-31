@@ -419,10 +419,28 @@ class Console(QMainWindow):
             except Exception as e:ok=False;self.log('Giọng nói: chưa bật được quyền micro: '+str(e)[:150])
             if not ok:
                 QDesktopServices.openUrl(QUrl('ms-settings:privacy-microphone'));return
-            self.log('Giọng nói: đã bật quyền micro Windows cho ứng dụng máy tính; mở lại mic…')
-            QTimer.singleShot(800,self.voice_apply)
+            # đo trên Windows thật: quyền mới chỉ áp dụng cho tiến trình mở SAU khi bật -> phải mở lại NBL
+            self.log('Giọng nói: đã bật quyền micro Windows cho ứng dụng máy tính. Windows chỉ áp dụng khi mở lại NBL.')
+            live=hasattr(self,'studio_panel') and self.studio_panel.active()
+            if live:
+                QMessageBox.information(self,'Đã bật quyền micro','Đã bật quyền micro. Windows chỉ áp dụng khi mở lại NBL — đang LIVE nên NBL KHÔNG tự mở lại; hết LIVE thì tắt NBL rồi mở lại là dùng được giữ phím cách.')
+            elif QMessageBox.question(self,'Đã bật quyền micro','Đã bật quyền micro. Windows chỉ áp dụng khi mở lại NBL.\n\nMở lại NBL ngay bây giờ?')==QMessageBox.StandardButton.Yes:
+                self.restart_app()
         finally:
             self._mic_asking=False
+    def restart_app(self):
+        """Mở lại NBL (chỉ khi không LIVE). NBL chỉ cho chạy 1 bản (khóa chống trùng) nên tiến trình phụ đợi bản này
+        tắt hẳn rồi mới mở NBL_LIVE.exe (chạy từ mã nguồn: bootstrap.py)."""
+        exe=BASE/'NBL_LIVE.exe';target=[str(exe)] if exe.is_file() else [sys.executable,str(BASE/'bootstrap.py')]
+        code=('import sys,time,subprocess\nsys.path.insert(0,sys.argv[1])\nfrom video_commands import pid_alive\n'
+              'pid=int(sys.argv[2]);end=time.time()+90\nwhile pid_alive(pid) and time.time()<end:time.sleep(0.5)\n'
+              'time.sleep(1);subprocess.Popen(sys.argv[3:],cwd=sys.argv[1])')
+        try:
+            flags=0x00000008|0x00000200 if sys.platform=='win32' else 0      # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+            subprocess.Popen([sys.executable,'-c',code,str(BASE),str(os.getpid())]+target,cwd=str(BASE),creationflags=flags,close_fds=True)
+        except Exception as e:
+            self.log('Chưa tự mở lại được NBL: '+str(e)[:150]);QMessageBox.information(self,'Mở lại NBL','Tắt NBL rồi mở lại bằng biểu tượng NBL LIVE.');return
+        self.log('Đang mở lại NBL…');QTimer.singleShot(300,self.close)
     def ptt_changed(self,on):
         ai=getattr(self,'ai',None)
         if ai is not None:ai.set_hold(on)

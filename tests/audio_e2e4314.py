@@ -68,7 +68,8 @@ def feed():
 
 feeder = QTimer(); feeder.timeout.connect(feed); feeder.start(15)
 owner = Owner()
-p = ptt.PushToTalk(owner, Path(os.environ.get('TEMP', '/tmp')), key_reader=lambda: False)
+key = {'down': False}
+p = ptt.PushToTalk(owner, Path(os.environ.get('TEMP', '/tmp')), key_reader=lambda: key['down'])
 cfg = dict(enabled=True, mic=bytes(cout.id()).hex(), out='', anywhere=True, duck=True)
 ok = p.arm(cfg)
 results = []
@@ -81,7 +82,9 @@ if not ok and p.blocked:
         ok = p.arm(cfg); print('  thử lại sau %.1f s: %s' % (time.time() - t0, ok), flush=True)
         if ok:
             break
-    results.append(('nhận ra Windows chặn micro và bật quyền xong mở được (cùng lần chạy)', ok, p.error))
+    print('KHONG TINH DIEM: cùng lần chạy mở được sau khi bật quyền:', ok, '(Windows chỉ áp dụng khi mở lại app)', flush=True)
+    if not ok:
+        print('KET QUA AM THANH THAT: lần chạy này chỉ để đo quyền micro', flush=True); os._exit(0)
 results.append(('arm() mở được micro + cáp thật bằng định dạng gốc', ok and not p.error, p.error))
 spin(3)
 results.append(('micro gửi tiếng (byte nhận > 0)', p.got > 0, p.got))
@@ -89,10 +92,11 @@ results.append(('nhận ra tiếng thử 440 Hz (mức > 0,05)', p.level > 0.05,
 results.append(('không báo lỗi quyền micro sau 2,5 giây', not p.error, p.error))
 before = p.sink.processedUSecs() if p.sink else 0
 free0 = p.sink.bytesFree() if p.sink else -1
-p.talking = True; spin(1.5); p.talking = False
+key['down'] = True; spin(1.8); talked = p.talking; key['down'] = False; spin(0.4)
 after = p.sink.processedUSecs() if p.sink else 0
 print('  cáp: bytesFree lúc đầu', free0, '| bufferSize', p.sink.bufferSize() if p.sink else -1, '| state', ptt.err_name(p.sink.state()) if p.sink else '-', '| error', ptt.err_name(p.sink.error()) if p.sink else '-', flush=True)
-results.append(('giữ phím: tiếng ghi vào cáp (byte đã ghi > 0)', p.written > 0, (p.written, before, after)))
+results.append(('giữ phím: đang nói + tiếng ghi vào cáp (byte đã ghi > 0)', talked and p.written > 0, (talked, p.written, before, after)))
+results.append(('thả phím: ngắt mic', not p.talking and owner.changes[-2:] == [True, False], owner.changes))
 p.disarm(quiet=True)
 for name, good, info in results:
     print(('OK   ' if good else 'FAIL ') + name + '  [' + str(info) + ']', flush=True)
