@@ -1,0 +1,10 @@
+ma thoat bo cai: 0
+co nbl_camera.dll: True
+dang ky camera: C:\Program Files\NBL_LIVE\camera\nbl_camera.dll
+C:\Program Files\NBL_LIVE\ocr_vendor\onnxruntime\capi\onnxruntime_validation.py:26: UserWarning: Unsupported Windows version (2025server). ONNX Runtime supports Windows 10 and above, only.
+  warnings.warn(
+DA KIEM TRA: ma Python, thu vien video, ket noi Chrome, mo hinh OCR.
+Đang dùng: PP-OCRv6 tiếng Việt (OcrDoc Run 6)
+SETUP 4.1: DA KIEM TRA TOAN VEN 1450 TEP.
+vcam.registered() True
+tao camera True 
