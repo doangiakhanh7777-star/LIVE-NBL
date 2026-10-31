@@ -4,10 +4,10 @@ OutFile "app\NBL_LIVE.exe"
 Icon "nbl.ico"
 RequestExecutionLevel admin
 SilentInstall silent
-VIProductVersion "4.3.15.0"
+VIProductVersion "4.3.16.0"
 VIAddVersionKey /LANG=0 "ProductName" "NBL LIVE"
 VIAddVersionKey /LANG=0 "FileDescription" "NBL LIVE"
-VIAddVersionKey /LANG=0 "FileVersion" "4.3.15"
+VIAddVersionKey /LANG=0 "FileVersion" "4.3.16"
 VIAddVersionKey /LANG=0 "ProductVersion" "4.3.4"
 VIAddVersionKey /LANG=0 "CompanyName" "NBL"
 VIAddVersionKey /LANG=0 "LegalCopyright" "NBL"

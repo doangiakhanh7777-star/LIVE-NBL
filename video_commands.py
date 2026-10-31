@@ -10,7 +10,7 @@ LAST = {}          # 4.3.14: lần gửi gần nhất: {'folder': …, 'redirect
 
 
 def dispatch_video_command(folder, action, config, process, launch):
-    if action not in ('play', 'pause', 'next', 'stop', 'close', 'settings'):
+    if action not in ('play', 'pause', 'next', 'stop', 'close', 'settings', 'window'):
         raise ValueError('Lệnh video không hợp lệ.')
     alive = process is not None and process.poll() is None
     folder = Path(folder)

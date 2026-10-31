@@ -6,7 +6,7 @@ Unicode true
 
 !define APP "NBL LIVE"
 !ifndef VER
-!define VER "4.3.15"
+!define VER "4.3.16"
 !endif
 !define UKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NBL_LIVE"
 
@@ -21,7 +21,7 @@ BrandingText "${APP} ${VER}"
 ShowInstDetails show
 ShowUninstDetails show
 
-VIProductVersion "4.3.15.0"
+VIProductVersion "4.3.16.0"
 VIAddVersionKey /LANG=0 "ProductName" "${APP}"
 VIAddVersionKey /LANG=0 "FileDescription" "Cài đặt ${APP} ${VER}"
 VIAddVersionKey /LANG=0 "FileVersion" "${VER}"
@@ -108,7 +108,19 @@ Section "NBL LIVE" SecMain
   RMDir /r "$INSTDIR\__pycache__"
   RMDir /r "$INSTDIR\_update"
   DetailPrint "Đang chép NBL LIVE (khoảng 400 MB)…"
-  File /r "app\*.*"
+  File /r /x nbl_camera.dll "app\*.*"
+  ; 4.3.16: camera ảo NBL Camera. Studio đang dùng camera thì file bị khóa -> giữ file cũ (cùng bản), không hỏng lượt cài
+  SetOutPath "$INSTDIR\camera"
+  SetOverwrite try
+  File "app\camera\nbl_camera.dll"
+  SetOverwrite on
+  SetOutPath "$INSTDIR"
+  DetailPrint "Đang cài camera ảo NBL Camera…"
+  ${DisableX64FSRedirection}
+  nsExec::ExecToLog '"$WINDIR\System32\regsvr32.exe" /s "$INSTDIR\camera\nbl_camera.dll"'
+  Pop $3
+  ${EnableX64FSRedirection}
+  DetailPrint "Camera ảo: mã $3"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
   SetShellVarContext all
@@ -150,6 +162,9 @@ SectionEnd
 
 Section "Uninstall"
   SetShellVarContext all
+  ${DisableX64FSRedirection}
+  nsExec::Exec '"$WINDIR\System32\regsvr32.exe" /s /u "$INSTDIR\camera\nbl_camera.dll"'
+  ${EnableX64FSRedirection}
   Delete "$DESKTOP\NBL LIVE.lnk"
   RMDir /r "$SMPROGRAMS\NBL LIVE"
 !include "uninstall_list.nsh"

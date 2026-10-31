@@ -117,6 +117,24 @@ class Chrome:
         except Exception:
             pass
 
+    def set_window_state(self, state):
+        """4.3.16: thu nhỏ ('minimized') / hiện lại ('normal') các cửa sổ Chrome LIVE của NBL qua DevTools (không chuột).
+        Chỉ Chrome riêng của NBL (cổng của nó) — không bao giờ đụng Chrome của chủ máy."""
+        browser = {'webSocketDebuggerUrl': self.get('/json/version')['webSocketDebuggerUrl']}
+        seen = set(); n = 0
+        for p in self.pages():
+            if p.get('type') != 'page':
+                continue
+            try:
+                wid = self.call(browser, 'Browser.getWindowForTarget', {'targetId': p['id']}).get('windowId')
+            except Exception:
+                continue
+            if wid is None or wid in seen:
+                continue
+            seen.add(wid)
+            self.call(browser, 'Browser.setWindowBounds', {'windowId': wid, 'bounds': {'windowState': state}}); n += 1
+        return n
+
     def page_state(self, target):
         r = self.call(target, 'Runtime.evaluate', {'expression': HEARTBEAT_JS, 'returnByValue': True})
         return (r.get('result') or {}).get('value') or {}

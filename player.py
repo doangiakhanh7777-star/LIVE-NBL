@@ -100,6 +100,7 @@ class VideoCanvas(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
         self.setAutoFillBackground(False)
         self.frame = QImage()
+        self.frame_hook = None          # 4.3.16: NBL Camera nhận từng khung
         self.sink = QVideoSink(self)
         self.sink.videoFrameChanged.connect(self.on_frame)
 
@@ -110,6 +111,14 @@ class VideoCanvas(QWidget):
         if image.isNull():
             return
         self.frame = image
+        if self.frame_hook is not None:
+            try:
+                self.frame_hook(image)
+            except Exception:
+                pass
+        win = self.window()
+        if not win.isVisible() or win.isMinimized():
+            return                     # 4.3.16: cửa sổ đang ẩn / thu nhỏ: không vẽ (đỡ CPU), camera vẫn nhận hình
         self.update()
         if _hidden(self):            # 4.3.15: bị kéo khuất -> Qt không vẽ, tự vẽ bằng GDI để Studio vẫn chụp được
             paint_hidden(self, image)
@@ -133,6 +142,8 @@ class Output(QMainWindow):
         self.stopped_since = None; self.recovery_count = 0; self.playing_since = None
         self.setWindowIcon(QIcon(str(Path(__file__).parent/'assets/logo_38.ico')));self.setWindowTitle('NBL VIDEO'); self.resize(405, 720)
         self.video = VideoCanvas(); self.setCentralWidget(self.video)
+        self.cam = None; self.cam_want = True; self.cam_tried = 0.0
+        self.video.frame_hook = self.cam_send
         self.audio = QAudioOutput(self); self.audio.setMuted(True)
         self.player = QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.player.setVideoOutput(self.video.sink)
         self.player.mediaStatusChanged.connect(self.media_status)
@@ -170,7 +181,7 @@ class Output(QMainWindow):
         self.status()
     def status(self, error=''):
         if error: self.last_error = error
-        write_json(self.folder/'status.json', dict(time=time.time(), state=self.player.playbackState().name, position=self.player.position(), duration=self.player.duration(), path=self.player.source().toLocalFile(), error=self.last_error, title=self.windowTitle(), muted=self.audio.isMuted(), device=self.audio.device().description()))
+        write_json(self.folder/'status.json', dict(time=time.time(), state=self.player.playbackState().name, position=self.player.position(), duration=self.player.duration(), path=self.player.source().toLocalFile(), error=self.last_error, title=self.windowTitle(), muted=self.audio.isMuted(), device=self.audio.device().description(), camera=self.cam_state(), shown=self.isVisible() and not self.isMinimized()))
     def refresh_audio(self):
         if not self.config: return
         devices = QMediaDevices.audioOutputs()
@@ -184,6 +195,33 @@ class Output(QMainWindow):
         if self.audio.device() != selected: self.audio.setDevice(selected)
         self.audio.setVolume(self.config['volume']/100)
         self.audio.setMuted(self.config['mute'])
+    # ---------- 4.3.16: camera ảo NBL Camera ----------
+    def cam_send(self, image):
+        if not self.cam_want:
+            return
+        if self.cam is None:
+            if time.monotonic() - self.cam_tried < 10:
+                return
+            self.cam_tried = time.monotonic()
+            try:
+                import vcam
+                cam = vcam.VirtualCam()
+            except Exception as e:
+                self.cam_error = str(e)[:120]; return
+            if not cam.ok:
+                self.cam_error = cam.error; cam.close(); return
+            self.cam = cam; self.cam_error = ''
+        self.cam.send_image(image)
+    def cam_state(self):
+        if not self.cam_want:
+            return dict(state='off')
+        if self.cam is None:
+            return dict(state='error' if getattr(self, 'cam_error', '') else 'waiting', error=getattr(self, 'cam_error', ''))
+        return dict(state='connected' if self.cam.connected() else 'ready', sent=self.cam.sent)
+    def set_camera(self, on):
+        self.cam_want = bool(on)
+        if not on and self.cam is not None:
+            self.cam.close(); self.cam = None
     def apply(self, config):
         old_playlist = self.config.get('playlist', [])
         current_path = self.player.source().toLocalFile()
@@ -195,6 +233,7 @@ class Output(QMainWindow):
             self.index = self.order.index(matching) if matching is not None else -1
             # Keep the current clip running; edited playlist is used at the next boundary.
         self.setWindowTitle(f"NBL VIDEO {config['number']:02d}" + (f" — {config['account']}" if config['account'] else ''))
+        self.set_camera(config.get('camera', True))
         self.refresh_audio()
         return True
     def cancel_transition(self):
@@ -215,7 +254,14 @@ class Output(QMainWindow):
             if command['token'] == self.token: return
             self.token = command['token']; self.last_error = ''
             action = command['action']
-            if action not in ('play','next','pause','stop','close','settings'):raise ValueError('Lệnh không hợp lệ')
+            if action not in ('play','next','pause','stop','close','settings','window'):raise ValueError('Lệnh không hợp lệ')
+            if action == 'window':
+                # 4.3.16: "Ẩn hết khi LIVE": ẩn / hiện cửa sổ (đang phát qua NBL Camera thì Studio vẫn có hình)
+                if command.get('config', {}).get('show'):
+                    self.showNormal(); self.raise_(); self.activateWindow()
+                else:
+                    self.hide()
+                self.status(); return
             if action == 'stop':
                 self.wanted='stopped';self.cancel_transition();self.player.stop();self.status();return
             if action == 'close':self.close();return
@@ -273,6 +319,8 @@ class Output(QMainWindow):
         self.next()
     def closeEvent(self, event):
         self.wanted = 'stopped'; self.cancel_transition(); self.player.stop(); self.status('Cửa sổ đã đóng.')
+        if self.cam is not None:
+            self.cam.close(); self.cam = None
         try: write_json(self.folder/'player.json', dict(pid=os.getpid(), closed=True))
         except OSError: pass
         super().closeEvent(event)

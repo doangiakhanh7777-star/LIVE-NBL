@@ -31,7 +31,7 @@ def button(text, callback, kind=''):
 
 class Console(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.15'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
+        super().__init__(); self.setWindowTitle('TOOL NBL LIVE • 4.3.16'); screen=QApplication.primaryScreen();self.resize(430,max(420,min(790,screen.availableGeometry().height()-60)) if screen else 790); self.setMinimumSize(400,120);self.setMaximumWidth(480);self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint,False)
         self.setWindowIcon(QIcon(str(BASE/'assets/logo_38.ico')))
         self.path = DATA/'profiles.json'
         self.startup_notices=[]
@@ -74,6 +74,7 @@ class Console(QMainWindow):
         connect_menu.addAction('Tắt hẳn TikTok LIVE Studio',self.quit_studio)
         connect_menu.addAction('Kết nối lại TikTok LIVE Studio',lambda:(setattr(self.studio_panel,'auto_at',0),setattr(self.studio_panel,'auto_launched',False),self.log('Đang tìm và kết nối lại Studio…')))
         connect.setMenu(connect_menu);actions=QHBoxLayout();actions.addWidget(connect,1);actions.addWidget(manage,1);body.addLayout(actions)
+        self.hide_btn=button('🙈 Ẩn hết khi LIVE (NBL, Studio, Chrome, video)',self.hide_all);self.hide_btn.setToolTip('Ẩn NBL xuống khay (góc phải dưới), thu nhỏ Studio + Chrome LIVE, ẩn cửa sổ video. Ghim, AI, lịch vẫn chạy; không dùng chuột/bàn phím.');body.addWidget(self.hide_btn)
         from nav_button import NavButton
         self.navigation=NavButton();self.navigation.setMinimumHeight(42);body.addWidget(self.navigation)
         self.tabs=QTabWidget();self.tabs.tabBar().hide();self.navigation.currentIndexChanged.connect(self.tabs.setCurrentIndex);body.addWidget(self.tabs,1)
@@ -142,6 +143,7 @@ class Console(QMainWindow):
         for i,(text, action) in enumerate([('Thêm video',self.add_video),('Xóa video',self.remove_video),('↑',lambda:self.move_video(-1)),('↓',lambda:self.move_video(1))]): row.addWidget(button(text,action),i//2,i%2)
         v.addLayout(row)
         self.build_store(v)
+        self.build_camera(v)
         options = QHBoxLayout(); self.loop = QCheckBox('Lặp playlist vô hạn'); self.shuffle = QCheckBox('Xáo video mỗi vòng'); self.mute = QCheckBox('Tắt tiếng phiên này')
         options = QVBoxLayout()
         for w in (self.loop,self.shuffle,self.mute): options.addWidget(w)
@@ -465,6 +467,7 @@ class Console(QMainWindow):
             self.ptt_ducked=None
         self.log('Giọng nói: '+('đang nói vào LIVE…' if on else 'đã ngắt mic.'))
     def voice_refresh(self):
+        if hasattr(self,'voice_state') and not self.voice_state.isVisible():return     # 4.3.16: trang không mở thì thôi
         rt=getattr(self,'remote_talk',None)
         if hasattr(self,'voice_phone'):
             t=rt.status() if rt else ''
@@ -886,6 +889,88 @@ class Console(QMainWindow):
         except Exception:pass
     def add_video(self):
         paths,_=QFileDialog.getOpenFileNames(self,'Thêm video','','Video (*.mp4 *.mkv *.mov *.avi *.webm);;Tất cả (*)');existing=set(self.playlist_paths());self.add_playlist_items([p for p in paths if p not in existing])
+    # ---------- 4.3.16: camera ảo NBL Camera + Ẩn hết khi LIVE ----------
+    def build_camera(self,v):
+        g=QGroupBox('📷 Camera ảo NBL Camera — để ẩn / thu nhỏ cửa sổ video mà LIVE vẫn có hình');gv=QVBoxLayout(g)
+        self.cam_on=QCheckBox('Phát hình NBL VIDEO qua NBL Camera');self.cam_on.setChecked(bool(self.data.get('settings',{}).get('camera',True)));gv.addWidget(self.cam_on)
+        self.cam_state=QLabel('');self.cam_state.setWordWrap(True);self.cam_state.setObjectName('accountStatus');gv.addWidget(self.cam_state)
+        row=QHBoxLayout();self.cam_install_btn=button('Cài camera ảo',self.install_camera);row.addWidget(self.cam_install_btn);row.addStretch();gv.addLayout(row)
+        how=QLabel('Làm một lần trong TikTok LIVE Studio: Thêm nguồn → Camera → chọn "NBL Camera" → chỉnh khung cho vừa → xóa nguồn "Chọn chương trình" (pythonw.exe NBL VIDEO) cũ. Từ đó cửa sổ video ẩn, thu nhỏ, kéo khuất đều không mất hình. Tiếng vẫn qua cáp ảo như cũ.')
+        how.setWordWrap(True);how.setObjectName('subtitle');gv.addWidget(how);v.addWidget(g)
+        self.cam_on.toggled.connect(self.camera_toggle);self.refresh_camera()
+        from PySide6.QtWidgets import QSystemTrayIcon
+        self.hidden_state=None;self.tray=None
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self.tray=QSystemTrayIcon(QIcon(str(BASE/'assets/logo_38.ico')),self);self.tray.setToolTip('NBL LIVE')
+            m=QMenu();m.addAction('Mở NBL',self.show_nbl);m.addAction('🙈 Ẩn hết khi LIVE',self.hide_all);m.addAction('Hiện lại tất cả',self.show_all)
+            m.addSeparator();m.addAction('Thoát NBL',lambda:(self.show_all(),self.close()))
+            self.tray_menu=m;self.tray.setContextMenu(m)
+            self.tray.activated.connect(lambda reason:self.show_nbl() if reason in (QSystemTrayIcon.ActivationReason.Trigger,QSystemTrayIcon.ActivationReason.DoubleClick) else None)
+            self.tray.show()
+    def camera_toggle(self,on):
+        self.data.setdefault('settings',{})['camera']=bool(on)
+        try:write_json(self.path,self.data)
+        except Exception:pass
+        if self.data.get('sessions'):
+            try:self.command('settings',False)
+            except Exception:pass
+        self.log('Camera ảo NBL Camera: '+('BẬT' if on else 'TẮT')+'.')
+    def refresh_camera(self):
+        if not hasattr(self,'cam_state'):return
+        import vcam
+        reg=vcam.registered();self.cam_install_btn.setVisible(not reg and sys.platform=='win32')
+        st=getattr(self,'video_st',None) or {};cam=st.get('camera') or {};state=cam.get('state')
+        if not self.cam_on.isChecked():text='Đang tắt: Studio phải chụp cửa sổ video (không ẩn / thu nhỏ được).'
+        elif not reg:text='⚠ Máy chưa cài camera ảo. Bấm "Cài camera ảo" (Windows hỏi quyền quản trị, bấm Có) hoặc cài lại NBL.'
+        elif not st:text='Mở NBL VIDEO (MỞ & PHÁT) để camera có hình.'
+        elif state=='connected':text='🟢 Studio đang dùng NBL Camera — ẩn / thu nhỏ cửa sổ video thoải mái.'
+        elif state=='ready':text='🟡 NBL Camera có hình nhưng Studio chưa dùng. Trong Studio: Thêm nguồn → Camera → NBL Camera.'
+        elif state=='error':text='⚠ '+str(cam.get('error') or 'NBL Camera lỗi.')
+        else:text='Đang mở NBL Camera…'
+        if self.cam_state.text()!=text:self.cam_state.setText(text)
+    def install_camera(self):
+        import vcam,ctypes
+        if not vcam.DLL.is_file():QMessageBox.warning(self,'Camera ảo','Không thấy '+str(vcam.DLL)+'. Cài lại NBL.');return
+        r=ctypes.windll.shell32.ShellExecuteW(None,'runas',str(Path(os.environ.get('WINDIR','C:\\Windows'))/'System32'/'regsvr32.exe'),'/s "'+str(vcam.DLL)+'"',None,0)
+        self.log('Camera ảo: đã gửi lệnh cài (Windows hỏi quyền quản trị).' if r>32 else 'Camera ảo: chưa cài được (mã '+str(r)+').')
+        QTimer.singleShot(3000,self.refresh_camera)
+    def chrome_window(self,state):
+        try:self.live_chrome.chrome.set_window_state(state)
+        except Exception:pass
+    def show_nbl(self):
+        self.showNormal();self.raise_();self.activateWindow()
+    def hide_all(self):
+        """Ẩn NBL xuống khay, thu nhỏ Studio + Chrome LIVE, ẩn cửa sổ video (chỉ khi Studio đã dùng NBL Camera)."""
+        import studio_scheduler,threading
+        st=getattr(self,'video_st',None) or {};cam=(st.get('camera') or {}).get('state');hide_video=bool(st)
+        if st and cam!='connected':
+            ans=QMessageBox.question(self,'Ẩn hết khi LIVE','Studio chưa dùng NBL Camera (đang chụp cửa sổ video), nên ẩn cửa sổ video sẽ MẤT HÌNH trên LIVE.\n\nVẫn ẩn NBL + Studio + Chrome và GIỮ cửa sổ video trên màn hình?\n\n(Muốn ẩn luôn video: trang Video & âm thanh → Camera ảo, làm theo hướng dẫn một lần.)')
+            if ans!=QMessageBox.StandardButton.Yes:return
+            hide_video=False
+        studio_scheduler.NO_MOUSE=True
+        self.hidden_state=dict(studio=[],video=hide_video)
+        try:
+            import winhide;self.hidden_state['studio']=winhide.minimize([h for h,_,mini in winhide.windows() if not mini])
+        except Exception as e:self.log('Ẩn Studio: '+str(e)[:120])
+        threading.Thread(target=self.chrome_window,args=('minimized',),daemon=True).start()
+        if hide_video and self.data.get('sessions'):
+            try:self.command('window',False,{**self.current(),'show':False})
+            except Exception as e:self.log('Ẩn cửa sổ video: '+str(e)[:120])
+        self.hide()
+        if self.tray is not None:self.tray.showMessage('NBL LIVE đang chạy ẩn','Ghim, AI, lịch vẫn chạy; không dùng chuột/bàn phím. Bấm biểu tượng NBL ở khay để mở lại.',QIcon(str(BASE/'assets/logo_38.ico')),5000)
+        self.log('Ẩn hết khi LIVE: NBL xuống khay, thu nhỏ '+str(len(self.hidden_state['studio']))+' cửa sổ Studio + Chrome LIVE'+(', ẩn cửa sổ video.' if hide_video else ' (giữ cửa sổ video vì Studio chưa dùng NBL Camera).'))
+    def show_all(self):
+        import studio_scheduler,threading
+        studio_scheduler.NO_MOUSE=False
+        h=self.hidden_state or {};self.hidden_state=None
+        try:
+            import winhide;winhide.restore(h.get('studio') or [])
+        except Exception:pass
+        threading.Thread(target=self.chrome_window,args=('normal',),daemon=True).start()
+        if self.data.get('sessions'):
+            try:self.command('window',False,{**self.current(),'show':True})
+            except Exception:pass
+        self.show_nbl();self.log('Đã hiện lại NBL, Studio, Chrome LIVE và cửa sổ video.')
     # ---------- 4.3.13: kho video NBL (gửi từ điện thoại) ----------
     def build_store(self,v):
         from video_store import VideoStore
@@ -1006,7 +1091,8 @@ class Console(QMainWindow):
     def command(self,action,save=True,session=None):
         if save:self.collect();write_json(self.path,self.data)
         s=session or self.current();folder=DATA/'runtime'/s['id']
-        process=dispatch_video_command(folder,action,s,self.processes.get(s['id']),lambda f:self.launch(BASE/'player.py',[f]))
+        cfg={**s,'camera':bool(self.data.get('settings',{}).get('camera',True))}     # 4.3.16: NBL Camera
+        process=dispatch_video_command(folder,action,cfg,self.processes.get(s['id']),lambda f:self.launch(BASE/'player.py',[f]))
         if process is not None:self.processes[s['id']]=process
     def export_diagnostics(self):
         from diagnostics import build
@@ -1265,7 +1351,7 @@ class Console(QMainWindow):
                     self.errors[s['id']]=st['error']
                 else:self.errors.pop(s['id'],None)
             except (OSError,ValueError,KeyError):pass
-        st=statuses.get(self.current()['id']);self.label.setText(f"NBL VIDEO {self.current()['number']:02d} • "+(f"{ {'PlayingState':'Đang phát','PausedState':'Tạm dừng','StoppedState':'Đã dừng'}.get(st['state'],st['state'])} • {'Tắt tiếng' if st['muted'] else st['device']} • {Path(st['path']).name}" if st else 'Chưa mở / không có tín hiệu cập nhật'))
+        st=statuses.get(self.current()['id']);self.video_st=st;self.refresh_camera();self.label.setText(f"NBL VIDEO {self.current()['number']:02d} • "+(f"{ {'PlayingState':'Đang phát','PausedState':'Tạm dừng','StoppedState':'Đã dừng'}.get(st['state'],st['state'])} • {'Tắt tiếng' if st['muted'] else st['device']} • {Path(st['path']).name}" if st else 'Chưa mở / không có tín hiệu cập nhật'))
         clients=self.bridge.snapshot();chrome_errors=sum(bool(m.get('error')) for c in clients.values() for m in c.get('modules',{}).values() if isinstance(m,dict))
         self.label.setText(self.label.text()+f' • Chrome: {len(clients)} tab / {chrome_errors} lỗi')
         binding=self.current().get('chrome_binding');bound=resolve_binding(binding,clients)
@@ -1320,6 +1406,7 @@ class Console(QMainWindow):
         # (video_commands: a window that reported in the last 3 s gets the commands).
         if self.alarm_window:self.alarm_window.close()
         getattr(self,'phone_server',None) and self.phone_server.stop()
+        getattr(self,'tray',None) and self.tray.hide()
         getattr(self,'ptt',None) and self.ptt.disarm(quiet=True)
         getattr(self,'remote_talk',None) and self.remote_talk.close(quiet=True)
         self.studio_chat.shutdown();getattr(self,'ai',None) and self.ai.shutdown();self.studio_panel.shutdown();__import__('studio_vision_rpc').close_service();self.notifier.close();set_awake(False);self.bridge.close();self.obs.close()

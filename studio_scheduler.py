@@ -4,6 +4,8 @@ from pathlib import Path
 
 _control_lock=threading.Lock()
 _controls={}
+NO_MOUSE = False          # 4.3.16: app đặt True khi "Ẩn hết khi LIVE"
+
 def cancel_controls():
  with _control_lock:
   for path in list(_controls):
@@ -92,6 +94,10 @@ def execute(profile,action,deadline=0,payload=None):
     if not (profile.get('useMouse') and profile.get('vision',{}).get('enabled') and profile.get('windowHandle') and action not in ('probe','connect','chat_read','captcha')):raise
  # 4.1: with reading-by-image set up, starting and ending the LIVE also go through it.
  if action=='vision_capture' or (profile.get('vision',{}).get('enabled') and action in ('send','chat_check','greet_scan','greet','status','start','stop','close_summary','reset_live')):
+  # 4.3.16 (chủ máy): đang "Ẩn hết khi LIVE" thì không bao giờ dùng đường ảnh + chuột (chủ máy đang dùng PC việc khác)
+  if NO_MOUSE:
+   from studio_vision_logic import NotTouched as _NT
+   raise _NT('NBL đang ẩn: không dùng chuột/bàn phím. Kết nối tự động (DevTools) với Studio đang hỏng — hiện lại NBL để xử lý.')
   if not is_studio_window(profile):raise ValueError('Chọn đúng cửa sổ LIVE Studio trước.')
   from studio_vision import execute_vision
   try:return execute_vision(profile,action,deadline,payload)
@@ -111,6 +117,10 @@ def execute(profile,action,deadline=0,payload=None):
    result=execute_vision(fresh,action,deadline,payload)
    if isinstance(result,dict):result.update(windowHandle=fresh['windowHandle'],pid=fresh['pid'],windowTitle=fresh['windowTitle'],rebound=True)
    return result
+ if NO_MOUSE and action not in ('inspect','probe'):
+  # 4.3.16: đường cũ (studio_control.ps1) kéo cửa sổ lên trước / bấm chuột -> cấm khi đang ẩn
+  from studio_vision_logic import NotTouched as _NT
+  raise _NT('NBL đang ẩn: không dùng chuột/bàn phím (nick này chưa có kết nối tự động với Studio).')
  if action not in ('inspect','pick','probe'):required+=['accountAnchor']
  if action not in ('inspect','pick','probe','greet_scan','collapse_chat'):required+=['liveIndicator']
  if action=='start':required+=['startButton']

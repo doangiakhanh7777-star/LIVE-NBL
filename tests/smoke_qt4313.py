@@ -221,7 +221,49 @@ def t_player_hidden_fallback():
     assert callable(player.paint_hidden) and callable(player._hidden)
 
 
-for name, fn in [('tiêu đề 4.3.14', t_title), ('có trang Giọng nói + AI', t_pages), ('chọn Gemini/ChatGPT', t_ai_engine_ui),
+def t_hide_all_and_back():
+    import studio_scheduler
+    w.video_st = None                       # chưa mở NBL VIDEO: không hỏi, chỉ ẩn NBL + Studio + Chrome
+    w.show(); spin(0.1)
+    w.hide_all(); spin(0.2)
+    assert not w.isVisible() and studio_scheduler.NO_MOUSE, 'Ẩn hết: NBL phải ẩn + cấm chuột'
+    assert w.hidden_state is not None
+    w.show_all(); spin(0.2)
+    assert w.isVisible() and not studio_scheduler.NO_MOUSE and w.hidden_state is None
+
+
+def t_tray_and_camera_ui():
+    assert w.hide_btn.text().startswith('🙈')
+    assert w.tray is None or w.tray.contextMenu() is not None
+    w.refresh_camera(); assert w.cam_state.text(), 'khung camera chưa có chữ'
+    w.cam_on.setChecked(False); spin(0.05); assert w.data['settings']['camera'] is False
+    w.cam_on.setChecked(True); spin(0.05); assert w.data['settings']['camera'] is True
+
+
+def t_player_camera_and_window_command():
+    import json, player, vcam
+    from PySide6.QtGui import QColor, QImage
+    from PySide6.QtMultimedia import QVideoFrame
+    folder = Path(DATA_ROOT) / 'runtime_test'; (folder / 'commands').mkdir(parents=True, exist_ok=True)
+    out = player.Output(folder); out.show(); spin(0.2)
+    img = QImage(360, 640, QImage.Format.Format_RGB32); img.fill(QColor(200, 30, 30))
+    out.video.on_frame(QVideoFrame(img)); spin(0.05)
+    state = out.cam_state()
+    print('      camera trong NBL VIDEO:', state, flush=True)
+    if vcam.DLL.is_file():
+        assert state['state'] in ('ready', 'connected') and state.get('sent', 0) >= 1, state
+    (folder / 'commands' / 'a.json').write_text(json.dumps(dict(token='t1', action='window', config={'show': False}, deadline=time.time() + 15)), encoding='utf-8')
+    out.poll(); spin(0.1); assert not out.isVisible(), 'lệnh ẩn cửa sổ video không chạy'
+    out.video.on_frame(QVideoFrame(img)); spin(0.05)
+    if out.cam is not None:
+        assert out.cam.sent >= 2, 'cửa sổ ẩn thì camera vẫn phải nhận hình'
+    (folder / 'commands' / 'b.json').write_text(json.dumps(dict(token='t2', action='window', config={'show': True}, deadline=time.time() + 15)), encoding='utf-8')
+    out.poll(); spin(0.1); assert out.isVisible()
+    st = json.loads((folder / 'status.json').read_text(encoding='utf-8')); assert 'camera' in st and 'shown' in st, st
+    out.close(); spin(0.1)
+
+
+for name, fn in [('tiêu đề đúng phiên bản', t_title), ('có trang Giọng nói + AI', t_pages), ('chọn Gemini/ChatGPT', t_ai_engine_ui),
                  ('make_ai đúng lớp', t_make_ai), ('trang Giọng nói đủ ô', t_voice_page_widgets),
                  ('bật giọng nói khi máy không có micro', t_voice_arm_without_devices_is_clean),
                  ('mic chỉ vào cáp khi đang giữ phím, không trễ dần', t_pump_only_while_talking_and_never_lags),
@@ -232,7 +274,10 @@ for name, fn in [('tiêu đề 4.3.14', t_title), ('có trang Giọng nói + AI'
                  ('phone API nhận kho video', t_phone_server_has_store),
                  ('phím + điện thoại cùng nói: AI im/nhãn đỏ bật tắt 1 lần', t_two_talkers_toggle_once),
                  ('phone API có đường nói qua điện thoại', t_phone_talk_wired),
-                 ('NBL VIDEO có đường vẽ khi bị khuất', t_player_hidden_fallback)]:
+                 ('NBL VIDEO có đường vẽ khi bị khuất', t_player_hidden_fallback),
+                 ('Ẩn hết khi LIVE rồi Hiện lại (cấm chuột khi ẩn)', t_hide_all_and_back),
+                 ('khay hệ thống + khung camera ảo', t_tray_and_camera_ui),
+                 ('NBL VIDEO đẩy hình vào NBL Camera, ẩn/hiện cửa sổ theo lệnh', t_player_camera_and_window_command)]:
     check(name, fn)
 
 ok = all(r[1] for r in results)

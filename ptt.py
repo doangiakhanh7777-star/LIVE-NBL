@@ -351,7 +351,7 @@ class RemoteTalk(QObject):
         self.sink = self.out = self.pipe = self.jit = None; self.fo = None
         self.talking = False; self.peer = ''; self.last = 0.0; self.level = 0.0; self.error = ''
         self.received = 0; self.written = 0; self.closing = 0.0
-        self.timer = QTimer(self); self.timer.timeout.connect(self.tick); self.timer.start(10)
+        self.timer = QTimer(self); self.timer.timeout.connect(self.tick); self.timer.start(100)    # 10 ms khi đang nói
 
     # ---- luồng HTTP ----
     def begin(self, rate, peer):
@@ -403,6 +403,9 @@ class RemoteTalk(QObject):
                 self.owner.log('Điện thoại nói: đã ngắt (nhận %d KB).' % (self.received // 1024))
 
     def tick(self):
+        want = 10 if (self.talking or not self.q.empty()) else 100       # 4.3.16: rảnh thì 100 ms cho nhẹ máy
+        if self.timer.interval() != want:
+            self.timer.setInterval(want)
         for _ in range(200):
             try:
                 item = self.q.get_nowait()

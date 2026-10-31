@@ -657,13 +657,17 @@ def running_studio(exe):
     return ('"' + name + '"') in out
 
 
+NO_THROTTLE = ('--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows')
+
+
 def launch(exe, port, wait=90):
     if not exe or not Path(exe).is_file():
         raise NotTouched('Không thấy file TikTok LIVE Studio: ' + str(exe))
     flags = 0
     for f in ('DETACHED_PROCESS', 'CREATE_NEW_PROCESS_GROUP', 'CREATE_NO_WINDOW'):
         flags |= getattr(subprocess, f, 0)
-    subprocess.Popen([exe, '--remote-debugging-port=%d' % port, '--remote-allow-origins=http://127.0.0.1:%d' % port],
+    # 4.3.16: cờ chống bóp tốc độ khi Studio bị ẩn / thu nhỏ ("Ẩn hết khi LIVE") — giống Chrome LIVE của NBL
+    subprocess.Popen([exe, '--remote-debugging-port=%d' % port, '--remote-allow-origins=http://127.0.0.1:%d' % port, *NO_THROTTLE],
                      cwd=str(Path(exe).parent), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      creationflags=flags, close_fds=True)
     studio = Studio(port)
@@ -835,14 +839,14 @@ CDP_ACTIONS = ('probe', 'status', 'start', 'stop', 'close_summary', 'chat_check'
 # ---- 4.3.0: Studio icons open Studio with NBL's port (owner agreed 28/10/2026) ----
 SHORTCUT_PS = r'''
 $ErrorActionPreference = 'SilentlyContinue'
-$args2 = '--remote-debugging-port=%PORT% --remote-allow-origins=http://127.0.0.1:%PORT%'
+$args2 = '--remote-debugging-port=%PORT% --remote-allow-origins=http://127.0.0.1:%PORT% --disable-renderer-backgrounding --disable-background-timer-throttling --disable-backgrounding-occluded-windows'
 $sh = New-Object -ComObject WScript.Shell
 $dirs = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('CommonDesktopDirectory'), [Environment]::GetFolderPath('StartMenu'), [Environment]::GetFolderPath('CommonStartMenu'))
 $n = 0
 foreach ($d in $dirs) { if (-not $d) { continue }
   Get-ChildItem -Path $d -Filter '*.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
     $l = $sh.CreateShortcut($_.FullName)
-    if ($l.TargetPath -match 'TikTok LIVE Studio[^\\]*\.exe$' -and $l.Arguments -notmatch 'remote-debugging-port=%PORT%') { $l.Arguments = $args2; $l.Save(); $n++ } } }
+    if ($l.TargetPath -match 'TikTok LIVE Studio[^\\]*\.exe$' -and ($l.Arguments -notmatch 'remote-debugging-port=%PORT%' -or $l.Arguments -notmatch 'disable-renderer-backgrounding')) { $l.Arguments = $args2; $l.Save(); $n++ } } }
 Write-Output $n
 '''
 
