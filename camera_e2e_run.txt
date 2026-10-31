@@ -1,0 +1,18 @@
+DLL: D:\a\LIVE-NBL\LIVE-NBL\camera\nbl_camera.dll True | đã đăng ký với Windows: True
+Tạo camera: True 
+Đẩy một khung 360x640 -> 720x1280: 1.8 ms
+[in#0 @ 000002439bb9e380] "NBL Camera" (video)
+[in#0 @ 000002439bb9e380]   Alternative name "@device_sw_{860BB310-5D01-11D0-BD3B-00A0C911CE86}\NBL Camera"
+[in#0 @ 000002439bb9e380] Could not enumerate audio only devices (or none found).
+Error opening input file dummy.
+
+ffmpeg đọc camera: mã 0 
+Điểm ảnh trên (200, 30, 30) | dưới (20, 40, 220)
+OK   tạo được NBL Camera  []
+OK   đẩy một khung dưới 25 ms (đủ 30 hình/giây)  [1.8]
+OK   Windows liệt kê camera "NBL Camera" (DirectShow)  []
+OK   ffmpeg đọc được khung hình 720x1280 từ NBL Camera  [8]
+OK   nửa trên ĐỎ (không lật, đúng thứ tự màu)  [(200, 30, 30)]
+OK   nửa dưới XANH  [(20, 40, 220)]
+OK   NBL thấy có app đang dùng camera (scIsConnected)  [15]
+KET QUA CAMERA AO: 7/7
